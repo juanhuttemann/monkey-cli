@@ -1,6 +1,6 @@
 # mogger
 
-A Go CLI application that outputs a greeting message from an LLM API.
+A Go CLI application that sends custom prompts to an LLM API and displays the response.
 
 ## Setup
 
@@ -16,13 +16,23 @@ export ANTHROPIC_MODEL="claude-3-5-sonnet-20241022"
 
 ## Usage
 
-Run the application:
+The application requires a `-p` or `--prompt` flag to specify the prompt to send to the LLM.
 
 ```bash
-go run main.go
+go run main.go -p "What is the capital of France?"
 ```
 
-The application makes an HTTP POST request to the configured LLM API and outputs the returned greeting message.
+The `-p` flag supports both quoted and unquoted multi-word prompts:
+
+```bash
+# Quoted prompt
+./mogger -p "Write a haiku about coding"
+
+# Unquoted multi-word prompt
+./mogger -p Write a haiku about coding
+```
+
+If the `-p` flag is not provided, a usage message is displayed and the application exits with a non-zero status code.
 
 ## Architecture
 
