@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,12 +10,12 @@ import (
 	"testing"
 )
 
-func TestPrintHello(t *testing.T) {
+func TestSendPrompt_Success(t *testing.T) {
 	// Setup mock server for LLM API
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "Hello from LLM!"}]}`))
+		w.Write([]byte(`{"content": [{"type": "text", "text": "The capital of France is Paris."}]}`))
 	}))
 	defer server.Close()
 
@@ -27,63 +29,52 @@ func TestPrintHello(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	got := printHello()
-	want := "Hello from LLM!"
+	got, err := sendPrompt("What is the capital of France?")
+	if err != nil {
+		t.Fatalf("sendPrompt() returned error: %v", err)
+	}
 
+	want := "The capital of France is Paris."
 	if got != want {
-		t.Errorf("printHello() = %q, want %q", got, want)
+		t.Errorf("sendPrompt() = %q, want %q", got, want)
 	}
 }
 
-func TestGetGreeting_Success(t *testing.T) {
-	// Setup mock server
+func TestSendPrompt_SendsCorrectPrompt(t *testing.T) {
+	var requestBody map[string]interface{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify request method and path
-		if r.Method != "POST" {
-			t.Errorf("expected POST request, got %s", r.Method)
-		}
-		if r.URL.Path != "/v1/messages" {
-			t.Errorf("expected /v1/messages path, got %s", r.URL.Path)
-		}
-
-		// Verify headers
-		if r.Header.Get("Content-Type") != "application/json" {
-			t.Errorf("expected Content-Type: application/json, got %s", r.Header.Get("Content-Type"))
-		}
-		if r.Header.Get("x-api-key") != "test-api-key" {
-			t.Errorf("expected x-api-key header, got %s", r.Header.Get("x-api-key"))
-		}
-
-		// Return mock response
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &requestBody)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "Hello from Claude!"}]}`))
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
 	}))
 	defer server.Close()
 
-	// Set environment variables
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
 	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+	os.Setenv("ANTHROPIC_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	// Call getGreeting
-	got, err := getGreeting()
+	_, err := sendPrompt("custom test prompt")
 	if err != nil {
-		t.Fatalf("getGreeting() returned error: %v", err)
+		t.Fatalf("sendPrompt() returned error: %v", err)
 	}
 
-	want := "Hello from Claude!"
-	if got != want {
-		t.Errorf("getGreeting() = %q, want %q", got, want)
+	// Verify the prompt was sent correctly
+	messages := requestBody["messages"].([]interface{})
+	msg := messages[0].(map[string]interface{})
+	content := msg["content"].(string)
+	if content != "custom test prompt" {
+		t.Errorf("Request content = %q, want %q", content, "custom test prompt")
 	}
 }
 
-func TestGetGreeting_MissingAPIKey(t *testing.T) {
+func TestSendPrompt_MissingAPIKey(t *testing.T) {
 	// Ensure API key is not set
 	os.Unsetenv("ANTHROPIC_API_KEY")
 	os.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
@@ -93,9 +84,9 @@ func TestGetGreeting_MissingAPIKey(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	_, err := getGreeting()
+	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("getGreeting() should return error when ANTHROPIC_API_KEY is missing")
+		t.Fatal("sendPrompt() should return error when ANTHROPIC_API_KEY is missing")
 	}
 
 	if !strings.Contains(err.Error(), "ANTHROPIC_API_KEY") {
@@ -103,7 +94,7 @@ func TestGetGreeting_MissingAPIKey(t *testing.T) {
 	}
 }
 
-func TestGetGreeting_MissingBaseURL(t *testing.T) {
+func TestSendPrompt_MissingBaseURL(t *testing.T) {
 	// Ensure base URL is not set
 	os.Setenv("ANTHROPIC_API_KEY", "test-key")
 	os.Unsetenv("ANTHROPIC_BASE_URL")
@@ -113,9 +104,9 @@ func TestGetGreeting_MissingBaseURL(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	_, err := getGreeting()
+	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("getGreeting() should return error when ANTHROPIC_BASE_URL is missing")
+		t.Fatal("sendPrompt() should return error when ANTHROPIC_BASE_URL is missing")
 	}
 
 	if !strings.Contains(err.Error(), "ANTHROPIC_BASE_URL") {
@@ -123,7 +114,7 @@ func TestGetGreeting_MissingBaseURL(t *testing.T) {
 	}
 }
 
-func TestGetGreeting_MissingModel(t *testing.T) {
+func TestSendPrompt_MissingModel(t *testing.T) {
 	// Ensure model is not set
 	os.Setenv("ANTHROPIC_API_KEY", "test-key")
 	os.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
@@ -133,9 +124,9 @@ func TestGetGreeting_MissingModel(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_BASE_URL")
 	}()
 
-	_, err := getGreeting()
+	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("getGreeting() should return error when ANTHROPIC_MODEL is missing")
+		t.Fatal("sendPrompt() should return error when ANTHROPIC_MODEL is missing")
 	}
 
 	if !strings.Contains(err.Error(), "ANTHROPIC_MODEL") {
@@ -143,13 +134,11 @@ func TestGetGreeting_MissingModel(t *testing.T) {
 	}
 }
 
-func TestGetGreeting_HTTPError(t *testing.T) {
+func TestSendPrompt_HTTPError(t *testing.T) {
 	// Create a server that closes immediately to simulate network error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Close connection immediately
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	// Close the server before making request to force error
 	server.Close()
 
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
@@ -161,20 +150,18 @@ func TestGetGreeting_HTTPError(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	_, err := getGreeting()
+	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("getGreeting() should return error on network failure")
+		t.Fatal("sendPrompt() should return error on network failure")
 	}
 
-	// Error should indicate request failure
 	errMsg := err.Error()
 	if !strings.Contains(errMsg, "request") && !strings.Contains(errMsg, "connection") {
 		t.Errorf("error should indicate request/connection failure, got: %v", err)
 	}
 }
 
-func TestGetGreeting_Non200Status(t *testing.T) {
-	// Setup mock server returning 500 error
+func TestSendPrompt_Non200Status(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -191,9 +178,9 @@ func TestGetGreeting_Non200Status(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	_, err := getGreeting()
+	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("getGreeting() should return error on non-200 status")
+		t.Fatal("sendPrompt() should return error on non-200 status")
 	}
 
 	errMsg := err.Error()
@@ -205,8 +192,7 @@ func TestGetGreeting_Non200Status(t *testing.T) {
 	}
 }
 
-func TestGetGreeting_InvalidJSON(t *testing.T) {
-	// Setup mock server returning invalid JSON
+func TestSendPrompt_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -223,9 +209,9 @@ func TestGetGreeting_InvalidJSON(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	_, err := getGreeting()
+	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("getGreeting() should return error on invalid JSON")
+		t.Fatal("sendPrompt() should return error on invalid JSON")
 	}
 
 	errMsg := err.Error()
@@ -234,8 +220,7 @@ func TestGetGreeting_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestGetGreeting_EmptyContent(t *testing.T) {
-	// Setup mock server returning empty content array
+func TestSendPrompt_EmptyContent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -252,13 +237,40 @@ func TestGetGreeting_EmptyContent(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_MODEL")
 	}()
 
-	_, err := getGreeting()
+	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("getGreeting() should return error on empty content")
+		t.Fatal("sendPrompt() should return error on empty content")
 	}
 
 	errMsg := err.Error()
 	if !strings.Contains(errMsg, "content") {
 		t.Errorf("error should mention content, got: %v", err)
+	}
+}
+
+func TestPrintUsage(t *testing.T) {
+	// Capture stderr
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	printUsage()
+
+	w.Close()
+	os.Stderr = oldStderr
+
+	var buf strings.Builder
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	// Verify output contains expected strings
+	if !strings.Contains(output, "Usage: mogger -p") {
+		t.Errorf("printUsage() should contain 'Usage: mogger -p', got: %q", output)
+	}
+	if !strings.Contains(output, "-p, --prompt") {
+		t.Errorf("printUsage() should contain '-p, --prompt', got: %q", output)
+	}
+	if !strings.Contains(output, "required") {
+		t.Errorf("printUsage() should contain 'required', got: %q", output)
 	}
 }
