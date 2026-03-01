@@ -276,6 +276,43 @@ func TestSendMessage_SendsCorrectRequestBody(t *testing.T) {
 	}
 }
 
+func TestNewClient_StripsTrailingSlash(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"https://api.example.com/", "https://api.example.com"},
+		{"https://api.example.com//", "https://api.example.com"},
+		{"https://api.example.com", "https://api.example.com"},
+	}
+	for _, tc := range cases {
+		client := NewClient(tc.input, "key")
+		if client.baseURL != tc.want {
+			t.Errorf("NewClient(%q).baseURL = %q, want %q", tc.input, client.baseURL, tc.want)
+		}
+	}
+}
+
+func TestSendMessage_BaseURLWithTrailingSlash(t *testing.T) {
+	var requestPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL+"/", "test-key")
+	_, err := client.SendMessage(context.Background(), "test")
+	if err != nil {
+		t.Fatalf("SendMessage() returned error: %v", err)
+	}
+
+	if requestPath != MessagesEndpoint {
+		t.Errorf("Request path = %q, want %q (double-slash from trailing slash bug)", requestPath, MessagesEndpoint)
+	}
+}
+
 func TestConstants(t *testing.T) {
 	// Verify constants are correct
 	if DefaultMaxTokens != 100 {

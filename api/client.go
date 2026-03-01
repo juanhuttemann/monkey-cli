@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // Constants for API configuration
@@ -32,7 +33,7 @@ type ClientOption func(*Client)
 // NewClient creates a new API client with the given base URL and API key
 func NewClient(baseURL, apiKey string, opts ...ClientOption) *Client {
 	client := &Client{
-		baseURL:    baseURL,
+		baseURL:    strings.TrimRight(baseURL, "/"),
 		apiKey:     apiKey,
 		httpClient: http.DefaultClient,
 	}
