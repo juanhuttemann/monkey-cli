@@ -18,18 +18,12 @@ const (
 	AnthropicVersion  = "2023-06-01"
 )
 
-// HTTPDoer defines the interface for HTTP clients (allows mocking)
-type HTTPDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 // Client handles communication with the LLM API
 type Client struct {
 	baseURL    string
 	apiKey     string
 	model      string
 	httpClient *http.Client
-	doer       HTTPDoer // for interface-based mocking
 }
 
 // ClientOption is a function that configures a Client
