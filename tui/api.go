@@ -26,10 +26,12 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 	cmd := func() tea.Msg {
 		defer cancel()
 
-		// Build full message list: history + new user prompt
-		apiMessages := make([]api.Message, len(messages))
-		for i, m := range messages {
-			apiMessages[i] = api.Message{Role: m.Role, Content: m.Content}
+		// Build full message list: history (user/assistant only) + new user prompt
+		var apiMessages []api.Message
+		for _, m := range messages {
+			if m.Role == "user" || m.Role == "assistant" {
+				apiMessages = append(apiMessages, api.Message{Role: m.Role, Content: m.Content})
+			}
 		}
 		apiMessages = append(apiMessages, api.Message{Role: "user", Content: prompt})
 
