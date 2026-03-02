@@ -45,19 +45,18 @@ func TestView_RendersSpinner_WhenLoading(t *testing.T) {
 
 	view := model.View()
 
-	// When loading, view should contain spinner characters
-	// Common spinner characters from bubbletea spinners
-	spinnerChars := "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏|/–\\"
+	// Monkey spinner frames: 🙈 🙉 🙊
+	monkeyFrames := []string{"🙈", "🙉", "🙊"}
 	hasSpinner := false
-	for _, char := range spinnerChars {
-		if strings.Contains(view, string(char)) {
+	for _, frame := range monkeyFrames {
+		if strings.Contains(view, frame) {
 			hasSpinner = true
 			break
 		}
 	}
 
 	if !hasSpinner {
-		t.Error("View() should contain spinner characters when loading")
+		t.Error("View() should contain monkey spinner emoji when loading")
 	}
 }
 

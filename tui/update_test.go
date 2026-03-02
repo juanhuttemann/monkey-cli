@@ -494,3 +494,22 @@ func TestUpdate_SpinnerTick_ContinuesWhenLoading(t *testing.T) {
 		t.Error("spinner.TickMsg in StateLoading should return a non-nil cmd (keep ticking)")
 	}
 }
+
+func TestNewModel_UsesMonkeySpinner(t *testing.T) {
+	model := NewModel(nil)
+
+	want := spinner.Monkey
+	got := model.spinner.Spinner
+
+	if got.FPS != want.FPS {
+		t.Errorf("spinner FPS = %v, want %v (Monkey)", got.FPS, want.FPS)
+	}
+	if len(got.Frames) != len(want.Frames) {
+		t.Errorf("spinner frames = %v, want %v (Monkey)", got.Frames, want.Frames)
+	}
+	for i, frame := range want.Frames {
+		if got.Frames[i] != frame {
+			t.Errorf("spinner.Frames[%d] = %q, want %q", i, got.Frames[i], frame)
+		}
+	}
+}

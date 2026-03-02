@@ -52,6 +52,7 @@ func NewModel(client *api.Client) Model {
 	vp := viewport.New(80, 20)
 
 	sp := spinner.New()
+	sp.Spinner = spinner.Monkey
 	t := timer.NewWithInterval(24*time.Hour, time.Second)
 
 	return Model{
