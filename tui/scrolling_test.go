@@ -102,6 +102,96 @@ func TestScrolling_NewMessage_SetsScrollToBottomTrue(t *testing.T) {
 	}
 }
 
+// TestScrolling_PageUp_SetsScrollToBottomFalse verifies that pressing PageUp
+// clears scrollToBottom so subsequent renders don't snap back to the bottom.
+func TestScrolling_PageUp_SetsScrollToBottomFalse(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 10)
+
+	for i := 0; i < 15; i++ {
+		model.AddMessage("user", fmt.Sprintf("message %d", i))
+	}
+	response := PromptResponseMsg{Response: "reply"}
+	updated, _ := model.Update(response)
+	m := updated.(Model)
+
+	if !m.scrollToBottom {
+		t.Fatal("scrollToBottom should be true after new message")
+	}
+
+	pgUp := tea.KeyMsg{Type: tea.KeyPgUp}
+	updated2, _ := m.Update(pgUp)
+	m2 := updated2.(Model)
+
+	if m2.scrollToBottom {
+		t.Error("After PageUp, scrollToBottom should be false")
+	}
+}
+
+// TestScrolling_PageUp_DecreasesYOffset verifies that PageUp actually scrolls
+// the viewport upward when content exceeds the viewport height.
+func TestScrolling_PageUp_DecreasesYOffset(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 10)
+
+	for i := 0; i < 15; i++ {
+		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
+	}
+
+	response := PromptResponseMsg{Response: "assistant reply"}
+	updated, _ := model.Update(response)
+	m := updated.(Model)
+
+	if m.viewport.YOffset == 0 {
+		t.Skip("Viewport not scrollable - content may not exceed viewport height")
+	}
+
+	initialOffset := m.viewport.YOffset
+	pgUp := tea.KeyMsg{Type: tea.KeyPgUp}
+	updated2, _ := m.Update(pgUp)
+	m2 := updated2.(Model)
+
+	if m2.viewport.YOffset >= initialOffset {
+		t.Errorf("After PageUp, YOffset = %d, want < %d", m2.viewport.YOffset, initialOffset)
+	}
+}
+
+// TestScrolling_PageDown_IncreasesYOffset verifies that PageDown scrolls down
+// from a position that is not already at the bottom.
+func TestScrolling_PageDown_IncreasesYOffset(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 10)
+
+	for i := 0; i < 15; i++ {
+		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
+	}
+
+	response := PromptResponseMsg{Response: "assistant reply"}
+	updated, _ := model.Update(response)
+	m := updated.(Model)
+
+	if m.viewport.YOffset == 0 {
+		t.Skip("Viewport not scrollable - cannot test PageDown from top")
+	}
+
+	// Scroll to top first via PageUp
+	pgUp := tea.KeyMsg{Type: tea.KeyPgUp}
+	for i := 0; i < 20; i++ {
+		upd, _ := m.Update(pgUp)
+		m = upd.(Model)
+	}
+	topOffset := m.viewport.YOffset
+
+	// Now PageDown should increase offset
+	pgDown := tea.KeyMsg{Type: tea.KeyPgDown}
+	updated2, _ := m.Update(pgDown)
+	m2 := updated2.(Model)
+
+	if m2.viewport.YOffset <= topOffset {
+		t.Errorf("After PageDown from top, YOffset = %d, want > %d", m2.viewport.YOffset, topOffset)
+	}
+}
+
 // TestScrolling_MouseWheelUp_SetsScrollToBottomFalse verifies that mouse wheel up
 // clears scrollToBottom so subsequent renders don't snap back to the bottom.
 func TestScrolling_MouseWheelUp_SetsScrollToBottomFalse(t *testing.T) {

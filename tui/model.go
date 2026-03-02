@@ -135,6 +135,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.timer.Stop()
 			}
 			return m, tea.Quit
+		case tea.KeyPgUp:
+			m.scrollToBottom = false
+			var vpCmd tea.Cmd
+			m.viewport, vpCmd = m.viewport.Update(msg)
+			cmds = append(cmds, vpCmd)
+		case tea.KeyPgDown:
+			var vpCmd tea.Cmd
+			m.viewport, vpCmd = m.viewport.Update(msg)
+			cmds = append(cmds, vpCmd)
 		case tea.KeyCtrlM:
 			if m.CanSubmit() {
 				input := m.input.Value()
