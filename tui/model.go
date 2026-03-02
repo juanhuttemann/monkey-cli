@@ -58,7 +58,7 @@ func NewModel(client *api.Client) Model {
 
 // Init implements tea.Model
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.spinner.Tick)
+	return textarea.Blink
 }
 
 // Update implements tea.Model
@@ -78,7 +78,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.SetValue("")
 				m.state = StateLoading
 				cmd := SendPromptCmd(m.client, m.messages, input)
-				cmds = append(cmds, cmd)
+				cmds = append(cmds, cmd, m.spinner.Tick)
 			}
 		default:
 			var inputCmd tea.Cmd
@@ -111,9 +111,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = StateReady
 
 	case spinner.TickMsg:
-		var spinCmd tea.Cmd
-		m.spinner, spinCmd = m.spinner.Update(msg)
-		cmds = append(cmds, spinCmd)
+		if m.state == StateLoading {
+			var spinCmd tea.Cmd
+			m.spinner, spinCmd = m.spinner.Update(msg)
+			cmds = append(cmds, spinCmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)

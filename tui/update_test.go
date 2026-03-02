@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"mogger/api"
 )
@@ -325,5 +326,27 @@ func TestUpdate_CtrlC_Exits(t *testing.T) {
 	quitMsg := cmd()
 	if quitMsg != tea.Quit() {
 		t.Error("CtrlC key should trigger a quit command")
+	}
+}
+
+func TestUpdate_SpinnerTick_StopsWhenNotLoading(t *testing.T) {
+	model := NewModel(nil)
+	// StateReady by default — spinner should not keep ticking
+
+	_, cmd := model.Update(spinner.TickMsg{})
+
+	if cmd != nil {
+		t.Error("spinner.TickMsg in StateReady should return nil cmd (no more ticks)")
+	}
+}
+
+func TestUpdate_SpinnerTick_ContinuesWhenLoading(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+
+	_, cmd := model.Update(spinner.TickMsg{})
+
+	if cmd == nil {
+		t.Error("spinner.TickMsg in StateLoading should return a non-nil cmd (keep ticking)")
 	}
 }
