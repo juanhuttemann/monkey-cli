@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"mogger/api"
@@ -26,6 +27,10 @@ type Model struct {
 	viewport       viewport.Model
 	state          State
 	spinner        spinner.Model
+	timer          timer.Model
+	startTime      time.Time
+	timerActive    bool
+	lastElapsed    time.Duration
 	client         *api.Client
 	width          int
 	height         int
@@ -44,6 +49,7 @@ func NewModel(client *api.Client) Model {
 	vp := viewport.New(80, 20)
 
 	sp := spinner.New()
+	t := timer.NewWithInterval(24*time.Hour, time.Second)
 
 	return Model{
 		client:         client,
@@ -51,6 +57,7 @@ func NewModel(client *api.Client) Model {
 		input:          ta,
 		viewport:       vp,
 		spinner:        sp,
+		timer:          t,
 		state:          StateReady,
 		width:          80,
 		height:         24,
@@ -101,8 +108,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.scrollToBottom = true
 				m.viewport.SetContent(m.renderMessages())
 				m.viewport.GotoBottom()
+				// Start elapsed timer
+				m.timer = timer.NewWithInterval(24*time.Hour, time.Second)
+				m.timerActive = true
+				m.startTime = time.Now()
 				cmd := SendPromptCmd(m.client, m.messages, input)
-				cmds = append(cmds, cmd, m.spinner.Tick)
+				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init())
 			}
 		default:
 			var inputCmd tea.Cmd
@@ -134,6 +145,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PromptResponseMsg:
 		m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
 		m.state = StateReady
+		m.lastElapsed = time.Since(m.startTime)
+		m.timerActive = false
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
@@ -141,9 +154,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PromptErrorMsg:
 		m.messages = append(m.messages, Message{Role: "error", Content: msg.Err.Error(), Timestamp: time.Now()})
 		m.state = StateReady
+		m.lastElapsed = time.Since(m.startTime)
+		m.timerActive = false
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
+
+	case timer.TickMsg:
+		if m.timerActive {
+			var timerCmd tea.Cmd
+			m.timer, timerCmd = m.timer.Update(msg)
+			cmds = append(cmds, timerCmd)
+		}
 
 	case spinner.TickMsg:
 		if m.state == StateLoading {
@@ -170,7 +192,15 @@ func (m Model) View() string {
 	view.WriteString("\n")
 
 	if m.state == StateLoading {
-		view.WriteString(SpinnerStyle().Render(m.spinner.View()))
+		line := SpinnerStyle().Render(m.spinner.View())
+		if m.timerActive {
+			elapsed := time.Since(m.startTime).Round(time.Second)
+			line += " " + TimerStyle().Render(elapsed.String())
+		}
+		view.WriteString(line)
+		view.WriteString("\n")
+	} else if m.lastElapsed > 0 {
+		view.WriteString(TimerStyle().Render("took " + m.lastElapsed.Round(time.Second).String()))
 		view.WriteString("\n")
 	}
 
@@ -236,6 +266,19 @@ func (m *Model) SetDimensions(width, height int) {
 // CanSubmit returns true when input is non-empty (trimmed) and not loading
 func (m Model) CanSubmit() bool {
 	return strings.TrimSpace(m.input.Value()) != "" && m.state != StateLoading
+}
+
+// IsTimerRunning returns whether the elapsed timer is active
+func (m Model) IsTimerRunning() bool {
+	return m.timerActive
+}
+
+// SetTimerActive sets the timer active state and records the start time when activating
+func (m *Model) SetTimerActive(v bool) {
+	m.timerActive = v
+	if v {
+		m.startTime = time.Now()
+	}
 }
 
 // AddMessage appends a message to the conversation history (pointer receiver to mutate in place)

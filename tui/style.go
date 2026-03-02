@@ -56,3 +56,9 @@ func SpinnerStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FFA500"))
 }
+
+// TimerStyle returns the styling for the elapsed time indicator
+func TimerStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#AAAAAA"))
+}
