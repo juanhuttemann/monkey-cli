@@ -1,10 +1,10 @@
-// Package tui provides the Terminal User Interface for mogger
+// Package tui provides the Terminal User Interface for monkey
 package tui
 
 import (
 	"time"
 
-	"mogger/api"
+	"monkey/api"
 )
 
 // Message represents a single message in the conversation

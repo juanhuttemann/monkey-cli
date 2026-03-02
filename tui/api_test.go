@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"mogger/api"
+	"monkey/api"
 )
 
 func TestSendPromptCmd_ReturnsCmd(t *testing.T) {

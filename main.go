@@ -9,9 +9,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"mogger/api"
-	"mogger/config"
-	"mogger/tui"
+	"monkey/api"
+	"monkey/config"
+	"monkey/tui"
 )
 
 // sendPrompt calls the LLM API with the user-provided prompt and returns the response
@@ -51,7 +51,7 @@ func runPrompt(prompt string) string {
 
 // printUsage displays the help message to stderr
 func printUsage() {
-	fmt.Fprintln(os.Stderr, "Usage: mogger -p \"<prompt>\"")
+	fmt.Fprintln(os.Stderr, "Usage: monkey -p \"<prompt>\"")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Flags:")
 	fmt.Fprintln(os.Stderr, "  -p, --prompt string   Your prompt to send to the LLM (required)")
@@ -81,6 +81,9 @@ func launchTUI() {
 	}
 	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
 	model := tui.NewModel(client)
+	model.SetIntro(introContent())
+	model.SetIntroTitle(AppTitle)
+	model.SetIntroVersion("v" + Version)
 
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {

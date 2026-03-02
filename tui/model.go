@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"mogger/api"
+	"monkey/api"
 )
 
 // State represents the current UI state
@@ -43,6 +43,9 @@ type Model struct {
 	scrollToBottom bool
 	retryCh        chan RetryingMsg
 	toolCallCh     chan ToolCallMsg
+	intro          string
+	introTitle     string
+	introVersion   string
 }
 
 // NewModel creates a new TUI model with initialized components
@@ -272,7 +275,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	// Sync viewport content (handles the AddMessage + View() direct path in tests).
 	// This does not affect YOffset, preserving the user's scroll position.
-	m.viewport.SetContent(m.renderMessages())
+	if len(m.messages) == 0 && m.intro != "" {
+		m.viewport.SetContent(RenderIntroBlock(m.width, m.introTitle, m.introVersion, m.intro))
+	} else {
+		m.viewport.SetContent(m.renderMessages())
+	}
 	if m.scrollToBottom {
 		m.viewport.GotoBottom()
 	}
@@ -375,6 +382,21 @@ func (m *Model) SetTimerActive(v bool) {
 	if v {
 		m.startTime = time.Now()
 	}
+}
+
+// SetIntro sets the intro content (ASCII art + version) shown on startup before any messages.
+func (m *Model) SetIntro(intro string) {
+	m.intro = intro
+}
+
+// SetIntroTitle sets the title displayed in the intro block's border.
+func (m *Model) SetIntroTitle(title string) {
+	m.introTitle = title
+}
+
+// SetIntroVersion sets the version string displayed next to the title in the intro block's border.
+func (m *Model) SetIntroVersion(version string) {
+	m.introVersion = version
 }
 
 // AddMessage appends a message to the conversation history (pointer receiver to mutate in place)

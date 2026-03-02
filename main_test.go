@@ -264,8 +264,8 @@ func TestPrintUsage(t *testing.T) {
 	output := buf.String()
 
 	// Verify output contains expected strings
-	if !strings.Contains(output, "Usage: mogger -p") {
-		t.Errorf("printUsage() should contain 'Usage: mogger -p', got: %q", output)
+	if !strings.Contains(output, "Usage: monkey -p") {
+		t.Errorf("printUsage() should contain 'Usage: monkey -p', got: %q", output)
 	}
 	if !strings.Contains(output, "-p, --prompt") {
 		t.Errorf("printUsage() should contain '-p, --prompt', got: %q", output)

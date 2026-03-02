@@ -1,4 +1,4 @@
-# mogger
+# monkey
 
 A Go CLI/TUI application for chatting with an LLM API. Run it without arguments for an interactive terminal interface, or pass a prompt directly for one-shot CLI output.
 
@@ -19,7 +19,7 @@ export ANTHROPIC_MODEL="claude-3-5-sonnet-20241022"
 Run with no arguments to open the interactive chat interface:
 
 ```bash
-./mogger
+./monkey
 ```
 
 - Type your message in the input box at the bottom
@@ -31,17 +31,17 @@ Run with no arguments to open the interactive chat interface:
 Pass a prompt with `-p` or `--prompt` for a single response printed to stdout:
 
 ```bash
-./mogger -p "What is the capital of France?"
+./monkey -p "What is the capital of France?"
 ```
 
 The `-p` flag supports both quoted and unquoted multi-word prompts:
 
 ```bash
 # Quoted
-./mogger -p "Write a haiku about coding"
+./monkey -p "Write a haiku about coding"
 
 # Unquoted
-./mogger -p Write a haiku about coding
+./monkey -p Write a haiku about coding
 ```
 
 ## Architecture

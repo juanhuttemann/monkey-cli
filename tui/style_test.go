@@ -195,6 +195,20 @@ func TestToolMessageStyle_NoBackground(t *testing.T) {
 	}
 }
 
+func TestRenderIntroBlock_HasBorder(t *testing.T) {
+	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
+	if len(rendered) <= len("ascii art") {
+		t.Error("RenderIntroBlock should add a border")
+	}
+}
+
+func TestRenderIntroBlock_TitleAppearsInBorder(t *testing.T) {
+	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
+	if !strings.Contains(stripANSI(rendered), "Monkey") {
+		t.Error("RenderIntroBlock should include the title in the border")
+	}
+}
+
 func TestAssistantMessageStyle_RespectsWidth(t *testing.T) {
 	// Test with different widths
 	styleNarrow := AssistantMessageStyle(40)

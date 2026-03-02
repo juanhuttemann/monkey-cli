@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"mogger/api"
+	"monkey/api"
 )
 
 func TestWaitForRetry_ReturnsRetryingMsg(t *testing.T) {

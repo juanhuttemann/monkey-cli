@@ -5,7 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"mogger/api"
+	"monkey/api"
 )
 
 // APITimeout is the default timeout for API requests
