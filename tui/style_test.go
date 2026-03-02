@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestUserMessageStyle_HasBorder(t *testing.T) {
@@ -96,6 +98,25 @@ func TestInputAreaStyle_HasBorder(t *testing.T) {
 	// A bordered style should produce output longer than the content
 	if len(rendered) <= len("input area") {
 		t.Errorf("InputStyle should add border, got rendered length %d, content length %d", len(rendered), len("input area"))
+	}
+}
+
+func TestMessageStyles_NoBackgroundColors(t *testing.T) {
+	// Message box backgrounds bleed through the border and clash with the
+	// terminal's native background. All three message styles must be background-free.
+	cases := []struct {
+		name  string
+		style func(int) lipgloss.Style
+	}{
+		{"UserMessageStyle", UserMessageStyle},
+		{"AssistantMessageStyle", AssistantMessageStyle},
+		{"ErrorMessageStyle", ErrorMessageStyle},
+	}
+	for _, tc := range cases {
+		rendered := tc.style(80).Render("test content")
+		if stripped := stripANSIBackground(rendered); stripped != rendered {
+			t.Errorf("%s: rendered output contains background ANSI codes", tc.name)
+		}
 	}
 }
 

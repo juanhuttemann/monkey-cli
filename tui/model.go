@@ -79,7 +79,8 @@ func (m Model) renderMessages() string {
 		case "user":
 			rendered = UserMessageStyle(m.width).Render(msg.Content)
 		case "assistant":
-			rendered = AssistantMessageStyle(m.width).Render(msg.Content)
+			md := strings.TrimRight(RenderMarkdown(msg.Content, m.width-8), "\n")
+			rendered = AssistantMessageStyle(m.width).Render(md)
 		default:
 			rendered = ErrorMessageStyle(m.width).Render(msg.Content)
 		}

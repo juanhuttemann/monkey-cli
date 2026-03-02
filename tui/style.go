@@ -7,9 +7,6 @@ const (
 	UserBorderColor      = "#04B575" // Green
 	AssistantBorderColor = "#7D56F4" // Purple
 	ErrorBorderColor     = "#FF6B6B" // Red
-	UserBackground       = "#1A1A1A" // Darker
-	AssistantBackground  = "#0D0D0D" // Default
-	ErrorBackground      = "#3D1A1A" // Dark red
 )
 
 // UserMessageStyle returns the styling for user messages
@@ -17,7 +14,6 @@ func UserMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(UserBorderColor)).
-		Background(lipgloss.Color(UserBackground)).
 		Width(width - 4).
 		Padding(0, 1)
 }
@@ -27,7 +23,6 @@ func AssistantMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(AssistantBorderColor)).
-		Background(lipgloss.Color(AssistantBackground)).
 		Width(width - 4).
 		Padding(0, 1)
 }
@@ -37,7 +32,6 @@ func ErrorMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ErrorBorderColor)).
-		Background(lipgloss.Color(ErrorBackground)).
 		Width(width - 4).
 		Padding(0, 1)
 }

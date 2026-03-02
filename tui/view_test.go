@@ -19,7 +19,7 @@ func TestView_RendersMessages(t *testing.T) {
 	if !strings.Contains(view, "Hello") {
 		t.Error("View() should contain user message 'Hello'")
 	}
-	if !strings.Contains(view, "Hi there!") {
+	if !strings.Contains(stripANSI(view), "Hi there!") {
 		t.Error("View() should contain assistant message 'Hi there!'")
 	}
 }
@@ -105,7 +105,7 @@ func TestView_AssistantMessage_HasBlueBorder(t *testing.T) {
 
 	view := model.View()
 
-	if !strings.Contains(view, "Assistant response") {
+	if !strings.Contains(stripANSI(view), "Assistant response") {
 		t.Error("View() should contain the assistant message text")
 	}
 
@@ -147,10 +147,11 @@ func TestView_MessagesInOrder(t *testing.T) {
 
 	view := model.View()
 
-	// Find positions of each message
-	firstIdx := strings.Index(view, "first message")
-	secondIdx := strings.Index(view, "second message")
-	thirdIdx := strings.Index(view, "third message")
+	// Find positions of each message (strip ANSI so multi-word text is contiguous)
+	stripped := stripANSI(view)
+	firstIdx := strings.Index(stripped, "first message")
+	secondIdx := strings.Index(stripped, "second message")
+	thirdIdx := strings.Index(stripped, "third message")
 
 	if firstIdx == -1 || secondIdx == -1 || thirdIdx == -1 {
 		t.Fatal("View() should contain all messages")
@@ -271,7 +272,7 @@ func TestView_Integration(t *testing.T) {
 	if !strings.Contains(view, "Hello") {
 		t.Error("View() should contain user message")
 	}
-	if !strings.Contains(view, "Hi!") {
+	if !strings.Contains(stripANSI(view), "Hi!") {
 		t.Error("View() should contain assistant message")
 	}
 	if !strings.Contains(view, "New message") {
