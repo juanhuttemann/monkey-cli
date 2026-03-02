@@ -1,7 +1,11 @@
 // Package tui provides the Terminal User Interface for mogger
 package tui
 
-import "time"
+import (
+	"time"
+
+	"mogger/api"
+)
 
 // Message represents a single message in the conversation
 type Message struct {
@@ -26,8 +30,9 @@ type SendPromptMsg struct {
 
 // PromptResponseMsg is returned when the API responds successfully
 type PromptResponseMsg struct {
-	Response string
-	Err      error
+	Response  string
+	ToolCalls []api.ToolCallResult
+	Err       error
 }
 
 // PromptErrorMsg is returned when the API returns an error

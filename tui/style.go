@@ -7,6 +7,7 @@ const (
 	UserBorderColor      = "#4B2DA8" // Dark purple
 	AssistantBorderColor = "#04B575" // Green
 	ErrorBorderColor     = "#FF6B6B" // Red
+	ToolBorderColor      = "#00AACC" // Cyan
 )
 
 // UserMessageStyle returns the styling for user messages
@@ -32,6 +33,15 @@ func ErrorMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ErrorBorderColor)).
+		Width(width - 4).
+		Padding(0, 1)
+}
+
+// ToolMessageStyle returns the styling for tool call messages (cyan border)
+func ToolMessageStyle(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ToolBorderColor)).
 		Width(width - 4).
 		Padding(0, 1)
 }

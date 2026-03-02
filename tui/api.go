@@ -35,14 +35,19 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 		}
 		apiMessages = append(apiMessages, api.Message{Role: "user", Content: prompt})
 
-		response, err := client.SendMessageWithHistory(ctx, apiMessages)
+		var toolCalls []api.ToolCallResult
+		response, err := client.SendMessageWithTools(ctx, apiMessages, []api.Tool{api.BashTool()}, api.BashExecutor{},
+			func(tc api.ToolCallResult) {
+				toolCalls = append(toolCalls, tc)
+			},
+		)
 		if err != nil {
 			if ctx.Err() == context.Canceled {
 				return PromptCancelledMsg{}
 			}
 			return PromptErrorMsg{Err: err}
 		}
-		return PromptResponseMsg{Response: response}
+		return PromptResponseMsg{Response: response, ToolCalls: toolCalls}
 	}
 
 	return cmd, cancel

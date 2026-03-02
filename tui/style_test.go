@@ -160,6 +160,41 @@ func TestUserMessageStyle_RespectsWidth(t *testing.T) {
 	}
 }
 
+func TestToolMessageStyle_HasBorder(t *testing.T) {
+	style := ToolMessageStyle(80)
+	rendered := style.Render("$ ls")
+	if len(rendered) <= len("$ ls") {
+		t.Error("ToolMessageStyle should add a border")
+	}
+}
+
+func TestToolMessageStyle_HasANSI(t *testing.T) {
+	style := ToolMessageStyle(80)
+	rendered := style.Render("test")
+	if !strings.Contains(rendered, "\x1b[") {
+		t.Error("ToolMessageStyle should produce ANSI escape codes")
+	}
+}
+
+func TestToolMessageStyle_IsDistinctFromOtherStyles(t *testing.T) {
+	tool := ToolMessageStyle(80).Render("test")
+	user := UserMessageStyle(80).Render("test")
+	assistant := AssistantMessageStyle(80).Render("test")
+	if tool == user {
+		t.Error("ToolMessageStyle should differ from UserMessageStyle")
+	}
+	if tool == assistant {
+		t.Error("ToolMessageStyle should differ from AssistantMessageStyle")
+	}
+}
+
+func TestToolMessageStyle_NoBackground(t *testing.T) {
+	rendered := ToolMessageStyle(80).Render("test content")
+	if stripped := stripANSIBackground(rendered); stripped != rendered {
+		t.Error("ToolMessageStyle should not set a background color")
+	}
+}
+
 func TestAssistantMessageStyle_RespectsWidth(t *testing.T) {
 	// Test with different widths
 	styleNarrow := AssistantMessageStyle(40)

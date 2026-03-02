@@ -96,6 +96,8 @@ func (m Model) renderMessages() string {
 		case "assistant":
 			md := strings.TrimRight(RenderMarkdown(msg.Content, sw-8), "\n")
 			rendered = AssistantMessageStyle(sw).Render(md)
+		case "tool":
+			rendered = ToolMessageStyle(sw).Render(msg.Content)
 		default:
 			rendered = ErrorMessageStyle(sw).Render(msg.Content)
 		}
@@ -174,6 +176,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, vpCmd)
 
 	case PromptResponseMsg:
+		for _, tc := range msg.ToolCalls {
+			m.messages = append(m.messages, Message{
+				Role:      "tool",
+				Content:   formatToolCall(tc),
+				Timestamp: time.Now(),
+			})
+		}
 		m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
@@ -331,4 +340,17 @@ func (m *Model) AddMessage(role, content string) {
 		Content:   content,
 		Timestamp: time.Now(),
 	})
+}
+
+// formatToolCall formats an api.ToolCallResult for display in the conversation.
+// For bash calls it shows "$ <command>\n<output>"; other tools show "<name>: <output>".
+func formatToolCall(tc api.ToolCallResult) string {
+	if cmd, ok := tc.Input["command"].(string); ok {
+		content := "$ " + cmd
+		if tc.Output != "" {
+			content += "\n" + strings.TrimRight(tc.Output, "\n")
+		}
+		return content
+	}
+	return tc.Output
 }
