@@ -5,20 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Environment variable names
 const (
-	EnvAPIKey  = "ANTHROPIC_API_KEY"
-	EnvBaseURL = "ANTHROPIC_BASE_URL"
-	EnvModel   = "ANTHROPIC_MODEL"
+	EnvAPIKey    = "ANTHROPIC_API_KEY"
+	EnvBaseURL   = "ANTHROPIC_BASE_URL"
+	EnvModel     = "ANTHROPIC_MODEL"
+	EnvMaxTokens = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"
 )
 
 // Config holds the application configuration
 type Config struct {
-	APIKey  string
-	BaseURL string
-	Model   string
+	APIKey    string
+	BaseURL   string
+	Model     string
+	MaxTokens int // 0 means use the API client's default
 }
 
 // Loader defines the interface for loading configuration
@@ -51,11 +54,21 @@ func (l *envLoader) Load() (Config, error) {
 		return Config{}, errors.New("missing required environment variable: " + EnvModel)
 	}
 
-	return Config{
+	cfg := Config{
 		APIKey:  apiKey,
 		BaseURL: baseURL,
 		Model:   model,
-	}, nil
+	}
+
+	if s := os.Getenv(EnvMaxTokens); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n <= 0 {
+			return Config{}, fmt.Errorf("%s must be a positive integer, got %q", EnvMaxTokens, s)
+		}
+		cfg.MaxTokens = n
+	}
+
+	return cfg, nil
 }
 
 // Validate checks that all required fields are set

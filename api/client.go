@@ -14,7 +14,7 @@ import (
 
 // Constants for API configuration
 const (
-	DefaultMaxTokens = 100
+	DefaultMaxTokens = 8192
 	MessagesEndpoint = "/v1/messages"
 	AnthropicVersion = "2023-06-01"
 )
@@ -24,6 +24,7 @@ type Client struct {
 	baseURL    string
 	apiKey     string
 	model      string
+	maxTokens  int
 	httpClient *http.Client
 }
 
@@ -57,6 +58,22 @@ func WithModel(model string) ClientOption {
 	return func(c *Client) {
 		c.model = model
 	}
+}
+
+// WithMaxTokens sets the maximum number of tokens in API responses.
+// If not set, DefaultMaxTokens is used.
+func WithMaxTokens(n int) ClientOption {
+	return func(c *Client) {
+		c.maxTokens = n
+	}
+}
+
+// effectiveMaxTokens returns the configured max tokens, falling back to DefaultMaxTokens.
+func (c *Client) effectiveMaxTokens() int {
+	if c.maxTokens > 0 {
+		return c.maxTokens
+	}
+	return DefaultMaxTokens
 }
 
 // doRequest sends an apiRequest to the LLM API and returns the response text
@@ -107,7 +124,7 @@ func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (string, err
 func (c *Client) SendMessage(ctx context.Context, prompt string) (string, error) {
 	return c.doRequest(ctx, apiRequest{
 		Model:     c.model,
-		MaxTokens: DefaultMaxTokens,
+		MaxTokens: c.effectiveMaxTokens(),
 		Messages: []Message{
 			{Role: "user", Content: prompt},
 		},
@@ -122,7 +139,7 @@ func (c *Client) SendMessageWithHistory(ctx context.Context, messages []Message)
 
 	return c.doRequest(ctx, apiRequest{
 		Model:     c.model,
-		MaxTokens: DefaultMaxTokens,
+		MaxTokens: c.effectiveMaxTokens(),
 		Messages:  messages,
 	})
 }

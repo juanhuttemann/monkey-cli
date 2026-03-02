@@ -313,11 +313,35 @@ func TestSendMessage_BaseURLWithTrailingSlash(t *testing.T) {
 	}
 }
 
-func TestConstants(t *testing.T) {
-	// Verify constants are correct
-	if DefaultMaxTokens != 100 {
-		t.Errorf("DefaultMaxTokens = %d, want %d", DefaultMaxTokens, 100)
+func TestWithMaxTokens_OverridesDefaultInRequest(t *testing.T) {
+	var requestBody apiRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &requestBody)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", WithModel("m"), WithMaxTokens(4096))
+	_, err := client.SendMessage(context.Background(), "hi")
+	if err != nil {
+		t.Fatalf("SendMessage() returned error: %v", err)
 	}
+	if requestBody.MaxTokens != 4096 {
+		t.Errorf("MaxTokens = %d, want 4096", requestBody.MaxTokens)
+	}
+}
+
+func TestDefaultMaxTokens_IsLargeEnoughForRealResponses(t *testing.T) {
+	// 100 tokens ≈ 75 words ≈ 7 lines — too small for useful LLM responses.
+	const minReasonable = 8192
+	if DefaultMaxTokens < minReasonable {
+		t.Errorf("DefaultMaxTokens = %d, want >= %d; small value cuts responses short", DefaultMaxTokens, minReasonable)
+	}
+}
+
+func TestConstants(t *testing.T) {
 	if MessagesEndpoint != "/v1/messages" {
 		t.Errorf("MessagesEndpoint = %q, want %q", MessagesEndpoint, "/v1/messages")
 	}

@@ -23,7 +23,11 @@ func sendPrompt(prompt string) (string, error) {
 	}
 
 	// Create API client
-	client := api.NewClient(cfg.BaseURL, cfg.APIKey, api.WithModel(cfg.Model))
+	opts := []api.ClientOption{api.WithModel(cfg.Model)}
+	if cfg.MaxTokens > 0 {
+		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))
+	}
+	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
 
 	// Send message and get response
 	return client.SendMessage(context.Background(), prompt)
@@ -62,7 +66,11 @@ func launchTUI() {
 		os.Exit(1)
 	}
 
-	client := api.NewClient(cfg.BaseURL, cfg.APIKey, api.WithModel(cfg.Model))
+	opts := []api.ClientOption{api.WithModel(cfg.Model)}
+	if cfg.MaxTokens > 0 {
+		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))
+	}
+	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
 	model := tui.NewModel(client)
 
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())

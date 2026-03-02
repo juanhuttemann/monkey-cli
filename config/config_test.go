@@ -126,6 +126,81 @@ func TestEnvConstants(t *testing.T) {
 	if EnvModel != "ANTHROPIC_MODEL" {
 		t.Errorf("EnvModel = %q, want %q", EnvModel, "ANTHROPIC_MODEL")
 	}
+	if EnvMaxTokens != "CLAUDE_CODE_MAX_OUTPUT_TOKENS" {
+		t.Errorf("EnvMaxTokens = %q, want %q", EnvMaxTokens, "CLAUDE_CODE_MAX_OUTPUT_TOKENS")
+	}
+}
+
+func setRequiredEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv(EnvAPIKey, "test-key")
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	t.Setenv(EnvModel, "test-model")
+}
+
+func TestLoad_MaxTokens_NotSet_DefaultsToZero(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv(EnvMaxTokens, "")
+
+	cfg, err := NewEnvLoader().Load()
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if cfg.MaxTokens != 0 {
+		t.Errorf("MaxTokens = %d, want 0 (unset)", cfg.MaxTokens)
+	}
+}
+
+func TestLoad_MaxTokens_Valid(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv(EnvMaxTokens, "4096")
+
+	cfg, err := NewEnvLoader().Load()
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if cfg.MaxTokens != 4096 {
+		t.Errorf("MaxTokens = %d, want 4096", cfg.MaxTokens)
+	}
+}
+
+func TestLoad_MaxTokens_InvalidString(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv(EnvMaxTokens, "abc")
+
+	_, err := NewEnvLoader().Load()
+	if err == nil {
+		t.Fatal("Load() should return error for non-integer CLAUDE_CODE_MAX_OUTPUT_TOKENS")
+	}
+	if !strings.Contains(err.Error(), EnvMaxTokens) {
+		t.Errorf("error should mention %s, got: %v", EnvMaxTokens, err)
+	}
+}
+
+func TestLoad_MaxTokens_Zero(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv(EnvMaxTokens, "0")
+
+	_, err := NewEnvLoader().Load()
+	if err == nil {
+		t.Fatal("Load() should return error for CLAUDE_CODE_MAX_OUTPUT_TOKENS=0")
+	}
+	if !strings.Contains(err.Error(), EnvMaxTokens) {
+		t.Errorf("error should mention %s, got: %v", EnvMaxTokens, err)
+	}
+}
+
+func TestLoad_MaxTokens_Negative(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv(EnvMaxTokens, "-1")
+
+	_, err := NewEnvLoader().Load()
+	if err == nil {
+		t.Fatal("Load() should return error for negative CLAUDE_CODE_MAX_OUTPUT_TOKENS")
+	}
+	if !strings.Contains(err.Error(), EnvMaxTokens) {
+		t.Errorf("error should mention %s, got: %v", EnvMaxTokens, err)
+	}
 }
 
 func TestConfig_EmptyValues(t *testing.T) {
