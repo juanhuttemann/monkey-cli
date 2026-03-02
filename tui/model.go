@@ -89,6 +89,9 @@ func (m Model) renderMessages() string {
 		}
 		sb.WriteString(rendered)
 		sb.WriteString("\n")
+		ts := msg.Timestamp.Format("15:04")
+		sb.WriteString(MessageTimestampStyle(m.width).Render(ts))
+		sb.WriteString("\n")
 	}
 	return sb.String()
 }

@@ -56,3 +56,11 @@ func TimerStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#AAAAAA"))
 }
+
+// MessageTimestampStyle returns the styling for per-message timestamps: gray, right-aligned.
+func MessageTimestampStyle(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Width(width - 2).
+		Align(lipgloss.Right).
+		Foreground(lipgloss.Color("#555555"))
+}
