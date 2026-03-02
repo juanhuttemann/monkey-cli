@@ -155,7 +155,7 @@ func TestSendPromptCmd_TimeoutError(t *testing.T) {
 	messages := []Message{}
 
 	// Use a short timeout for testing
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 100*time.Millisecond)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 100*time.Millisecond, nil)
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -182,7 +182,7 @@ func TestSendPromptCmdWithTimeout_RespectsTimeout(t *testing.T) {
 	messages := []Message{}
 
 	timeout := 100 * time.Millisecond
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", timeout)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", timeout, nil)
 	_ = cmd()
 
 	elapsed := time.Since(startTime)
@@ -215,6 +215,47 @@ func TestSendPromptCmd_Cancel_ReturnsCancelledMsg(t *testing.T) {
 	}
 }
 
+func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
+	var requestCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		requestCount++
+		if requestCount == 1 {
+			w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}`))
+		} else {
+			w.Write([]byte(`{"content":[{"type":"text","text":"done"}]}`))
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	messages := []Message{}
+
+	toolCallCh := make(chan ToolCallMsg, 10)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, toolCallCh)
+	result := cmd()
+
+	// Channel should have received the tool call
+	select {
+	case tc := <-toolCallCh:
+		if tc.ToolCall.Name != "bash" {
+			t.Errorf("tool call name = %q, want bash", tc.ToolCall.Name)
+		}
+	default:
+		t.Error("expected tool call in channel, but it was empty")
+	}
+
+	// Final result is PromptResponseMsg (tool calls are not embedded in it)
+	resp, ok := result.(PromptResponseMsg)
+	if !ok {
+		t.Fatalf("result = %T, want PromptResponseMsg", result)
+	}
+	if resp.Response != "done" {
+		t.Errorf("Response = %q, want %q", resp.Response, "done")
+	}
+}
+
 // SendPromptCmdWithTimeout is tested above - this tests the exported version
 func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -227,7 +268,7 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	messages := []Message{}
 
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 5*time.Second)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 5*time.Second, nil)
 	if cmd == nil {
 		t.Fatal("SendPromptCmdWithTimeout() returned nil, want non-nil tea.Cmd")
 	}

@@ -396,77 +396,6 @@ func TestUpdate_SpinnerTick_StopsWhenNotLoading(t *testing.T) {
 	}
 }
 
-func TestUpdate_PromptResponse_AddsToolCallsBeforeAssistant(t *testing.T) {
-	model := NewModel(nil)
-
-	responseMsg := PromptResponseMsg{
-		Response: "Here is the result",
-		ToolCalls: []api.ToolCallResult{
-			{Name: "bash", Input: map[string]any{"command": "ls"}, Output: "file.txt\n"},
-		},
-	}
-	updatedModel, _ := model.Update(responseMsg)
-
-	m := updatedModel.(Model)
-	history := m.GetHistory()
-
-	if len(history) != 2 {
-		t.Fatalf("expected 2 messages (tool + assistant), got %d", len(history))
-	}
-	if history[0].Role != "tool" {
-		t.Errorf("history[0].Role = %q, want %q", history[0].Role, "tool")
-	}
-	if history[1].Role != "assistant" {
-		t.Errorf("history[1].Role = %q, want %q", history[1].Role, "assistant")
-	}
-}
-
-func TestUpdate_PromptResponse_ToolMessageContainsCommandAndOutput(t *testing.T) {
-	model := NewModel(nil)
-
-	responseMsg := PromptResponseMsg{
-		Response: "done",
-		ToolCalls: []api.ToolCallResult{
-			{Name: "bash", Input: map[string]any{"command": "echo hello"}, Output: "hello\n"},
-		},
-	}
-	updatedModel, _ := model.Update(responseMsg)
-
-	m := updatedModel.(Model)
-	toolMsg := m.GetHistory()[0]
-
-	if !strings.Contains(toolMsg.Content, "echo hello") {
-		t.Errorf("tool message should contain the command, got: %q", toolMsg.Content)
-	}
-	if !strings.Contains(toolMsg.Content, "hello") {
-		t.Errorf("tool message should contain the output, got: %q", toolMsg.Content)
-	}
-}
-
-func TestUpdate_PromptResponse_MultipleToolCalls(t *testing.T) {
-	model := NewModel(nil)
-
-	responseMsg := PromptResponseMsg{
-		Response: "all done",
-		ToolCalls: []api.ToolCallResult{
-			{Name: "bash", Input: map[string]any{"command": "echo a"}, Output: "a\n"},
-			{Name: "bash", Input: map[string]any{"command": "echo b"}, Output: "b\n"},
-		},
-	}
-	updatedModel, _ := model.Update(responseMsg)
-
-	m := updatedModel.(Model)
-	history := m.GetHistory()
-
-	if len(history) != 3 {
-		t.Fatalf("expected 3 messages (tool + tool + assistant), got %d", len(history))
-	}
-	if history[0].Role != "tool" || history[1].Role != "tool" || history[2].Role != "assistant" {
-		t.Errorf("expected [tool, tool, assistant] roles, got [%q, %q, %q]",
-			history[0].Role, history[1].Role, history[2].Role)
-	}
-}
-
 func TestUpdate_PromptResponse_NoToolCallsWhenEmpty(t *testing.T) {
 	model := NewModel(nil)
 
@@ -481,6 +410,78 @@ func TestUpdate_PromptResponse_NoToolCallsWhenEmpty(t *testing.T) {
 	}
 	if history[0].Role != "assistant" {
 		t.Errorf("history[0].Role = %q, want %q", history[0].Role, "assistant")
+	}
+}
+
+func TestUpdate_ToolCallMsg_AddsToolMessage(t *testing.T) {
+	model := NewModel(nil)
+
+	tc := api.ToolCallResult{Name: "bash", Input: map[string]any{"command": "ls"}, Output: "file.txt\n"}
+	updatedModel, _ := model.Update(ToolCallMsg{ToolCall: tc})
+
+	m := updatedModel.(Model)
+	history := m.GetHistory()
+
+	if len(history) != 1 {
+		t.Fatalf("expected 1 message after ToolCallMsg, got %d", len(history))
+	}
+	if history[0].Role != "tool" {
+		t.Errorf("history[0].Role = %q, want %q", history[0].Role, "tool")
+	}
+}
+
+func TestUpdate_ToolCallMsg_MessageContent(t *testing.T) {
+	model := NewModel(nil)
+
+	tc := api.ToolCallResult{Name: "bash", Input: map[string]any{"command": "echo hello"}, Output: "hello\n"}
+	updatedModel, _ := model.Update(ToolCallMsg{ToolCall: tc})
+
+	m := updatedModel.(Model)
+	toolMsg := m.GetHistory()[0]
+
+	if !strings.Contains(toolMsg.Content, "echo hello") {
+		t.Errorf("tool message should contain command, got: %q", toolMsg.Content)
+	}
+	if !strings.Contains(toolMsg.Content, "hello") {
+		t.Errorf("tool message should contain output, got: %q", toolMsg.Content)
+	}
+}
+
+func TestUpdate_ToolCallMsg_AppearsBeforeAssistant(t *testing.T) {
+	model := NewModel(nil)
+
+	tc := api.ToolCallResult{Name: "bash", Input: map[string]any{"command": "ls"}, Output: "file.txt\n"}
+	m1, _ := model.Update(ToolCallMsg{ToolCall: tc})
+	m2, _ := m1.(Model).Update(PromptResponseMsg{Response: "Here is the result"})
+
+	history := m2.(Model).GetHistory()
+	if len(history) != 2 {
+		t.Fatalf("expected 2 messages (tool + assistant), got %d", len(history))
+	}
+	if history[0].Role != "tool" {
+		t.Errorf("history[0].Role = %q, want tool", history[0].Role)
+	}
+	if history[1].Role != "assistant" {
+		t.Errorf("history[1].Role = %q, want assistant", history[1].Role)
+	}
+}
+
+func TestUpdate_ToolCallMsg_MultipleToolCalls(t *testing.T) {
+	model := NewModel(nil)
+
+	tc1 := api.ToolCallResult{Name: "bash", Input: map[string]any{"command": "echo a"}, Output: "a\n"}
+	tc2 := api.ToolCallResult{Name: "bash", Input: map[string]any{"command": "echo b"}, Output: "b\n"}
+	m1, _ := model.Update(ToolCallMsg{ToolCall: tc1})
+	m2, _ := m1.(Model).Update(ToolCallMsg{ToolCall: tc2})
+	m3, _ := m2.(Model).Update(PromptResponseMsg{Response: "all done"})
+
+	history := m3.(Model).GetHistory()
+	if len(history) != 3 {
+		t.Fatalf("expected 3 messages (tool + tool + assistant), got %d", len(history))
+	}
+	if history[0].Role != "tool" || history[1].Role != "tool" || history[2].Role != "assistant" {
+		t.Errorf("expected [tool, tool, assistant], got [%q, %q, %q]",
+			history[0].Role, history[1].Role, history[2].Role)
 	}
 }
 

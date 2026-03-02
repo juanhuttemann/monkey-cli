@@ -42,6 +42,7 @@ type Model struct {
 	err            error
 	scrollToBottom bool
 	retryCh        chan RetryingMsg
+	toolCallCh     chan ToolCallMsg
 }
 
 // NewModel creates a new TUI model with initialized components
@@ -161,9 +162,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.startTime = time.Now()
 				retryCh := make(chan RetryingMsg, 10)
 				m.retryCh = retryCh
-				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, input, APITimeout, retryCh)
+				toolCallCh := make(chan ToolCallMsg, 10)
+				m.toolCallCh = toolCallCh
+				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, input, APITimeout, toolCallCh, retryCh)
 				m.cancelFn = cancel
-				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh))
+				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh))
 			}
 		default:
 			var inputCmd tea.Cmd
@@ -193,13 +196,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, vpCmd)
 
 	case PromptResponseMsg:
-		for _, tc := range msg.ToolCalls {
-			m.messages = append(m.messages, Message{
-				Role:      "tool",
-				Content:   formatToolCall(tc),
-				Timestamp: time.Now(),
-			})
-		}
 		m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
@@ -237,6 +233,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case retryDoneMsg:
 		// Retry channel closed; the API result will arrive separately.
+
+	case ToolCallMsg:
+		m.messages = append(m.messages, Message{
+			Role:      "tool",
+			Content:   formatToolCall(msg.ToolCall),
+			Timestamp: time.Now(),
+		})
+		m.scrollToBottom = true
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		if m.toolCallCh != nil {
+			cmds = append(cmds, waitForToolCall(m.toolCallCh))
+		}
+
+	case toolCallDoneMsg:
+		// Tool call channel closed; the API result will arrive separately.
 
 	case timer.TickMsg:
 		if m.timerActive {

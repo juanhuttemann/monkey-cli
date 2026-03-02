@@ -15,13 +15,14 @@ const APITimeout = 60 * time.Second
 // the new prompt to the API using the default timeout.
 // The returned CancelFunc can be called to cancel the in-flight request.
 func SendPromptCmd(client *api.Client, messages []Message, prompt string) (tea.Cmd, context.CancelFunc) {
-	return SendPromptCmdWithTimeout(client, messages, prompt, APITimeout)
+	return SendPromptCmdWithTimeout(client, messages, prompt, APITimeout, nil)
 }
 
 // SendPromptCmdWithTimeout creates a tea.Cmd that sends the prompt with a per-attempt timeout.
 // The returned CancelFunc can be called to cancel the in-flight request.
+// toolCallCh, if non-nil, receives a ToolCallMsg for each tool call as it completes and is closed when done.
 // An optional retryCh receives a RetryingMsg before each retry attempt and is closed when done.
-func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt string, timeout time.Duration, retryChs ...chan<- RetryingMsg) (tea.Cmd, context.CancelFunc) {
+func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt string, timeout time.Duration, toolCallCh chan<- ToolCallMsg, retryChs ...chan<- RetryingMsg) (tea.Cmd, context.CancelFunc) {
 	// Use a cancel-only parent so that each retry gets a fresh per-attempt timeout
 	// rather than sharing an already-expired deadline.
 	parentCtx, parentCancel := context.WithCancel(context.Background())
@@ -36,6 +37,9 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 		defer parentCancel()
 		if retryCh != nil {
 			defer close(retryCh)
+		}
+		if toolCallCh != nil {
+			defer close(toolCallCh)
 		}
 
 		// Build full message list: history (user/assistant only) + new user prompt
@@ -56,10 +60,11 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 			})
 		}
 
-		var toolCalls []api.ToolCallResult
 		response, err := client.SendMessageWithTools(ctx, apiMessages, []api.Tool{api.BashTool()}, api.BashExecutor{},
 			func(tc api.ToolCallResult) {
-				toolCalls = append(toolCalls, tc)
+				if toolCallCh != nil {
+					toolCallCh <- ToolCallMsg{ToolCall: tc}
+				}
 			},
 		)
 		if err != nil {
@@ -68,10 +73,22 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 			}
 			return PromptErrorMsg{Err: err}
 		}
-		return PromptResponseMsg{Response: response, ToolCalls: toolCalls}
+		return PromptResponseMsg{Response: response}
 	}
 
 	return cmd, parentCancel
+}
+
+// waitForToolCall returns a tea.Cmd that blocks until it receives a ToolCallMsg from ch,
+// or returns toolCallDoneMsg when ch is closed.
+func waitForToolCall(ch <-chan ToolCallMsg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return toolCallDoneMsg{}
+		}
+		return msg
+	}
 }
 
 // waitForRetry returns a tea.Cmd that blocks until it receives a RetryingMsg from ch,

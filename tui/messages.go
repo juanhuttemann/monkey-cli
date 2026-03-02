@@ -30,9 +30,8 @@ type SendPromptMsg struct {
 
 // PromptResponseMsg is returned when the API responds successfully
 type PromptResponseMsg struct {
-	Response  string
-	ToolCalls []api.ToolCallResult
-	Err       error
+	Response string
+	Err      error
 }
 
 // PromptErrorMsg is returned when the API returns an error
@@ -51,3 +50,11 @@ type RetryingMsg struct {
 
 // retryDoneMsg is sent when the retry notification channel has been closed.
 type retryDoneMsg struct{}
+
+// ToolCallMsg is sent to the model as each tool call completes during the API loop.
+type ToolCallMsg struct {
+	ToolCall api.ToolCallResult
+}
+
+// toolCallDoneMsg is sent when the tool call channel has been closed.
+type toolCallDoneMsg struct{}
