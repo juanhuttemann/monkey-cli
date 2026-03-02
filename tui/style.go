@@ -4,8 +4,8 @@ import "github.com/charmbracelet/lipgloss"
 
 // Style constants
 const (
-	UserBorderColor      = "#04B575" // Green
-	AssistantBorderColor = "#7D56F4" // Purple
+	UserBorderColor      = "#4B2DA8" // Dark purple
+	AssistantBorderColor = "#04B575" // Green
 	ErrorBorderColor     = "#FF6B6B" // Red
 )
 

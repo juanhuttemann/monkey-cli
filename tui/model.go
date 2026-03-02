@@ -73,24 +73,36 @@ func (m Model) Init() tea.Cmd {
 	return textarea.Blink
 }
 
+// messageStyleWidth returns the style parameter used for message bubbles.
+// It caps the terminal width so text stays within ~75 chars for readability.
+// Width(p-4) + Padding(0,1) = text area of p-6; at p=81 that is 75 chars.
+func (m Model) messageStyleWidth() int {
+	const maxStyleWidth = 126
+	if m.width > maxStyleWidth {
+		return maxStyleWidth
+	}
+	return m.width
+}
+
 // renderMessages returns the styled content string for all messages.
 func (m Model) renderMessages() string {
+	sw := m.messageStyleWidth()
 	var sb strings.Builder
 	for _, msg := range m.messages {
 		var rendered string
 		switch msg.Role {
 		case "user":
-			rendered = UserMessageStyle(m.width).Render(msg.Content)
+			rendered = UserMessageStyle(sw).Render(msg.Content)
 		case "assistant":
-			md := strings.TrimRight(RenderMarkdown(msg.Content, m.width-8), "\n")
-			rendered = AssistantMessageStyle(m.width).Render(md)
+			md := strings.TrimRight(RenderMarkdown(msg.Content, sw-8), "\n")
+			rendered = AssistantMessageStyle(sw).Render(md)
 		default:
-			rendered = ErrorMessageStyle(m.width).Render(msg.Content)
+			rendered = ErrorMessageStyle(sw).Render(msg.Content)
 		}
 		sb.WriteString(rendered)
 		sb.WriteString("\n")
 		ts := msg.Timestamp.Format("15:04")
-		sb.WriteString(MessageTimestampStyle(m.width).Render(ts))
+		sb.WriteString(MessageTimestampStyle(sw).Render(ts))
 		sb.WriteString("\n")
 	}
 	return sb.String()

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	glamourstyles "github.com/charmbracelet/glamour/styles"
 )
 
 // ansiSGR matches ANSI Select Graphic Rendition escape sequences.
@@ -18,8 +19,13 @@ func RenderMarkdown(content string, width int) string {
 		return content
 	}
 
+	style := glamourstyles.DarkStyleConfig
+	zero := uint(0)
+	style.Document.Margin = &zero
+	style.Document.StylePrimitive.BlockPrefix = ""
+
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithStyles(style),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {

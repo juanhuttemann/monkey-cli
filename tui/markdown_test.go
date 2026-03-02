@@ -7,6 +7,26 @@ import (
 	"testing"
 )
 
+func TestRenderMarkdown_NoLeadingBlankLine(t *testing.T) {
+	result := stripANSI(RenderMarkdown("hello world", 80))
+	if strings.HasPrefix(result, "\n") {
+		t.Errorf("RenderMarkdown should not start with a blank line, got: %q", result[:min(len(result), 20)])
+	}
+}
+
+func TestRenderMarkdown_NoLeftIndent(t *testing.T) {
+	result := stripANSI(RenderMarkdown("hello world", 80))
+	for _, line := range strings.Split(result, "\n") {
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, " ") {
+			t.Errorf("RenderMarkdown should not indent content, got line: %q", line)
+		}
+		break // only check first non-empty line
+	}
+}
+
 func TestRenderMarkdown_PreservesPlainText(t *testing.T) {
 	result := RenderMarkdown("hello world", 80)
 	if !strings.Contains(stripANSI(result), "hello world") {
