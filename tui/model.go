@@ -21,15 +21,16 @@ const (
 
 // Model is the main bubbletea model for the TUI
 type Model struct {
-	messages []Message
-	input    textarea.Model
-	viewport viewport.Model
-	state    State
-	spinner  spinner.Model
-	client   *api.Client
-	width    int
-	height   int
-	err      error
+	messages       []Message
+	input          textarea.Model
+	viewport       viewport.Model
+	state          State
+	spinner        spinner.Model
+	client         *api.Client
+	width          int
+	height         int
+	err            error
+	scrollToBottom bool
 }
 
 // NewModel creates a new TUI model with initialized components
@@ -45,20 +46,40 @@ func NewModel(client *api.Client) Model {
 	sp := spinner.New()
 
 	return Model{
-		client:   client,
-		messages: []Message{},
-		input:    ta,
-		viewport: vp,
-		spinner:  sp,
-		state:    StateReady,
-		width:    80,
-		height:   24,
+		client:         client,
+		messages:       []Message{},
+		input:          ta,
+		viewport:       vp,
+		spinner:        sp,
+		state:          StateReady,
+		width:          80,
+		height:         24,
+		scrollToBottom: true,
 	}
 }
 
 // Init implements tea.Model
 func (m Model) Init() tea.Cmd {
 	return textarea.Blink
+}
+
+// renderMessages returns the styled content string for all messages.
+func (m Model) renderMessages() string {
+	var sb strings.Builder
+	for _, msg := range m.messages {
+		var rendered string
+		switch msg.Role {
+		case "user":
+			rendered = UserMessageStyle(m.width).Render(msg.Content)
+		case "assistant":
+			rendered = AssistantMessageStyle(m.width).Render(msg.Content)
+		default:
+			rendered = ErrorMessageStyle(m.width).Render(msg.Content)
+		}
+		sb.WriteString(rendered)
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // Update implements tea.Model
@@ -77,6 +98,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.messages = append(m.messages, Message{Role: "user", Content: input, Timestamp: time.Now()})
 				m.input.SetValue("")
 				m.state = StateLoading
+				m.scrollToBottom = true
+				m.viewport.SetContent(m.renderMessages())
+				m.viewport.GotoBottom()
 				cmd := SendPromptCmd(m.client, m.messages, input)
 				cmds = append(cmds, cmd, m.spinner.Tick)
 			}
@@ -96,8 +120,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.viewport.Width = msg.Width
 		m.viewport.Height = vpHeight
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
 
 	case tea.MouseMsg:
+		if msg.Button == tea.MouseButtonWheelUp {
+			m.scrollToBottom = false
+		}
 		var vpCmd tea.Cmd
 		m.viewport, vpCmd = m.viewport.Update(msg)
 		cmds = append(cmds, vpCmd)
@@ -105,10 +134,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PromptResponseMsg:
 		m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
 		m.state = StateReady
+		m.scrollToBottom = true
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
 
 	case PromptErrorMsg:
 		m.messages = append(m.messages, Message{Role: "error", Content: msg.Err.Error(), Timestamp: time.Now()})
 		m.state = StateReady
+		m.scrollToBottom = true
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
 
 	case spinner.TickMsg:
 		if m.state == StateLoading {
@@ -123,26 +158,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model
 func (m Model) View() string {
-	var sb strings.Builder
-
-	// Render each message with its style
-	for _, msg := range m.messages {
-		var rendered string
-		switch msg.Role {
-		case "user":
-			rendered = UserMessageStyle(m.width).Render(msg.Content)
-		case "assistant":
-			rendered = AssistantMessageStyle(m.width).Render(msg.Content)
-		default:
-			rendered = ErrorMessageStyle(m.width).Render(msg.Content)
-		}
-		sb.WriteString(rendered)
-		sb.WriteString("\n")
+	// Sync viewport content (handles the AddMessage + View() direct path in tests).
+	// This does not affect YOffset, preserving the user's scroll position.
+	m.viewport.SetContent(m.renderMessages())
+	if m.scrollToBottom {
+		m.viewport.GotoBottom()
 	}
-
-	// Set viewport content and scroll to bottom
-	m.viewport.SetContent(sb.String())
-	m.viewport.GotoBottom()
 
 	var view strings.Builder
 	view.WriteString(m.viewport.View())
