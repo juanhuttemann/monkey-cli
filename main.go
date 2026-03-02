@@ -7,8 +7,10 @@ import (
 	"os"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"mogger/api"
 	"mogger/config"
+	"mogger/tui"
 )
 
 // sendPrompt calls the LLM API with the user-provided prompt and returns the response
@@ -46,6 +48,40 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  -p, --prompt string   Your prompt to send to the LLM (required)")
 }
 
+// shouldLaunchTUI returns true when no prompt was provided (empty or whitespace-only)
+func shouldLaunchTUI(prompt string) bool {
+	return strings.TrimSpace(prompt) == ""
+}
+
+// launchTUI starts the interactive TUI
+func launchTUI() {
+	loader := config.NewEnvLoader()
+	cfg, err := loader.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
+	client := api.NewClient(cfg.BaseURL, cfg.APIKey, api.WithModel(cfg.Model))
+	model := tui.NewModel(client)
+
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+}
+
+// run is the core application logic, separated for testability.
+// tuiRunner is called when no prompt is provided; in production this is launchTUI.
+func run(prompt string, tuiRunner func()) {
+	if shouldLaunchTUI(prompt) {
+		tuiRunner()
+		return
+	}
+	fmt.Println(runPrompt(prompt))
+}
+
 func main() {
 	// Define flags
 	promptFlag := flag.String("p", "", "Your prompt to send to the LLM")
@@ -64,12 +100,5 @@ func main() {
 		}
 	}
 
-	// Check if prompt is provided
-	if prompt == "" {
-		printUsage()
-		fmt.Fprintln(os.Stderr, "\nError: -p flag is required")
-		os.Exit(1)
-	}
-
-	fmt.Println(runPrompt(prompt))
+	run(prompt, launchTUI)
 }

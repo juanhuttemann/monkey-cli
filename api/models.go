@@ -5,11 +5,11 @@ package api
 type apiRequest struct {
 	Model     string       `json:"model"`
 	MaxTokens int          `json:"max_tokens"`
-	Messages  []apiMessage `json:"messages"`
+	Messages  []Message `json:"messages"`
 }
 
-// apiMessage represents a single message in the conversation
-type apiMessage struct {
+// Message represents a single message in the conversation
+type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }

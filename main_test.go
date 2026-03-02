@@ -274,3 +274,97 @@ func TestPrintUsage(t *testing.T) {
 		t.Errorf("printUsage() should contain 'required', got: %q", output)
 	}
 }
+
+func TestShouldLaunchTUI_NoFlags_ReturnsTrue(t *testing.T) {
+	// When prompt is empty, TUI should launch
+	prompt := ""
+
+	result := shouldLaunchTUI(prompt)
+	if !result {
+		t.Error("shouldLaunchTUI('') = false, want true")
+	}
+}
+
+func TestShouldLaunchTUI_WithPromptFlag_ReturnsFalse(t *testing.T) {
+	// When prompt is provided, CLI mode should be used
+	prompt := "Hello, world!"
+
+	result := shouldLaunchTUI(prompt)
+	if result {
+		t.Error("shouldLaunchTUI('Hello, world!') = true, want false")
+	}
+}
+
+func TestShouldLaunchTUI_WithArgs_ReturnsFalse(t *testing.T) {
+	// When prompt is built from positional args, CLI mode should be used
+	prompt := "hello world from args"
+
+	result := shouldLaunchTUI(prompt)
+	if result {
+		t.Error("shouldLaunchTUI('hello world from args') = true, want false")
+	}
+}
+
+func TestShouldLaunchTUI_WhitespaceOnly_ReturnsTrue(t *testing.T) {
+	// Whitespace-only prompt should still launch TUI
+	prompt := "   \t\n  "
+
+	result := shouldLaunchTUI(prompt)
+	if !result {
+		t.Error("shouldLaunchTUI('   ') = false, want true (whitespace should launch TUI)")
+	}
+}
+
+func TestRun_EmptyPrompt_LaunchesTUI(t *testing.T) {
+	tuiLaunched := false
+	run("", func() { tuiLaunched = true })
+
+	if !tuiLaunched {
+		t.Error("run('') should launch TUI when prompt is empty")
+	}
+}
+
+func TestRun_WhitespacePrompt_LaunchesTUI(t *testing.T) {
+	tuiLaunched := false
+	run("   \t\n  ", func() { tuiLaunched = true })
+
+	if !tuiLaunched {
+		t.Error("run('   ') should launch TUI when prompt is whitespace-only")
+	}
+}
+
+func TestRun_WithPrompt_DoesNotLaunchTUI(t *testing.T) {
+	server, cleanup := createMockServer(successResponse("pong"), 200)
+	defer cleanup()
+	defer setupTestEnv("test-key", server.URL, "test-model")()
+
+	tuiLaunched := false
+	run("ping", func() { tuiLaunched = true })
+
+	if tuiLaunched {
+		t.Error("run('ping') should not launch TUI when prompt is provided")
+	}
+}
+
+func TestRun_WithPrompt_PrintsResponse(t *testing.T) {
+	server, cleanup := createMockServer(successResponse("hello back"), 200)
+	defer cleanup()
+	defer setupTestEnv("test-key", server.URL, "test-model")()
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	run("hello", func() {})
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf strings.Builder
+	io.Copy(&buf, r)
+
+	if !strings.Contains(buf.String(), "hello back") {
+		t.Errorf("run() output = %q, want to contain %q", buf.String(), "hello back")
+	}
+}

@@ -322,3 +322,210 @@ func TestConstants(t *testing.T) {
 		t.Errorf("MessagesEndpoint = %q, want %q", MessagesEndpoint, "/v1/messages")
 	}
 }
+
+func TestSendMessageWithHistory_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "Response with history!"}]}`))
+	}))
+	defer server.Close()
+
+	messages := []Message{
+		{Role: "user", Content: "First message"},
+		{Role: "assistant", Content: "First response"},
+		{Role: "user", Content: "Second message"},
+	}
+
+	client := NewClient(server.URL, "test-key", WithModel("test-model"))
+	result, err := client.SendMessageWithHistory(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("SendMessageWithHistory() returned error: %v", err)
+	}
+
+	if result != "Response with history!" {
+		t.Errorf("SendMessageWithHistory() = %q, want %q", result, "Response with history!")
+	}
+}
+
+func TestSendMessageWithHistory_SendsAllMessages(t *testing.T) {
+	var requestBody apiRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &requestBody)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	messages := []Message{
+		{Role: "user", Content: "Message one"},
+		{Role: "assistant", Content: "Response one"},
+		{Role: "user", Content: "Message two"},
+	}
+
+	client := NewClient(server.URL, "test-key", WithModel("test-model"))
+	_, err := client.SendMessageWithHistory(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("SendMessageWithHistory() returned error: %v", err)
+	}
+
+	// Verify all messages were sent
+	if len(requestBody.Messages) != 3 {
+		t.Fatalf("Expected 3 messages in request, got %d", len(requestBody.Messages))
+	}
+	if requestBody.Messages[0].Content != "Message one" {
+		t.Errorf("Messages[0].Content = %q, want %q", requestBody.Messages[0].Content, "Message one")
+	}
+	if requestBody.Messages[1].Content != "Response one" {
+		t.Errorf("Messages[1].Content = %q, want %q", requestBody.Messages[1].Content, "Response one")
+	}
+	if requestBody.Messages[2].Content != "Message two" {
+		t.Errorf("Messages[2].Content = %q, want %q", requestBody.Messages[2].Content, "Message two")
+	}
+}
+
+func TestSendMessageWithHistory_EmptyMessages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	messages := []Message{}
+
+	client := NewClient(server.URL, "test-key", WithModel("test-model"))
+	_, err := client.SendMessageWithHistory(context.Background(), messages)
+	if err == nil {
+		t.Fatal("SendMessageWithHistory() should return error with empty messages")
+	}
+
+	if !strings.Contains(err.Error(), "message") {
+		t.Errorf("error should mention messages, got: %v", err)
+	}
+}
+
+func TestSendMessageWithHistory_SetsCorrectHeaders(t *testing.T) {
+	var receivedRequest *http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedRequest = r
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	client := NewClient(server.URL, "my-secret-key")
+	_, err := client.SendMessageWithHistory(context.Background(), messages)
+	if err != nil {
+		t.Fatalf("SendMessageWithHistory() returned error: %v", err)
+	}
+
+	if receivedRequest == nil {
+		t.Fatal("Did not receive request")
+	}
+
+	// Check headers
+	if ct := receivedRequest.Header.Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
+	}
+	if key := receivedRequest.Header.Get("x-api-key"); key != "my-secret-key" {
+		t.Errorf("x-api-key = %q, want %q", key, "my-secret-key")
+	}
+	if version := receivedRequest.Header.Get("anthropic-version"); version != "2023-06-01" {
+		t.Errorf("anthropic-version = %q, want %q", version, "2023-06-01")
+	}
+}
+
+func TestSendMessageWithHistory_Non200Status(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "internal server error"}`))
+	}))
+	defer server.Close()
+
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	client := NewClient(server.URL, "test-key")
+	_, err := client.SendMessageWithHistory(context.Background(), messages)
+	if err == nil {
+		t.Fatal("SendMessageWithHistory() should return error on non-200 status")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "500") {
+		t.Errorf("error should contain status code 500, got: %v", err)
+	}
+}
+
+func TestSendMessageWithHistory_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [}`)) // Invalid JSON
+	}))
+	defer server.Close()
+
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	client := NewClient(server.URL, "test-key")
+	_, err := client.SendMessageWithHistory(context.Background(), messages)
+	if err == nil {
+		t.Fatal("SendMessageWithHistory() should return error on invalid JSON")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "parse") && !strings.Contains(errMsg, "unmarshal") {
+		t.Errorf("error should indicate parse/unmarshal failure, got: %v", err)
+	}
+}
+
+func TestSendMessageWithHistory_EmptyContent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": []}`))
+	}))
+	defer server.Close()
+
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	client := NewClient(server.URL, "test-key")
+	_, err := client.SendMessageWithHistory(context.Background(), messages)
+	if err == nil {
+		t.Fatal("SendMessageWithHistory() should return error on empty content")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "content") {
+		t.Errorf("error should mention content, got: %v", err)
+	}
+}
+
+func TestSendMessageWithHistory_WithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	client := NewClient(server.URL, "test-key")
+
+	// Cancel context before request completes
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	_, err := client.SendMessageWithHistory(ctx, messages)
+	if err == nil {
+		t.Fatal("SendMessageWithHistory() should return error when context is cancelled")
+	}
+}

@@ -14,9 +14,9 @@ import (
 
 // Constants for API configuration
 const (
-	DefaultMaxTokens  = 100
-	MessagesEndpoint  = "/v1/messages"
-	AnthropicVersion  = "2023-06-01"
+	DefaultMaxTokens = 100
+	MessagesEndpoint = "/v1/messages"
+	AnthropicVersion = "2023-06-01"
 )
 
 // Client handles communication with the LLM API
@@ -59,65 +59,70 @@ func WithModel(model string) ClientOption {
 	}
 }
 
-// SendMessage sends a message to the LLM API and returns the response
-func (c *Client) SendMessage(ctx context.Context, prompt string) (string, error) {
-	// Build request body
-	reqBody := apiRequest{
-		Model:     c.model,
-		MaxTokens: DefaultMaxTokens,
-		Messages: []apiMessage{
-			{
-				Role:    "user",
-				Content: prompt,
-			},
-		},
-	}
-
+// doRequest sends an apiRequest to the LLM API and returns the response text
+func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (string, error) {
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Create HTTP request
 	url := c.baseURL + MessagesEndpoint
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", AnthropicVersion)
 
-	// Send request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	// Check status code
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Parse response
 	var apiResp apiResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Validate content
 	if len(apiResp.Content) == 0 {
 		return "", errors.New("no content in response")
 	}
 
 	return apiResp.Content[0].Text, nil
+}
+
+// SendMessage sends a message to the LLM API and returns the response
+func (c *Client) SendMessage(ctx context.Context, prompt string) (string, error) {
+	return c.doRequest(ctx, apiRequest{
+		Model:     c.model,
+		MaxTokens: DefaultMaxTokens,
+		Messages: []Message{
+			{Role: "user", Content: prompt},
+		},
+	})
+}
+
+// SendMessageWithHistory sends a conversation history to the LLM API and returns the response
+func (c *Client) SendMessageWithHistory(ctx context.Context, messages []Message) (string, error) {
+	if len(messages) == 0 {
+		return "", errors.New("no messages provided")
+	}
+
+	return c.doRequest(ctx, apiRequest{
+		Model:     c.model,
+		MaxTokens: DefaultMaxTokens,
+		Messages:  messages,
+	})
 }
