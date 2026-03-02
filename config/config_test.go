@@ -203,6 +203,52 @@ func TestLoad_MaxTokens_Negative(t *testing.T) {
 	}
 }
 
+func TestLoadSystemPromptFile_FileExists(t *testing.T) {
+	f, err := os.CreateTemp("", "system*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	f.WriteString("# System Prompt\n\nYou are a helpful coding assistant.")
+	f.Close()
+
+	got, err := LoadSystemPromptFile(f.Name())
+	if err != nil {
+		t.Fatalf("LoadSystemPromptFile() returned error: %v", err)
+	}
+	want := "# System Prompt\n\nYou are a helpful coding assistant."
+	if got != want {
+		t.Errorf("LoadSystemPromptFile() = %q, want %q", got, want)
+	}
+}
+
+func TestLoadSystemPromptFile_FileNotExist_ReturnsEmpty(t *testing.T) {
+	got, err := LoadSystemPromptFile("/nonexistent/path/system.md")
+	if err != nil {
+		t.Fatalf("LoadSystemPromptFile() returned error for non-existent file: %v", err)
+	}
+	if got != "" {
+		t.Errorf("LoadSystemPromptFile() = %q, want empty string", got)
+	}
+}
+
+func TestLoadSystemPromptFile_EmptyFile_ReturnsEmpty(t *testing.T) {
+	f, err := os.CreateTemp("", "system*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	f.Close()
+
+	got, err := LoadSystemPromptFile(f.Name())
+	if err != nil {
+		t.Fatalf("LoadSystemPromptFile() returned error: %v", err)
+	}
+	if got != "" {
+		t.Errorf("LoadSystemPromptFile() = %q, want empty string for empty file", got)
+	}
+}
+
 func TestConfig_EmptyValues(t *testing.T) {
 	// Setting empty string should be treated as missing
 	os.Setenv(EnvAPIKey, "")

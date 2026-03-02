@@ -528,6 +528,45 @@ func TestSendMessageWithHistory_EmptyContent(t *testing.T) {
 	}
 }
 
+func TestWithSystemPrompt_IncludedInRequest(t *testing.T) {
+	var requestBody apiRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &requestBody)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", WithSystemPrompt("You are a helpful coding assistant."))
+	_, err := client.SendMessage(context.Background(), "hi")
+	if err != nil {
+		t.Fatalf("SendMessage() returned error: %v", err)
+	}
+	if requestBody.System != "You are a helpful coding assistant." {
+		t.Errorf("System = %q, want %q", requestBody.System, "You are a helpful coding assistant.")
+	}
+}
+
+func TestWithSystemPrompt_Empty_OmittedFromRequest(t *testing.T) {
+	var rawBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rawBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	_, err := client.SendMessage(context.Background(), "hi")
+	if err != nil {
+		t.Fatalf("SendMessage() returned error: %v", err)
+	}
+	if strings.Contains(string(rawBody), `"system"`) {
+		t.Errorf("expected no system field in request when not set, got: %s", rawBody)
+	}
+}
+
 func TestSendMessageWithHistory_WithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 

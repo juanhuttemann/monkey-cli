@@ -52,13 +52,14 @@ func WithRetryNotifier(ctx context.Context, fn func(attempt int, err error)) con
 
 // Client handles communication with the LLM API
 type Client struct {
-	baseURL    string
-	apiKey     string
-	model      string
-	maxTokens  int
-	maxRetries int
-	retryDelay time.Duration
-	httpClient *http.Client
+	baseURL      string
+	apiKey       string
+	model        string
+	maxTokens    int
+	maxRetries   int
+	retryDelay   time.Duration
+	httpClient   *http.Client
+	systemPrompt string
 }
 
 // ClientOption is a function that configures a Client
@@ -106,6 +107,13 @@ func WithMaxTokens(n int) ClientOption {
 func WithMaxRetries(n int) ClientOption {
 	return func(c *Client) {
 		c.maxRetries = n
+	}
+}
+
+// WithSystemPrompt sets the system prompt sent with every request.
+func WithSystemPrompt(s string) ClientOption {
+	return func(c *Client) {
+		c.systemPrompt = s
 	}
 }
 
@@ -182,6 +190,7 @@ func (c *Client) doAttempt(parentCtx context.Context, jsonBody []byte) (apiRespo
 // ctx should be a cancellation-only context (no deadline); use WithPerAttemptTimeout
 // to apply a per-attempt deadline that resets on each retry.
 func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (apiResponse, error) {
+	reqBody.System = c.systemPrompt
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return apiResponse{}, fmt.Errorf("failed to marshal request: %w", err)

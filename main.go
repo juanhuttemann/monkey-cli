@@ -14,6 +14,44 @@ import (
 	"monkey/tui"
 )
 
+// systemPromptCandidates returns the paths to check for a system prompt, in priority order.
+// Local system.md takes precedence over the global ~/.config/monkey/system.md.
+func systemPromptCandidates() []string {
+	candidates := []string{"system.md"}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, home+"/.config/monkey/system.md")
+	}
+	return candidates
+}
+
+// buildClientOpts returns the client options for the given config,
+// including the system prompt loaded from the first system.md found.
+func buildClientOpts(cfg config.Config) ([]api.ClientOption, error) {
+	opts := []api.ClientOption{
+		api.WithModel(cfg.Model),
+		api.WithMaxRetries(3),
+		api.WithRetryDelay(time.Second),
+	}
+	if cfg.MaxTokens > 0 {
+		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))
+	}
+	var systemPrompt string
+	for _, path := range systemPromptCandidates() {
+		s, err := config.LoadSystemPromptFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if s != "" {
+			systemPrompt = s
+			break
+		}
+	}
+	if systemPrompt != "" {
+		opts = append(opts, api.WithSystemPrompt(systemPrompt))
+	}
+	return opts, nil
+}
+
 // sendPrompt calls the LLM API with the user-provided prompt and returns the response
 func sendPrompt(prompt string) (string, error) {
 	// Load configuration
@@ -24,13 +62,9 @@ func sendPrompt(prompt string) (string, error) {
 	}
 
 	// Create API client
-	opts := []api.ClientOption{
-		api.WithModel(cfg.Model),
-		api.WithMaxRetries(3),
-		api.WithRetryDelay(time.Second),
-	}
-	if cfg.MaxTokens > 0 {
-		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))
+	opts, err := buildClientOpts(cfg)
+	if err != nil {
+		return "", err
 	}
 	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
 
@@ -71,13 +105,10 @@ func launchTUI() {
 		os.Exit(1)
 	}
 
-	opts := []api.ClientOption{
-		api.WithModel(cfg.Model),
-		api.WithMaxRetries(3),
-		api.WithRetryDelay(time.Second),
-	}
-	if cfg.MaxTokens > 0 {
-		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))
+	opts, err := buildClientOpts(cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
 	}
 	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
 	model := tui.NewModel(client)

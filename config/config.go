@@ -71,6 +71,19 @@ func (l *envLoader) Load() (Config, error) {
 	return cfg, nil
 }
 
+// LoadSystemPromptFile reads a markdown file and returns its content as a string.
+// If the file does not exist, it returns an empty string and no error.
+func LoadSystemPromptFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return string(data), nil
+}
+
 // Validate checks that all required fields are set
 func (c Config) Validate() error {
 	if c.APIKey == "" {
