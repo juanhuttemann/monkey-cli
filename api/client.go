@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 )
 
 // Constants for API configuration
@@ -19,12 +21,43 @@ const (
 	AnthropicVersion = "2023-06-01"
 )
 
+// StatusError is returned when the API responds with a non-200 status code.
+type StatusError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("API returned status %d: %s", e.StatusCode, e.Body)
+}
+
+// retryNotifierKey is the context key for the per-request retry callback.
+type retryNotifierKey struct{}
+
+// perAttemptTimeoutKey is the context key for the per-attempt timeout duration.
+type perAttemptTimeoutKey struct{}
+
+// WithPerAttemptTimeout returns a context that will apply the given timeout to each
+// individual request attempt. This allows retrying after a timeout, as each retry
+// gets a fresh timeout rather than sharing an already-expired one.
+func WithPerAttemptTimeout(ctx context.Context, d time.Duration) context.Context {
+	return context.WithValue(ctx, perAttemptTimeoutKey{}, d)
+}
+
+// WithRetryNotifier returns a context that carries a callback invoked before each retry attempt.
+// attempt is 1-based; err is the error that triggered the retry.
+func WithRetryNotifier(ctx context.Context, fn func(attempt int, err error)) context.Context {
+	return context.WithValue(ctx, retryNotifierKey{}, fn)
+}
+
 // Client handles communication with the LLM API
 type Client struct {
 	baseURL    string
 	apiKey     string
 	model      string
 	maxTokens  int
+	maxRetries int
+	retryDelay time.Duration
 	httpClient *http.Client
 }
 
@@ -68,6 +101,23 @@ func WithMaxTokens(n int) ClientOption {
 	}
 }
 
+// WithMaxRetries sets the maximum number of retry attempts after a retryable error.
+// Default is 0 (no retries).
+func WithMaxRetries(n int) ClientOption {
+	return func(c *Client) {
+		c.maxRetries = n
+	}
+}
+
+// WithRetryDelay sets the base delay between retry attempts.
+// The actual delay doubles with each attempt (exponential backoff).
+// Default is 0 (no delay).
+func WithRetryDelay(d time.Duration) ClientOption {
+	return func(c *Client) {
+		c.retryDelay = d
+	}
+}
+
 // effectiveMaxTokens returns the configured max tokens, falling back to DefaultMaxTokens.
 func (c *Client) effectiveMaxTokens() int {
 	if c.maxTokens > 0 {
@@ -76,13 +126,8 @@ func (c *Client) effectiveMaxTokens() int {
 	return DefaultMaxTokens
 }
 
-// doRequest sends one HTTP request and returns the full API response.
-func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (apiResponse, error) {
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return apiResponse{}, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
+// doSingleAttempt sends one HTTP request and returns the full API response.
+func (c *Client) doSingleAttempt(ctx context.Context, jsonBody []byte) (apiResponse, error) {
 	url := c.baseURL + MessagesEndpoint
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
 	if err != nil {
@@ -105,7 +150,7 @@ func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (apiResponse
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return apiResponse{}, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		return apiResponse{}, &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
 	var apiResp apiResponse
@@ -118,6 +163,85 @@ func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (apiResponse
 	}
 
 	return apiResp, nil
+}
+
+// doAttempt wraps doSingleAttempt with a per-attempt timeout if one is configured
+// in the context via WithPerAttemptTimeout. This lets each retry get a fresh timeout
+// even after the previous attempt's deadline expired.
+func (c *Client) doAttempt(parentCtx context.Context, jsonBody []byte) (apiResponse, error) {
+	ctx := parentCtx
+	if d, ok := ctx.Value(perAttemptTimeoutKey{}).(time.Duration); ok && d > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(parentCtx, d)
+		defer cancel()
+	}
+	return c.doSingleAttempt(ctx, jsonBody)
+}
+
+// doRequest sends an HTTP request with automatic retries on retryable errors.
+// ctx should be a cancellation-only context (no deadline); use WithPerAttemptTimeout
+// to apply a per-attempt deadline that resets on each retry.
+func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (apiResponse, error) {
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return apiResponse{}, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	var lastErr error
+	for attempt := 0; attempt <= c.maxRetries; attempt++ {
+		if attempt > 0 {
+			if fn, ok := ctx.Value(retryNotifierKey{}).(func(int, error)); ok {
+				fn(attempt, lastErr)
+			}
+			delay := c.retryDelay * time.Duration(1<<(attempt-1))
+			if delay > 0 {
+				select {
+				case <-ctx.Done():
+					return apiResponse{}, ctx.Err()
+				case <-time.After(delay):
+				}
+			} else if ctx.Err() != nil {
+				return apiResponse{}, ctx.Err()
+			}
+		}
+
+		resp, err := c.doAttempt(ctx, jsonBody)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+		if !isRetryableError(ctx, err) {
+			break
+		}
+	}
+	return apiResponse{}, lastErr
+}
+
+// isRetryableError reports whether err warrants a retry attempt.
+// ctx should be the parent (non-per-attempt) context; if it is cancelled the
+// function returns false regardless of the error.
+func isRetryableError(ctx context.Context, err error) bool {
+	// Explicit user cancellation — do not retry.
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return false
+	}
+	var statusErr *StatusError
+	if errors.As(err, &statusErr) {
+		return statusErr.StatusCode == http.StatusTooManyRequests || statusErr.StatusCode >= 500
+	}
+	// Per-attempt timeout expired (parent ctx is still alive) — retry with fresh timeout.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	// Network-level transport errors (connection reset, EOF, etc.) are retryable.
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return true
+	}
+	return false
 }
 
 // extractText returns the concatenated text from all text blocks in a response.

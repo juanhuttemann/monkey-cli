@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -35,10 +36,12 @@ type Model struct {
 	client         *api.Client
 	cancelFn       context.CancelFunc
 	wasCancelled   bool
+	retryAttempt   int
 	width          int
 	height         int
 	err            error
 	scrollToBottom bool
+	retryCh        chan RetryingMsg
 }
 
 // NewModel creates a new TUI model with initialized components
@@ -99,6 +102,8 @@ func (m Model) renderMessages() string {
 			rendered = AssistantMessageStyle(sw).Render(md)
 		case "tool":
 			rendered = ToolMessageStyle(sw).Render(msg.Content)
+		case "system":
+			rendered = SystemMessageStyle(sw).Render(msg.Content)
 		default:
 			rendered = ErrorMessageStyle(sw).Render(msg.Content)
 		}
@@ -145,9 +150,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.timer = timer.NewWithInterval(24*time.Hour, time.Second)
 				m.timerActive = true
 				m.startTime = time.Now()
-				cmd, cancel := SendPromptCmd(m.client, m.messages, input)
+				retryCh := make(chan RetryingMsg, 10)
+				m.retryCh = retryCh
+				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, input, APITimeout, retryCh)
 				m.cancelFn = cancel
-				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init())
+				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh))
 			}
 		default:
 			var inputCmd tea.Cmd
@@ -189,6 +196,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastElapsed = time.Since(m.startTime)
 		m.timerActive = false
 		m.wasCancelled = false
+		m.retryAttempt = 0
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
@@ -199,6 +207,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastElapsed = time.Since(m.startTime)
 		m.timerActive = false
 		m.wasCancelled = false
+		m.retryAttempt = 0
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
@@ -208,7 +217,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = StateReady
 			m.timerActive = false
 			m.wasCancelled = true
+			m.retryAttempt = 0
 		}
+
+	case RetryingMsg:
+		m.retryAttempt = msg.Attempt
+		if m.retryCh != nil {
+			cmds = append(cmds, waitForRetry(m.retryCh))
+		}
+
+	case retryDoneMsg:
+		// Retry channel closed; the API result will arrive separately.
 
 	case timer.TickMsg:
 		if m.timerActive {
@@ -246,6 +265,9 @@ func (m Model) View() string {
 		if m.timerActive {
 			elapsed := time.Since(m.startTime).Round(time.Second)
 			line += " " + TimerStyle().Render(elapsed.String())
+		}
+		if m.retryAttempt > 0 {
+			line += " " + TimerStyle().Render(fmt.Sprintf("retrying (%d)", m.retryAttempt))
 		}
 		view.WriteString(line)
 		view.WriteString("\n")

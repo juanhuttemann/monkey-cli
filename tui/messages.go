@@ -42,3 +42,12 @@ type PromptErrorMsg struct {
 
 // PromptCancelledMsg is returned when the in-flight request is cancelled by the user
 type PromptCancelledMsg struct{}
+
+// RetryingMsg is sent to the model when the API client is about to retry a failed request.
+type RetryingMsg struct {
+	Attempt int
+	Err     error
+}
+
+// retryDoneMsg is sent when the retry notification channel has been closed.
+type retryDoneMsg struct{}

@@ -8,6 +8,7 @@ const (
 	AssistantBorderColor = "#04B575" // Green
 	ErrorBorderColor     = "#FF6B6B" // Red
 	ToolBorderColor      = "#00AACC" // Cyan
+	SystemBorderColor    = "#FFA500" // Orange
 )
 
 // UserMessageStyle returns the styling for user messages
@@ -42,6 +43,15 @@ func ToolMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ToolBorderColor)).
+		Width(width - 4).
+		Padding(0, 1)
+}
+
+// SystemMessageStyle returns the styling for system notices (e.g. retry messages)
+func SystemMessageStyle(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(SystemBorderColor)).
 		Width(width - 4).
 		Padding(0, 1)
 }

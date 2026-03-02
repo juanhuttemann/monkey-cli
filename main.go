@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"mogger/api"
@@ -23,7 +24,11 @@ func sendPrompt(prompt string) (string, error) {
 	}
 
 	// Create API client
-	opts := []api.ClientOption{api.WithModel(cfg.Model)}
+	opts := []api.ClientOption{
+		api.WithModel(cfg.Model),
+		api.WithMaxRetries(3),
+		api.WithRetryDelay(time.Second),
+	}
 	if cfg.MaxTokens > 0 {
 		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))
 	}
@@ -66,7 +71,11 @@ func launchTUI() {
 		os.Exit(1)
 	}
 
-	opts := []api.ClientOption{api.WithModel(cfg.Model)}
+	opts := []api.ClientOption{
+		api.WithModel(cfg.Model),
+		api.WithMaxRetries(3),
+		api.WithRetryDelay(time.Second),
+	}
 	if cfg.MaxTokens > 0 {
 		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))
 	}
