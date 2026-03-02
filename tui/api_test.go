@@ -22,7 +22,7 @@ func TestSendPromptCmd_ReturnsCmd(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	messages := []Message{{Role: "user", Content: "test"}}
 
-	cmd := SendPromptCmd(client, messages, "test prompt")
+	cmd, _ := SendPromptCmd(client, messages, "test prompt")
 	if cmd == nil {
 		t.Fatal("SendPromptCmd() returned nil, want non-nil tea.Cmd")
 	}
@@ -41,7 +41,7 @@ func TestSendPromptCmd_SendsWithContext(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	messages := []Message{{Role: "user", Content: "test"}}
 
-	cmd := SendPromptCmd(client, messages, "test prompt")
+	cmd, _ := SendPromptCmd(client, messages, "test prompt")
 	result := cmd()
 
 	// Verify request was made
@@ -77,7 +77,7 @@ func TestSendPromptCmd_UsesConversationHistory(t *testing.T) {
 		{Role: "user", Content: "second message"},
 	}
 
-	cmd := SendPromptCmd(client, messages, "new prompt")
+	cmd, _ := SendPromptCmd(client, messages, "new prompt")
 	_ = cmd()
 
 	// Verify request body contains conversation history
@@ -104,7 +104,7 @@ func TestSendPromptCmd_SuccessResponse(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	messages := []Message{}
 
-	cmd := SendPromptCmd(client, messages, "test prompt")
+	cmd, _ := SendPromptCmd(client, messages, "test prompt")
 	result := cmd()
 
 	response, ok := result.(PromptResponseMsg)
@@ -130,7 +130,7 @@ func TestSendPromptCmd_ErrorResponse(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	messages := []Message{}
 
-	cmd := SendPromptCmd(client, messages, "test prompt")
+	cmd, _ := SendPromptCmd(client, messages, "test prompt")
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -155,7 +155,7 @@ func TestSendPromptCmd_TimeoutError(t *testing.T) {
 	messages := []Message{}
 
 	// Use a short timeout for testing
-	cmd := SendPromptCmdWithTimeout(client, messages, "test prompt", 100*time.Millisecond)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 100*time.Millisecond)
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -182,7 +182,7 @@ func TestSendPromptCmdWithTimeout_RespectsTimeout(t *testing.T) {
 	messages := []Message{}
 
 	timeout := 100 * time.Millisecond
-	cmd := SendPromptCmdWithTimeout(client, messages, "test", timeout)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", timeout)
 	_ = cmd()
 
 	elapsed := time.Since(startTime)
@@ -190,6 +190,28 @@ func TestSendPromptCmdWithTimeout_RespectsTimeout(t *testing.T) {
 	// Should timeout within reasonable margin of the specified timeout
 	if elapsed > 500*time.Millisecond {
 		t.Errorf("Request took %v, should have timed out around %v", elapsed, timeout)
+	}
+}
+
+func TestSendPromptCmd_Cancel_ReturnsCancelledMsg(t *testing.T) {
+	// Server that blocks until the request context is done
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	messages := []Message{}
+
+	cmd, cancel := SendPromptCmd(client, messages, "test prompt")
+
+	// Cancel immediately before executing the cmd
+	cancel()
+
+	result := cmd()
+
+	if _, ok := result.(PromptCancelledMsg); !ok {
+		t.Errorf("SendPromptCmd() after cancel returned %T, want PromptCancelledMsg", result)
 	}
 }
 
@@ -205,7 +227,7 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	messages := []Message{}
 
-	cmd := SendPromptCmdWithTimeout(client, messages, "test prompt", 5*time.Second)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 5*time.Second)
 	if cmd == nil {
 		t.Fatal("SendPromptCmdWithTimeout() returned nil, want non-nil tea.Cmd")
 	}

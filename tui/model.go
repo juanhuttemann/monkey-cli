@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -32,6 +33,8 @@ type Model struct {
 	timerActive    bool
 	lastElapsed    time.Duration
 	client         *api.Client
+	cancelFn       context.CancelFunc
+	wasCancelled   bool
 	width          int
 	height         int
 	err            error
@@ -98,6 +101,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEsc, tea.KeyCtrlC:
+			if m.state == StateLoading {
+				if m.cancelFn != nil {
+					m.cancelFn()
+					m.cancelFn = nil
+				}
+				m.state = StateReady
+				m.timerActive = false
+				m.wasCancelled = true
+				return m, m.timer.Stop()
+			}
 			return m, tea.Quit
 		case tea.KeyCtrlM:
 			if m.CanSubmit() {
@@ -110,10 +123,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.SetContent(m.renderMessages())
 				m.viewport.GotoBottom()
 				// Start elapsed timer
+				m.wasCancelled = false
 				m.timer = timer.NewWithInterval(24*time.Hour, time.Second)
 				m.timerActive = true
 				m.startTime = time.Now()
-				cmd := SendPromptCmd(m.client, m.messages, input)
+				cmd, cancel := SendPromptCmd(m.client, m.messages, input)
+				m.cancelFn = cancel
 				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init())
 			}
 		default:
@@ -148,6 +163,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
 		m.timerActive = false
+		m.wasCancelled = false
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
@@ -157,9 +173,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
 		m.timerActive = false
+		m.wasCancelled = false
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
+
+	case PromptCancelledMsg:
+		if m.state == StateLoading {
+			m.state = StateReady
+			m.timerActive = false
+			m.wasCancelled = true
+		}
 
 	case timer.TickMsg:
 		if m.timerActive {
@@ -199,6 +223,9 @@ func (m Model) View() string {
 			line += " " + TimerStyle().Render(elapsed.String())
 		}
 		view.WriteString(line)
+		view.WriteString("\n")
+	} else if m.wasCancelled {
+		view.WriteString(TimerStyle().Render("canceled"))
 		view.WriteString("\n")
 	} else if m.lastElapsed > 0 {
 		view.WriteString(TimerStyle().Render("took " + m.lastElapsed.Round(time.Second).String()))

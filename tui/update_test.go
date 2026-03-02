@@ -291,22 +291,77 @@ func TestUpdate_PromptErrorMsg_SetsLoadingFalse(t *testing.T) {
 	}
 }
 
-func TestUpdate_Esc_Exits(t *testing.T) {
+func TestUpdate_Esc_WhenReady_Quits(t *testing.T) {
 	model := NewModel(nil)
 
-	// Simulate Escape key
+	// Simulate Escape key when in StateReady (default)
 	escKey := tea.KeyMsg{Type: tea.KeyEsc}
 	_, cmd := model.Update(escKey)
 
 	// Should return a quit command
 	if cmd == nil {
-		t.Error("Update(Esc) should return a non-nil command")
+		t.Error("Update(Esc) when StateReady should return a non-nil command")
 	}
 
 	// The quit command should produce a tea.QuitMsg
 	quitMsg := cmd()
 	if quitMsg != tea.Quit() {
-		t.Error("Esc key should trigger a quit command")
+		t.Error("Esc key when StateReady should trigger a quit command")
+	}
+}
+
+func TestUpdate_Esc_WhenLoading_GoesReady(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+
+	escKey := tea.KeyMsg{Type: tea.KeyEsc}
+	updatedModel, cmd := model.Update(escKey)
+
+	m := updatedModel.(Model)
+	if m.IsLoading() {
+		t.Error("Model should not be loading after Esc while loading")
+	}
+
+	// Should not quit — cmd may be non-nil (timer.Stop) but must not produce QuitMsg
+	if cmd != nil {
+		result := cmd()
+		if _, isQuit := result.(tea.QuitMsg); isQuit {
+			t.Error("Esc while loading should not quit the app")
+		}
+	}
+}
+
+func TestUpdate_PromptCancelled_WhenLoading_GoesReady(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+	initialHistory := len(model.GetHistory())
+
+	updatedModel, _ := model.Update(PromptCancelledMsg{})
+
+	m := updatedModel.(Model)
+	if m.IsLoading() {
+		t.Error("Model should not be loading after PromptCancelledMsg")
+	}
+	if len(m.GetHistory()) != initialHistory {
+		t.Errorf("PromptCancelledMsg should not add history entries: got %d, want %d",
+			len(m.GetHistory()), initialHistory)
+	}
+}
+
+func TestUpdate_PromptCancelled_WhenReady_IsNoOp(t *testing.T) {
+	model := NewModel(nil)
+	model.AddMessage("user", "hello")
+	initialHistory := len(model.GetHistory())
+
+	updatedModel, _ := model.Update(PromptCancelledMsg{})
+
+	m := updatedModel.(Model)
+	if m.IsLoading() {
+		t.Error("Model should remain in StateReady after PromptCancelledMsg when already ready")
+	}
+	if len(m.GetHistory()) != initialHistory {
+		t.Errorf("PromptCancelledMsg when ready should not change history: got %d, want %d",
+			len(m.GetHistory()), initialHistory)
 	}
 }
 

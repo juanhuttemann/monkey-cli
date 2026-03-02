@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"mogger/api"
 )
 
@@ -277,6 +278,21 @@ func TestView_Integration(t *testing.T) {
 	}
 	if !strings.Contains(view, "New message") {
 		t.Error("View() should contain input text")
+	}
+}
+
+func TestView_ShowsCanceled_AfterEscWhileLoading(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	model.SetLoading(true)
+
+	escKey := tea.KeyMsg{Type: tea.KeyEsc}
+	updatedModel, _ := model.Update(escKey)
+
+	view := updatedModel.(Model).View()
+
+	if !strings.Contains(stripANSI(view), "canceled") {
+		t.Error("View() should show 'canceled' after Esc while loading")
 	}
 }
 

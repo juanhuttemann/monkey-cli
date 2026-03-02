@@ -34,3 +34,6 @@ type PromptResponseMsg struct {
 type PromptErrorMsg struct {
 	Err error
 }
+
+// PromptCancelledMsg is returned when the in-flight request is cancelled by the user
+type PromptCancelledMsg struct{}
