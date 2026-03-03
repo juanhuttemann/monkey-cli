@@ -131,6 +131,22 @@ func RenderIntroBlock(width int, title, version, content string) string {
 	return sb.String()
 }
 
+// FilePickerStyle returns the styling for the file picker dropdown border.
+func FilePickerStyle(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#666666")).
+		Width(width - 4).
+		Padding(0, 1)
+}
+
+// FilePickerCursorStyle returns the styling for the highlighted file picker row.
+func FilePickerCursorStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color(AssistantBorderColor)).
+		Bold(true)
+}
+
 // MessageTimestampStyle returns the styling for per-message timestamps: gray, right-aligned.
 func MessageTimestampStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().

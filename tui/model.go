@@ -46,6 +46,7 @@ type Model struct {
 	intro          string
 	introTitle     string
 	introVersion   string
+	filePicker     FilePicker
 }
 
 // NewModel creates a new TUI model with initialized components
@@ -73,12 +74,13 @@ func NewModel(client *api.Client) Model {
 		width:          80,
 		height:         24,
 		scrollToBottom: true,
+		filePicker:     NewFilePicker(80),
 	}
 }
 
 // Init implements tea.Model
 func (m Model) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, LoadFilesCmd())
 }
 
 // messageStyleWidth returns the style parameter used for message bubbles.
@@ -128,6 +130,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEsc, tea.KeyCtrlC:
+			// Esc first dismisses the file picker; Ctrl+C always quits.
+			if msg.Type == tea.KeyEsc && m.filePicker.IsActive() {
+				m.filePicker.Deactivate()
+				return m, nil
+			}
 			if m.state == StateLoading {
 				if m.cancelFn != nil {
 					m.cancelFn()
@@ -148,12 +155,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var vpCmd tea.Cmd
 			m.viewport, vpCmd = m.viewport.Update(msg)
 			cmds = append(cmds, vpCmd)
+		case tea.KeyUp:
+			if m.filePicker.IsActive() {
+				var fpCmd tea.Cmd
+				m.filePicker, fpCmd = m.filePicker.Update(msg)
+				cmds = append(cmds, fpCmd)
+			} else {
+				var inputCmd tea.Cmd
+				m.input, inputCmd = m.input.Update(msg)
+				cmds = append(cmds, inputCmd)
+			}
+		case tea.KeyDown:
+			if m.filePicker.IsActive() {
+				var fpCmd tea.Cmd
+				m.filePicker, fpCmd = m.filePicker.Update(msg)
+				cmds = append(cmds, fpCmd)
+			} else {
+				var inputCmd tea.Cmd
+				m.input, inputCmd = m.input.Update(msg)
+				cmds = append(cmds, inputCmd)
+			}
+		case tea.KeyTab:
+			if m.filePicker.IsActive() {
+				if selected := m.filePicker.SelectedFile(); selected != "" {
+					m.input.SetValue(replaceCurrentMention(m.input.Value(), selected))
+					m.filePicker.Deactivate()
+				}
+			} else {
+				var inputCmd tea.Cmd
+				m.input, inputCmd = m.input.Update(msg)
+				cmds = append(cmds, inputCmd)
+			}
 		case tea.KeyCtrlM:
 			if m.CanSubmit() {
-				input := m.input.Value()
-				// Show the user message and clear the textarea immediately
-				m.messages = append(m.messages, Message{Role: "user", Content: input, Timestamp: time.Now()})
+				rawInput := m.input.Value()
+				expandedInput := expandMentions(rawInput)
+				// Show the original message in the UI (preserves @mentions)
+				m.messages = append(m.messages, Message{Role: "user", Content: rawInput, Timestamp: time.Now()})
 				m.input.SetValue("")
+				m.filePicker.Deactivate()
 				m.state = StateLoading
 				m.scrollToBottom = true
 				m.viewport.SetContent(m.renderMessages())
@@ -167,7 +207,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.retryCh = retryCh
 				toolCallCh := make(chan ToolCallMsg, 10)
 				m.toolCallCh = toolCallCh
-				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, input, APITimeout, toolCallCh, retryCh)
+				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, expandedInput, APITimeout, toolCallCh, retryCh)
 				m.cancelFn = cancel
 				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh))
 			}
@@ -175,12 +215,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var inputCmd tea.Cmd
 			m.input, inputCmd = m.input.Update(msg)
 			cmds = append(cmds, inputCmd)
+			// Sync picker state with the new input value
+			query, fpActive := detectMentionQuery(m.input.Value())
+			if fpActive {
+				m.filePicker.Activate()
+				m.filePicker.SetQuery(query)
+			} else {
+				m.filePicker.Deactivate()
+			}
+		}
+
+	case FilesLoadedMsg:
+		m.filePicker.SetFiles(msg.Files)
+		if m.filePicker.IsActive() {
+			query, _ := detectMentionQuery(m.input.Value())
+			m.filePicker.SetQuery(query)
 		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.input.SetWidth(msg.Width - 4)
+		m.filePicker.SetWidth(msg.Width)
 		vpHeight := msg.Height - 6
 		if vpHeight < 1 {
 			vpHeight = 1
@@ -288,6 +344,11 @@ func (m Model) View() string {
 	view.WriteString(m.viewport.View())
 	view.WriteString("\n")
 
+	if m.filePicker.IsActive() {
+		view.WriteString(m.filePicker.View())
+		view.WriteString("\n")
+	}
+
 	if m.state == StateLoading {
 		line := SpinnerStyle().Render(m.spinner.View())
 		if m.timerActive {
@@ -358,6 +419,7 @@ func (m *Model) SetDimensions(width, height int) {
 	m.width = width
 	m.height = height
 	m.input.SetWidth(width - 4)
+	m.filePicker.SetWidth(width)
 	vpHeight := height - 6
 	if vpHeight < 1 {
 		vpHeight = 1
