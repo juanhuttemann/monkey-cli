@@ -472,11 +472,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Retry channel closed; the API result will arrive separately.
 
 	case ToolCallMsg:
-		m.messages = append(m.messages, Message{
-			Role:      "tool",
-			Content:   formatToolCall(msg.ToolCall),
-			Timestamp: time.Now(),
-		})
+		if content := formatToolCall(msg.ToolCall); content != "" {
+			m.messages = append(m.messages, Message{
+				Role:      "tool",
+				Content:   content,
+				Timestamp: time.Now(),
+			})
+		}
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()

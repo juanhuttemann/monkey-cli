@@ -182,13 +182,24 @@ func TestToolApprovalDialog_View_CursorOnYes_Default(t *testing.T) {
 	}
 }
 
-func TestToolApprovalDialog_View_WithPreview_ShowsPreviewText(t *testing.T) {
+func TestToolApprovalDialog_View_WithPreview_ShowsSplitPanels(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "edit", "--- a\n+++ b\n-old\n+new\n", ch)
-	view := stripANSI(d.View())
-	if !strings.Contains(view, "--- a") {
-		t.Errorf("View with preview should contain diff text: %q", view)
+	d.Activate("model", "edit", "@@ -1,1 +1,1 @@\n-old\n+new\n", ch)
+	view := d.View()
+	stripped := stripANSI(view)
+	if !strings.Contains(stripped, "old") {
+		t.Errorf("View with preview should contain deleted content: %q", stripped)
+	}
+	if !strings.Contains(stripped, "new") {
+		t.Errorf("View with preview should contain added content: %q", stripped)
+	}
+	// Both panel border colors should appear in the raw ANSI output
+	if !strings.Contains(view, "255;107;107") {
+		t.Errorf("View with preview should have red border for left (before) panel")
+	}
+	if !strings.Contains(view, "86;211;100") {
+		t.Errorf("View with preview should have green border for right (after) panel")
 	}
 }
 

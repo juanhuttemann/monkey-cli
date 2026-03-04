@@ -98,7 +98,7 @@ func (d ToolApprovalDialog) View() string {
 	sb.WriteString(d.modelName + " wants to run " + d.toolName)
 	if d.previewText != "" {
 		sb.WriteString("\n\n")
-		sb.WriteString(d.previewText)
+		sb.WriteString(RenderSplitDiff(d.previewText, d.width))
 	}
 	sb.WriteString("\n")
 	options := []string{"Yes", "No"}

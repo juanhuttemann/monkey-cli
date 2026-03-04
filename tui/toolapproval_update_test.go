@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"monkey/api"
 )
 
 func TestUpdate_ToolApprovalRequestMsg_ActivatesDialog(t *testing.T) {
@@ -178,8 +179,8 @@ func TestUpdate_ToolApprovalRequestMsg_EditTool_ShowsDiffInDialog(t *testing.T) 
 	updatedModel, _ := model.Update(msg)
 	m := updatedModel.(Model)
 	view := stripANSI(m.approvalDialog.View())
-	if !strings.Contains(view, "-hello") || !strings.Contains(view, "+goodbye") {
-		t.Errorf("edit approval dialog should show diff in view: %q", view)
+	if !strings.Contains(view, "hello") || !strings.Contains(view, "goodbye") {
+		t.Errorf("edit approval dialog should show before/after content in view: %q", view)
 	}
 }
 
@@ -200,6 +201,17 @@ func TestUpdate_ToolApprovalRequestMsg_EditTool_BadFile_StillActivates(t *testin
 	m := updatedModel.(Model)
 	if !m.approvalDialog.IsActive() {
 		t.Error("dialog should still activate even if diff computation fails")
+	}
+}
+
+func TestUpdate_ToolCallMsg_EmptyOutput_IsNotAddedToHistory(t *testing.T) {
+	model := NewModel(nil)
+	before := len(model.GetHistory())
+	// Simulate a declined tool: Output is empty (as when ApprovingExecutor returns error)
+	updated, _ := model.Update(ToolCallMsg{ToolCall: api.ToolCallResult{Name: "edit", Output: ""}})
+	m := updated.(Model)
+	if len(m.GetHistory()) > before {
+		t.Error("ToolCallMsg with empty output should not add an empty block to message history")
 	}
 }
 
