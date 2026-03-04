@@ -209,6 +209,13 @@ func TestRenderIntroBlock_TitleAppearsInBorder(t *testing.T) {
 	}
 }
 
+func TestRenderIntroBlock_ShowsHelpText(t *testing.T) {
+	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
+	if !strings.Contains(stripANSI(rendered), "Type ? for help") {
+		t.Error("RenderIntroBlock should show 'Type ? for help' in the right panel")
+	}
+}
+
 func TestAssistantMessageStyle_RespectsWidth(t *testing.T) {
 	// Test with different widths
 	styleNarrow := AssistantMessageStyle(40)

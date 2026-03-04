@@ -49,6 +49,7 @@ type Model struct {
 	filePicker     FilePicker
 	commandPicker  CommandPicker
 	modelPicker    ModelPicker
+	helpPanel      HelpPanel
 	models         []string
 }
 
@@ -80,6 +81,7 @@ func NewModel(client *api.Client) Model {
 		filePicker:     NewFilePicker(80),
 		commandPicker:  NewCommandPicker(80),
 		modelPicker:    NewModelPicker(80),
+		helpPanel:      NewHelpPanel(80),
 	}
 }
 
@@ -137,6 +139,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEsc, tea.KeyCtrlC:
 			// Esc dismisses pickers or cancels loading; Ctrl+C always quits.
 			if msg.Type == tea.KeyEsc {
+				if m.helpPanel.IsActive() {
+					m.helpPanel.Deactivate()
+					return m, nil
+				}
 				if m.modelPicker.IsActive() {
 					m.modelPicker.Deactivate()
 					return m, nil
@@ -328,13 +334,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.commandPicker.Deactivate()
 				m.modelPicker.Deactivate()
-				// Sync file picker state with the new input value.
-				query, fpActive := detectMentionQuery(m.input.Value())
-				if fpActive {
-					m.filePicker.Activate()
-					m.filePicker.SetQuery(query)
-				} else {
+				if detectHelpQuery(m.input.Value()) {
+					m.helpPanel.Activate()
+					m.input.SetValue("")
 					m.filePicker.Deactivate()
+				} else {
+					m.helpPanel.Deactivate()
+					// Sync file picker state with the new input value.
+					query, fpActive := detectMentionQuery(m.input.Value())
+					if fpActive {
+						m.filePicker.Activate()
+						m.filePicker.SetQuery(query)
+					} else {
+						m.filePicker.Deactivate()
+					}
 				}
 			}
 		}
@@ -353,6 +366,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filePicker.SetWidth(msg.Width)
 		m.commandPicker.SetWidth(msg.Width)
 		m.modelPicker.SetWidth(msg.Width)
+		m.helpPanel.SetWidth(msg.Width)
 		vpHeight := msg.Height - 6
 		if vpHeight < 1 {
 			vpHeight = 1
@@ -496,6 +510,11 @@ func (m Model) View() string {
 	// text as a contiguous string while still providing a visible cursor.
 	view.WriteString(InputStyle(m.width, 3).Render(m.input.Value() + "▌"))
 
+	if m.helpPanel.IsActive() {
+		view.WriteString("\n")
+		view.WriteString(m.helpPanel.View())
+	}
+
 	return view.String()
 }
 
@@ -546,6 +565,7 @@ func (m *Model) SetDimensions(width, height int) {
 	m.filePicker.SetWidth(width)
 	m.commandPicker.SetWidth(width)
 	m.modelPicker.SetWidth(width)
+	m.helpPanel.SetWidth(width)
 	vpHeight := height - 6
 	if vpHeight < 1 {
 		vpHeight = 1

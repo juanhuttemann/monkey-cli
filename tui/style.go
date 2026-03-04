@@ -86,18 +86,56 @@ const IntroBorderColor = "#7B4F2E"
 
 // RenderIntroBlock renders content inside a bordered block with the title
 // and optional version embedded in the top border: ╭─ Title v0.1.0 ──────╮
+// The block is split: 3/5 left (content) │ 2/5 right ("Type ? for help").
 func RenderIntroBlock(width int, title, version, content string) string {
 	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(IntroBorderColor))
 	verFg := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
-	// Render the inner content with padding (no border).
-	inner := lipgloss.NewStyle().
-		Width(width - 4).
-		Padding(0, 1).
-		Render(content)
+	// Split inner area: 3/5 left, 1 divider, 2/5 right.
+	innerW := width - 2 // space between the two outer │ borders
+	leftW := innerW * 3 / 5
+	rightW := innerW - leftW - 1 // -1 for the divider │
 
-	lines := strings.Split(strings.TrimRight(inner, "\n"), "\n")
-	innerLineWidth := lipgloss.Width(lines[0])
+	// Center the art block as a unit within the left panel.
+	// Find the widest art line, compute a uniform left offset, then render.
+	artLines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+	maxArtW := 0
+	for _, l := range artLines {
+		if w := lipgloss.Width(l); w > maxArtW {
+			maxArtW = w
+		}
+	}
+	contentW := leftW - 2 // inner content area (Width() is outer, Padding uses 1 each side)
+	leftOff := max(0, (contentW-maxArtW)/2)
+	pad := strings.Repeat(" ", leftOff)
+	var centeredArt strings.Builder
+	for i, l := range artLines {
+		if i > 0 {
+			centeredArt.WriteByte('\n')
+		}
+		centeredArt.WriteString(pad + l)
+	}
+	leftLines := strings.Split(strings.TrimRight(
+		lipgloss.NewStyle().Width(leftW).Padding(0, 1).Render(centeredArt.String()),
+		"\n",
+	), "\n")
+	nLines := len(leftLines)
+
+	// Build right lines: "Type ? for help" vertically centered.
+	helpLine := lipgloss.NewStyle().
+		Width(rightW).
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#666666")).
+		Render("Type ? for help")
+	emptyRight := strings.Repeat(" ", rightW)
+	rightLines := make([]string, nLines)
+	for i := range rightLines {
+		if i == nLines/2 {
+			rightLines[i] = helpLine
+		} else {
+			rightLines[i] = emptyRight
+		}
+	}
 
 	// Top border: ╭─ Title v0.1.0 ──────────────────────────────────────────╮
 	prefix := "╭─ "
@@ -107,8 +145,8 @@ func RenderIntroBlock(width int, title, version, content string) string {
 		titleSection += " " + version
 	}
 	titleSection += suffix
-	// +2 accounts for the two │ side chars; -1 for ╮
-	dashLen := max(0, innerLineWidth+2-lipgloss.Width(titleSection)-1)
+	// innerW+2 accounts for the two │ side chars; -1 for ╮
+	dashLen := max(0, innerW+2-lipgloss.Width(titleSection)-1)
 
 	topLine := bdr.Render(prefix+title)
 	if version != "" {
@@ -118,15 +156,17 @@ func RenderIntroBlock(width int, title, version, content string) string {
 
 	var sb strings.Builder
 	sb.WriteString(topLine)
-	for _, line := range lines {
+	for i, ll := range leftLines {
 		sb.WriteByte('\n')
 		sb.WriteString(bdr.Render("│"))
-		sb.WriteString(line)
+		sb.WriteString(ll)
+		sb.WriteString(bdr.Render("│"))
+		sb.WriteString(rightLines[i])
 		sb.WriteString(bdr.Render("│"))
 	}
 	// Bottom border: ╰──────────────────────────────────────────────────────╯
 	sb.WriteByte('\n')
-	sb.WriteString(bdr.Render("╰" + strings.Repeat("─", innerLineWidth) + "╯"))
+	sb.WriteString(bdr.Render("╰" + strings.Repeat("─", innerW) + "╯"))
 
 	return sb.String()
 }
