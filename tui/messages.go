@@ -58,3 +58,14 @@ type ToolCallMsg struct {
 
 // toolCallDoneMsg is sent when the tool call channel has been closed.
 type toolCallDoneMsg struct{}
+
+// ToolApprovalRequestMsg is sent when the model wants to execute a tool and needs user approval.
+type ToolApprovalRequestMsg struct {
+	ModelName  string
+	ToolName   string
+	Input      map[string]any
+	ResponseCh chan<- bool
+}
+
+// toolApprovalDoneMsg is sent when the approval channel is closed (API goroutine finished).
+type toolApprovalDoneMsg struct{}

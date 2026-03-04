@@ -155,7 +155,7 @@ func TestSendPromptCmd_TimeoutError(t *testing.T) {
 	messages := []Message{}
 
 	// Use a short timeout for testing
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 100*time.Millisecond, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 100*time.Millisecond, nil, nil)
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -182,7 +182,7 @@ func TestSendPromptCmdWithTimeout_RespectsTimeout(t *testing.T) {
 	messages := []Message{}
 
 	timeout := 100 * time.Millisecond
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", timeout, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", timeout, nil, nil)
 	_ = cmd()
 
 	elapsed := time.Since(startTime)
@@ -233,7 +233,7 @@ func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
 	messages := []Message{}
 
 	toolCallCh := make(chan ToolCallMsg, 10)
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, toolCallCh)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, toolCallCh, nil)
 	result := cmd()
 
 	// Channel should have received the tool call
@@ -268,7 +268,7 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	messages := []Message{}
 
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 5*time.Second, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 5*time.Second, nil, nil)
 	if cmd == nil {
 		t.Fatal("SendPromptCmdWithTimeout() returned nil, want non-nil tea.Cmd")
 	}

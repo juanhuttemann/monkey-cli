@@ -43,6 +43,7 @@ type Model struct {
 	scrollToBottom bool
 	retryCh        chan RetryingMsg
 	toolCallCh     chan ToolCallMsg
+	approvalCh     chan ToolApprovalRequestMsg
 	intro          string
 	introTitle     string
 	introVersion   string
@@ -50,6 +51,7 @@ type Model struct {
 	commandPicker  CommandPicker
 	modelPicker    ModelPicker
 	helpPanel      HelpPanel
+	approvalDialog ToolApprovalDialog
 	models         []string
 }
 
@@ -82,6 +84,7 @@ func NewModel(client *api.Client) Model {
 		commandPicker:  NewCommandPicker(80),
 		modelPicker:    NewModelPicker(80),
 		helpPanel:      NewHelpPanel(80),
+		approvalDialog: NewToolApprovalDialog(80),
 	}
 }
 
@@ -164,6 +167,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				if m.state == StateLoading {
+					if m.approvalDialog.IsActive() {
+						m.approvalDialog.Deny()
+					}
 					if m.cancelFn != nil {
 						m.cancelFn()
 						m.cancelFn = nil
@@ -178,6 +184,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// Ctrl+C: cancel loading or quit.
 			if m.state == StateLoading {
+				if m.approvalDialog.IsActive() {
+					m.approvalDialog.Deny()
+				}
 				if m.cancelFn != nil {
 					m.cancelFn()
 					m.cancelFn = nil
@@ -198,7 +207,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport, vpCmd = m.viewport.Update(msg)
 			cmds = append(cmds, vpCmd)
 		case tea.KeyUp:
-			if m.modelPicker.IsActive() {
+			if m.approvalDialog.IsActive() {
+				var adCmd tea.Cmd
+				m.approvalDialog, adCmd = m.approvalDialog.Update(msg)
+				cmds = append(cmds, adCmd)
+			} else if m.modelPicker.IsActive() {
 				var mpCmd tea.Cmd
 				m.modelPicker, mpCmd = m.modelPicker.Update(msg)
 				cmds = append(cmds, mpCmd)
@@ -216,7 +229,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, inputCmd)
 			}
 		case tea.KeyDown:
-			if m.modelPicker.IsActive() {
+			if m.approvalDialog.IsActive() {
+				var adCmd tea.Cmd
+				m.approvalDialog, adCmd = m.approvalDialog.Update(msg)
+				cmds = append(cmds, adCmd)
+			} else if m.modelPicker.IsActive() {
 				var mpCmd tea.Cmd
 				m.modelPicker, mpCmd = m.modelPicker.Update(msg)
 				cmds = append(cmds, mpCmd)
@@ -264,6 +281,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, inputCmd)
 			}
 		case tea.KeyCtrlM:
+			// Approval dialog takes priority when active.
+			if m.approvalDialog.IsActive() {
+				approved := m.approvalDialog.IsApproved()
+				m.approvalDialog.Confirm()
+				if !approved {
+					// "No" behaves like Esc: cancel the in-flight request entirely.
+					if m.cancelFn != nil {
+						m.cancelFn()
+						m.cancelFn = nil
+					}
+					m.state = StateReady
+					m.timerActive = false
+					m.wasCancelled = true
+					return m, m.timer.Stop()
+				}
+				if m.approvalCh != nil {
+					cmds = append(cmds, waitForApproval(m.approvalCh))
+				}
+				return m, tea.Batch(cmds...)
+			}
 			// Model picker selection takes priority when active.
 			if m.modelPicker.IsActive() {
 				if selected := m.modelPicker.SelectedModel(); selected != "" {
@@ -314,9 +351,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.retryCh = retryCh
 				toolCallCh := make(chan ToolCallMsg, 10)
 				m.toolCallCh = toolCallCh
-				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, expandedInput, APITimeout, toolCallCh, retryCh)
+				approvalCh := make(chan ToolApprovalRequestMsg, 1)
+				m.approvalCh = approvalCh
+				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, expandedInput, APITimeout, toolCallCh, approvalCh, retryCh)
 				m.cancelFn = cancel
-				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh))
+				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh), waitForApproval(approvalCh))
 			}
 		default:
 			var inputCmd tea.Cmd
@@ -375,6 +414,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.commandPicker.SetWidth(msg.Width)
 		m.modelPicker.SetWidth(msg.Width)
 		m.helpPanel.SetWidth(msg.Width)
+		m.approvalDialog.SetWidth(msg.Width)
 		vpHeight := msg.Height - 6
 		if vpHeight < 1 {
 			vpHeight = 1
@@ -447,6 +487,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case toolCallDoneMsg:
 		// Tool call channel closed; the API result will arrive separately.
 
+	case ToolApprovalRequestMsg:
+		m.approvalDialog.Activate(msg.ModelName, msg.ToolName, msg.ResponseCh)
+		if m.approvalCh != nil {
+			cmds = append(cmds, waitForApproval(m.approvalCh))
+		}
+
+	case toolApprovalDoneMsg:
+		// Approval channel closed; the API result will arrive separately.
+
 	case timer.TickMsg:
 		if m.timerActive {
 			var timerCmd tea.Cmd
@@ -492,6 +541,11 @@ func (m Model) View() string {
 	}
 	if m.commandPicker.IsActive() {
 		view.WriteString(m.commandPicker.View())
+		view.WriteString("\n")
+	}
+
+	if m.approvalDialog.IsActive() {
+		view.WriteString(m.approvalDialog.View())
 		view.WriteString("\n")
 	}
 
@@ -574,6 +628,7 @@ func (m *Model) SetDimensions(width, height int) {
 	m.commandPicker.SetWidth(width)
 	m.modelPicker.SetWidth(width)
 	m.helpPanel.SetWidth(width)
+	m.approvalDialog.SetWidth(width)
 	vpHeight := height - 6
 	if vpHeight < 1 {
 		vpHeight = 1
