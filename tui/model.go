@@ -112,7 +112,15 @@ func (m Model) renderMessages() string {
 			rendered = UserMessageStyle(sw).Render(msg.Content)
 		case "assistant":
 			md := strings.TrimRight(RenderMarkdown(msg.Content, sw-8), "\n")
-			rendered = AssistantMessageStyle(sw).Render(md)
+			modelName := ""
+			if m.client != nil {
+				modelName = m.client.GetModel()
+			}
+			if modelName != "" {
+				rendered = RenderAssistantBlock(sw, modelName, md)
+			} else {
+				rendered = AssistantMessageStyle(sw).Render(md)
+			}
 		case "tool":
 			rendered = ToolMessageStyle(sw).Render(msg.Content)
 		case "system":

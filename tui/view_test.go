@@ -254,6 +254,32 @@ func TestView_TooSmall_ShowsWarning(t *testing.T) {
 	}
 }
 
+func TestView_AssistantMessage_ShowsModelInHeader(t *testing.T) {
+	client := newTestClientWithModel("claude-sonnet-4-5")
+	model := NewModel(client)
+	model.SetDimensions(80, 24)
+	model.AddMessage("assistant", "Hello!")
+
+	view := model.View()
+
+	if !strings.Contains(stripANSI(view), "claude-sonnet-4-5") {
+		t.Error("View() should show the current model name in the assistant message header")
+	}
+}
+
+func TestView_AssistantMessage_NoModelHeader_WhenNoClient(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	model.AddMessage("assistant", "Hello!")
+
+	view := model.View()
+
+	// Should render without panicking and still show content
+	if !strings.Contains(stripANSI(view), "Hello!") {
+		t.Error("View() should show assistant message content even when client is nil")
+	}
+}
+
 func TestView_Integration(t *testing.T) {
 	// Integration test with mock server
 	server := httptest.NewServer(nil)

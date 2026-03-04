@@ -171,6 +171,37 @@ func RenderIntroBlock(width int, title, version, content string) string {
 	return sb.String()
 }
 
+// RenderAssistantBlock renders an assistant message inside a green rounded border
+// with the model name embedded in the top border: ╭─ claude-sonnet-4-5 ──────╮
+func RenderAssistantBlock(width int, modelName, content string) string {
+	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(AssistantBorderColor))
+	modelFg := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+
+	// innerW matches the Width() param used by AssistantMessageStyle so the block is the same size.
+	innerW := width - 4
+
+	// Render content with the same padding as AssistantMessageStyle (no border here).
+	paddedContent := lipgloss.NewStyle().Width(innerW).Padding(0, 1).Render(content)
+	contentLines := strings.Split(paddedContent, "\n")
+
+	// Top border: ╭─ modelName ──────────────────────────────────────────╮
+	// "─ " prefix + modelName + " " suffix take up (2 + len(model) + 1) of innerW.
+	titleW := 2 + lipgloss.Width(modelName) + 1
+	dashLen := max(0, innerW-titleW)
+	topLine := bdr.Render("╭─ ") + modelFg.Render(modelName) + bdr.Render(" "+strings.Repeat("─", dashLen)+"╮")
+
+	var sb strings.Builder
+	sb.WriteString(topLine)
+	for _, line := range contentLines {
+		sb.WriteByte('\n')
+		sb.WriteString(bdr.Render("│") + line + bdr.Render("│"))
+	}
+	sb.WriteByte('\n')
+	sb.WriteString(bdr.Render("╰" + strings.Repeat("─", innerW) + "╯"))
+
+	return sb.String()
+}
+
 // FilePickerStyle returns the styling for the file picker dropdown border.
 func FilePickerStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().

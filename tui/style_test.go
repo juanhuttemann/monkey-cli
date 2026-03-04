@@ -232,3 +232,31 @@ func TestAssistantMessageStyle_RespectsWidth(t *testing.T) {
 		t.Error("AssistantMessageStyle(120) should produce non-empty output")
 	}
 }
+
+func TestRenderAssistantBlock_ShowsModelInBorder(t *testing.T) {
+	rendered := RenderAssistantBlock(80, "claude-sonnet-4-5", "response text")
+	if !strings.Contains(stripANSI(rendered), "claude-sonnet-4-5") {
+		t.Error("RenderAssistantBlock should show the model name in the top border")
+	}
+}
+
+func TestRenderAssistantBlock_ShowsContent(t *testing.T) {
+	rendered := RenderAssistantBlock(80, "claude-sonnet-4-5", "hello world")
+	if !strings.Contains(stripANSI(rendered), "hello world") {
+		t.Error("RenderAssistantBlock should include the message content")
+	}
+}
+
+func TestRenderAssistantBlock_HasBorder(t *testing.T) {
+	rendered := RenderAssistantBlock(80, "claude-sonnet-4-5", "text")
+	if len(rendered) <= len("text") {
+		t.Error("RenderAssistantBlock should add a border around the content")
+	}
+}
+
+func TestRenderAssistantBlock_HasANSI(t *testing.T) {
+	rendered := RenderAssistantBlock(80, "claude-sonnet-4-5", "text")
+	if !strings.Contains(rendered, "\x1b[") {
+		t.Error("RenderAssistantBlock should produce ANSI escape codes for styling")
+	}
+}
