@@ -82,16 +82,17 @@ func TestMention_EscDismissesPicker_NotQuit(t *testing.T) {
 	}
 }
 
-func TestMention_EscWhenPickerInactive_Quits(t *testing.T) {
+func TestMention_EscWhenPickerInactive_IsNoop(t *testing.T) {
 	m := setupModelWithFiles([]string{"main.go"})
 	// Picker is not active
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	if cmd == nil {
-		t.Error("Esc when picker inactive should return quit command")
-	}
-	if msg := cmd(); msg != tea.Quit() {
-		t.Error("Esc when picker inactive should produce QuitMsg")
+	// Esc no longer quits when picker is inactive (use /exit instead)
+	if cmd != nil {
+		result := cmd()
+		if _, isQuit := result.(tea.QuitMsg); isQuit {
+			t.Error("Esc when picker inactive should not quit — use /exit instead")
+		}
 	}
 }
 

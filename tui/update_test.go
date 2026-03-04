@@ -292,22 +292,18 @@ func TestUpdate_PromptErrorMsg_SetsLoadingFalse(t *testing.T) {
 	}
 }
 
-func TestUpdate_Esc_WhenReady_Quits(t *testing.T) {
+func TestUpdate_Esc_WhenReady_IsNoop(t *testing.T) {
 	model := NewModel(nil)
 
-	// Simulate Escape key when in StateReady (default)
+	// Esc when StateReady is now a no-op (use /exit to quit)
 	escKey := tea.KeyMsg{Type: tea.KeyEsc}
 	_, cmd := model.Update(escKey)
 
-	// Should return a quit command
-	if cmd == nil {
-		t.Error("Update(Esc) when StateReady should return a non-nil command")
-	}
-
-	// The quit command should produce a tea.QuitMsg
-	quitMsg := cmd()
-	if quitMsg != tea.Quit() {
-		t.Error("Esc key when StateReady should trigger a quit command")
+	if cmd != nil {
+		result := cmd()
+		if _, isQuit := result.(tea.QuitMsg); isQuit {
+			t.Error("Esc when StateReady should not quit — use /exit instead")
+		}
 	}
 }
 

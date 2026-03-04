@@ -47,12 +47,13 @@ type Model struct {
 	introTitle     string
 	introVersion   string
 	filePicker     FilePicker
+	commandPicker  CommandPicker
 }
 
 // NewModel creates a new TUI model with initialized components
 func NewModel(client *api.Client) Model {
 	ta := textarea.New()
-	ta.Placeholder = "Type your message... (Ctrl+Enter to send, Esc to quit)"
+	ta.Placeholder = "Type your message... (Ctrl+Enter to send, /exit to quit)"
 	ta.SetWidth(80)
 	ta.SetHeight(3)
 	ta.Focus()
@@ -75,6 +76,7 @@ func NewModel(client *api.Client) Model {
 		height:         24,
 		scrollToBottom: true,
 		filePicker:     NewFilePicker(80),
+		commandPicker:  NewCommandPicker(80),
 	}
 }
 
@@ -130,11 +132,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEsc, tea.KeyCtrlC:
-			// Esc first dismisses the file picker; Ctrl+C always quits.
-			if msg.Type == tea.KeyEsc && m.filePicker.IsActive() {
-				m.filePicker.Deactivate()
+			// Esc dismisses pickers or cancels loading; Ctrl+C always quits.
+			if msg.Type == tea.KeyEsc {
+				if m.filePicker.IsActive() {
+					m.filePicker.Deactivate()
+					return m, nil
+				}
+				if m.commandPicker.IsActive() {
+					m.commandPicker.Deactivate()
+					return m, nil
+				}
+				if m.state == StateLoading {
+					if m.cancelFn != nil {
+						m.cancelFn()
+						m.cancelFn = nil
+					}
+					m.state = StateReady
+					m.timerActive = false
+					m.wasCancelled = true
+					return m, m.timer.Stop()
+				}
+				// Esc no longer quits; use /exit instead.
 				return m, nil
 			}
+			// Ctrl+C: cancel loading or quit.
 			if m.state == StateLoading {
 				if m.cancelFn != nil {
 					m.cancelFn()
@@ -160,6 +181,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				var fpCmd tea.Cmd
 				m.filePicker, fpCmd = m.filePicker.Update(msg)
 				cmds = append(cmds, fpCmd)
+			} else if m.commandPicker.IsActive() {
+				var cpCmd tea.Cmd
+				m.commandPicker, cpCmd = m.commandPicker.Update(msg)
+				cmds = append(cmds, cpCmd)
 			} else {
 				var inputCmd tea.Cmd
 				m.input, inputCmd = m.input.Update(msg)
@@ -170,6 +195,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				var fpCmd tea.Cmd
 				m.filePicker, fpCmd = m.filePicker.Update(msg)
 				cmds = append(cmds, fpCmd)
+			} else if m.commandPicker.IsActive() {
+				var cpCmd tea.Cmd
+				m.commandPicker, cpCmd = m.commandPicker.Update(msg)
+				cmds = append(cmds, cpCmd)
 			} else {
 				var inputCmd tea.Cmd
 				m.input, inputCmd = m.input.Update(msg)
@@ -181,12 +210,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.input.SetValue(replaceCurrentMention(m.input.Value(), selected))
 					m.filePicker.Deactivate()
 				}
+			} else if m.commandPicker.IsActive() {
+				if selected := m.commandPicker.SelectedCommand(); selected != "" {
+					m.input.SetValue(selected)
+					m.commandPicker.Deactivate()
+				}
 			} else {
 				var inputCmd tea.Cmd
 				m.input, inputCmd = m.input.Update(msg)
 				cmds = append(cmds, inputCmd)
 			}
 		case tea.KeyCtrlM:
+			// If command picker is active, Tab should select; Enter executes current input.
+			inputVal := strings.TrimSpace(m.input.Value())
+			if cmd, ok := parseSlashCommand(inputVal); ok {
+				switch cmd {
+				case "/exit":
+					return m, tea.Quit
+				case "/clear":
+					m.messages = nil
+					m.input.SetValue("")
+					m.commandPicker.Deactivate()
+					m.filePicker.Deactivate()
+					return m, nil
+				}
+			}
 			if m.CanSubmit() {
 				rawInput := m.input.Value()
 				expandedInput := expandMentions(rawInput)
@@ -215,13 +263,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var inputCmd tea.Cmd
 			m.input, inputCmd = m.input.Update(msg)
 			cmds = append(cmds, inputCmd)
-			// Sync picker state with the new input value
-			query, fpActive := detectMentionQuery(m.input.Value())
-			if fpActive {
-				m.filePicker.Activate()
-				m.filePicker.SetQuery(query)
-			} else {
+			// Sync command picker state (slash commands take priority over file picker).
+			if cmdQuery, cpActive := detectCommandQuery(m.input.Value()); cpActive {
+				m.commandPicker.Activate()
+				m.commandPicker.SetQuery(cmdQuery)
 				m.filePicker.Deactivate()
+			} else {
+				m.commandPicker.Deactivate()
+				// Sync file picker state with the new input value.
+				query, fpActive := detectMentionQuery(m.input.Value())
+				if fpActive {
+					m.filePicker.Activate()
+					m.filePicker.SetQuery(query)
+				} else {
+					m.filePicker.Deactivate()
+				}
 			}
 		}
 
@@ -237,6 +293,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.input.SetWidth(msg.Width - 4)
 		m.filePicker.SetWidth(msg.Width)
+		m.commandPicker.SetWidth(msg.Width)
 		vpHeight := msg.Height - 6
 		if vpHeight < 1 {
 			vpHeight = 1
@@ -348,6 +405,10 @@ func (m Model) View() string {
 		view.WriteString(m.filePicker.View())
 		view.WriteString("\n")
 	}
+	if m.commandPicker.IsActive() {
+		view.WriteString(m.commandPicker.View())
+		view.WriteString("\n")
+	}
 
 	if m.state == StateLoading {
 		line := SpinnerStyle().Render(m.spinner.View())
@@ -420,6 +481,7 @@ func (m *Model) SetDimensions(width, height int) {
 	m.height = height
 	m.input.SetWidth(width - 4)
 	m.filePicker.SetWidth(width)
+	m.commandPicker.SetWidth(width)
 	vpHeight := height - 6
 	if vpHeight < 1 {
 		vpHeight = 1
