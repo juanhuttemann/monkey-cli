@@ -1,18 +1,20 @@
-package api
+package tools
 
 import (
 	"fmt"
 	"os/exec"
+
+	"monkey/api"
 )
 
 // BashTool returns the Tool definition for executing bash commands.
-func BashTool() Tool {
-	return Tool{
+func BashTool() api.Tool {
+	return api.Tool{
 		Name:        "bash",
 		Description: "Execute a bash command and return its combined stdout and stderr output.",
-		InputSchema: InputSchema{
+		InputSchema: api.InputSchema{
 			Type: "object",
-			Properties: map[string]PropertyDef{
+			Properties: map[string]api.PropertyDef{
 				"command": {
 					Type:        "string",
 					Description: "The bash command to execute.",
@@ -23,7 +25,7 @@ func BashTool() Tool {
 	}
 }
 
-// BashExecutor implements ToolExecutor for the bash tool.
+// BashExecutor implements api.ToolExecutor for the bash tool.
 type BashExecutor struct{}
 
 // ExecuteTool runs the bash command from input["command"] and returns combined output.

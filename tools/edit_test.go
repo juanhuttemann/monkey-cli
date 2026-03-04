@@ -1,4 +1,4 @@
-package api
+package tools
 
 import (
 	"os"
@@ -96,7 +96,6 @@ func TestEditExecutor_ReturnsDiff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
-	// Unified diff should have --- and +++ headers
 	if !strings.Contains(result, "---") || !strings.Contains(result, "+++") {
 		t.Errorf("expected unified diff output, got: %q", result)
 	}

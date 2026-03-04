@@ -1,18 +1,20 @@
-package api
+package tools
 
 import (
 	"fmt"
 	"os"
+
+	"monkey/api"
 )
 
 // WriteTool returns the Tool definition for writing file contents.
-func WriteTool() Tool {
-	return Tool{
+func WriteTool() api.Tool {
+	return api.Tool{
 		Name:        "write",
 		Description: "Write content to a file, creating or overwriting it.",
-		InputSchema: InputSchema{
+		InputSchema: api.InputSchema{
 			Type: "object",
-			Properties: map[string]PropertyDef{
+			Properties: map[string]api.PropertyDef{
 				"path": {
 					Type:        "string",
 					Description: "Absolute or relative path to the file to write.",
@@ -27,7 +29,7 @@ func WriteTool() Tool {
 	}
 }
 
-// WriteExecutor implements ToolExecutor for the write tool.
+// WriteExecutor implements api.ToolExecutor for the write tool.
 type WriteExecutor struct{}
 
 // ExecuteTool writes input["content"] to the file at input["path"].

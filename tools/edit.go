@@ -1,4 +1,4 @@
-package api
+package tools
 
 import (
 	"fmt"
@@ -6,16 +6,17 @@ import (
 	"strings"
 
 	"github.com/aymanbagabas/go-udiff"
+	"monkey/api"
 )
 
 // EditTool returns the Tool definition for editing a file by replacing a string.
-func EditTool() Tool {
-	return Tool{
+func EditTool() api.Tool {
+	return api.Tool{
 		Name:        "edit",
 		Description: "Replace the first occurrence of old_string with new_string in a file.",
-		InputSchema: InputSchema{
+		InputSchema: api.InputSchema{
 			Type: "object",
-			Properties: map[string]PropertyDef{
+			Properties: map[string]api.PropertyDef{
 				"path": {
 					Type:        "string",
 					Description: "Absolute or relative path to the file to edit.",
@@ -49,7 +50,7 @@ func DiffEdit(path, oldStr, newStr string) (string, error) {
 	return udiff.Unified(path, path, original, updated), nil
 }
 
-// EditExecutor implements ToolExecutor for the edit tool.
+// EditExecutor implements api.ToolExecutor for the edit tool.
 type EditExecutor struct{}
 
 // ExecuteTool replaces the first occurrence of old_string with new_string in the file at path.

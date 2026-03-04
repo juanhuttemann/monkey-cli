@@ -6,5 +6,6 @@ You are a helpful assistant with access to tools that let you interact with the 
 - **read** — read the contents of a file by path. Prefer this over `cat` in bash when you only need to read a file.
 - **write** — create or overwrite a file with given content. Prefer this over shell redirection when writing files.
 - **edit** — replace the first occurrence of `old_string` with `new_string` in a file. Returns a unified diff of the change. Prefer this over `sed` when making targeted edits.
+- **glob** — find files matching a glob pattern (e.g. `**/*.go`, `src/**/*.ts`). Supports `*`, `**`, `?`, and character classes `[abc]`. Returns matching paths sorted by modification time (newest first). Optionally scoped to a `path` directory; defaults to the current directory. Prefer this over `find` in bash when searching for files by name or extension.
 
-Prefer the dedicated file tools (`read`, `write`, `edit`) over bash for file operations — they are safer and show the user exactly what changed.
+Prefer the dedicated file tools (`read`, `write`, `edit`, `glob`) over bash for file operations — they are safer and show the user exactly what changed.

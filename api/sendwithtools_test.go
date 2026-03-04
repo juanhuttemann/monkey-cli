@@ -11,6 +11,19 @@ import (
 	"testing"
 )
 
+// stubBashTool returns a minimal Tool for use in SendMessageWithTools tests.
+func stubBashTool() Tool {
+	return Tool{
+		Name:        "bash",
+		Description: "Execute a bash command.",
+		InputSchema: InputSchema{
+			Type:     "object",
+			Properties: map[string]PropertyDef{"command": {Type: "string", Description: "command"}},
+			Required: []string{"command"},
+		},
+	}
+}
+
 // mockExecutor is a ToolExecutor that returns a preset result.
 type mockExecutor struct {
 	result string
@@ -43,7 +56,7 @@ func TestSendMessageWithTools_NoToolUse(t *testing.T) {
 	client := NewClient(server.URL, "test-key")
 	result, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "hello"}},
-		[]Tool{BashTool()},
+		[]Tool{stubBashTool()},
 		mockExecutor{result: "unused"},
 	)
 	if err != nil {
@@ -71,7 +84,7 @@ func TestSendMessageWithTools_SingleToolCall(t *testing.T) {
 	client := NewClient(server.URL, "test-key")
 	result, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "run echo"}},
-		[]Tool{BashTool()},
+		[]Tool{stubBashTool()},
 		mockExecutor{result: "hi\n"},
 	)
 	if err != nil {
@@ -101,7 +114,7 @@ func TestSendMessageWithTools_SendsToolsInFirstRequest(t *testing.T) {
 	client := NewClient(server.URL, "test-key")
 	_, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "hi"}},
-		[]Tool{BashTool()},
+		[]Tool{stubBashTool()},
 		mockExecutor{result: ""},
 	)
 	if err != nil {
@@ -140,7 +153,7 @@ func TestSendMessageWithTools_SendsToolResultInSecondRequest(t *testing.T) {
 	client := NewClient(server.URL, "test-key")
 	_, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "where am I?"}},
-		[]Tool{BashTool()},
+		[]Tool{stubBashTool()},
 		mockExecutor{result: "/home/user\n"},
 	)
 	if err != nil {
@@ -191,7 +204,7 @@ func TestSendMessageWithTools_AssistantToolUseAddedToHistory(t *testing.T) {
 	client := NewClient(server.URL, "test-key")
 	_, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "list files"}},
-		[]Tool{BashTool()},
+		[]Tool{stubBashTool()},
 		mockExecutor{result: "file.txt\n"},
 	)
 	if err != nil {
@@ -216,7 +229,7 @@ func TestSendMessageWithTools_AssistantToolUseAddedToHistory(t *testing.T) {
 
 func TestSendMessageWithTools_EmptyMessages(t *testing.T) {
 	client := NewClient("http://localhost", "key")
-	_, err := client.SendMessageWithTools(context.Background(), nil, []Tool{BashTool()}, mockExecutor{})
+	_, err := client.SendMessageWithTools(context.Background(), nil, []Tool{stubBashTool()}, mockExecutor{})
 	if err == nil {
 		t.Error("SendMessageWithTools() should return error for nil messages")
 	}

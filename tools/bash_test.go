@@ -1,4 +1,4 @@
-package api
+package tools
 
 import (
 	"strings"
@@ -90,7 +90,6 @@ func TestBashExecutor_CapturesStderr(t *testing.T) {
 func TestBashExecutor_NonZeroExitReturnsOutput(t *testing.T) {
 	exec := BashExecutor{}
 	result, err := exec.ExecuteTool("bash", map[string]any{"command": "echo fail && exit 1"})
-	// non-zero exit: output still returned, err returned too
 	if err == nil {
 		t.Error("ExecuteTool() should return an error for non-zero exit code")
 	}

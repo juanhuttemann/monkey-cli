@@ -1,18 +1,20 @@
-package api
+package tools
 
 import (
 	"fmt"
 	"os"
+
+	"monkey/api"
 )
 
 // ReadTool returns the Tool definition for reading file contents.
-func ReadTool() Tool {
-	return Tool{
+func ReadTool() api.Tool {
+	return api.Tool{
 		Name:        "read",
 		Description: "Read the contents of a file and return them as a string.",
-		InputSchema: InputSchema{
+		InputSchema: api.InputSchema{
 			Type: "object",
-			Properties: map[string]PropertyDef{
+			Properties: map[string]api.PropertyDef{
 				"path": {
 					Type:        "string",
 					Description: "Absolute or relative path to the file to read.",
@@ -23,7 +25,7 @@ func ReadTool() Tool {
 	}
 }
 
-// ReadExecutor implements ToolExecutor for the read tool.
+// ReadExecutor implements api.ToolExecutor for the read tool.
 type ReadExecutor struct{}
 
 // ExecuteTool reads the file at input["path"] and returns its contents.

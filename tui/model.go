@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"monkey/api"
+	"monkey/tools"
 )
 
 // State represents the current UI state
@@ -495,7 +496,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			path, _ := msg.Input["path"].(string)
 			oldStr, _ := msg.Input["old_string"].(string)
 			newStr, _ := msg.Input["new_string"].(string)
-			if diff, err := api.DiffEdit(path, oldStr, newStr); err == nil {
+			if diff, err := tools.DiffEdit(path, oldStr, newStr); err == nil {
 				preview = diff
 			}
 		}

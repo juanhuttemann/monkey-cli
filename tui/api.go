@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"monkey/api"
+	"monkey/tools"
 )
 
 // ApprovingExecutor wraps a ToolExecutor and requests user approval before each tool call.
@@ -92,12 +93,13 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 
 		// Build the multi-executor with all supported tools.
 		multi := api.NewMultiExecutor()
-		multi.Register("bash", api.BashExecutor{})
-		multi.Register("read", api.ReadExecutor{})
-		multi.Register("write", api.WriteExecutor{})
-		multi.Register("edit", api.EditExecutor{})
+		multi.Register("bash", tools.BashExecutor{})
+		multi.Register("read", tools.ReadExecutor{})
+		multi.Register("write", tools.WriteExecutor{})
+		multi.Register("edit", tools.EditExecutor{})
+		multi.Register("glob", tools.GlobExecutor{})
 
-		tools := []api.Tool{api.BashTool(), api.ReadTool(), api.WriteTool(), api.EditTool()}
+		toolList := []api.Tool{tools.BashTool(), tools.ReadTool(), tools.WriteTool(), tools.EditTool(), tools.GlobTool()}
 
 		// Use ApprovingExecutor when approvalCh is set, otherwise run tools directly.
 		var executor api.ToolExecutor = multi
@@ -109,7 +111,7 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 			executor = ApprovingExecutor{inner: multi, modelName: modelName, approvalCh: approvalCh}
 		}
 
-		response, err := client.SendMessageWithTools(ctx, apiMessages, tools, executor,
+		response, err := client.SendMessageWithTools(ctx, apiMessages, toolList, executor,
 			func(tc api.ToolCallResult) {
 				if toolCallCh != nil {
 					toolCallCh <- ToolCallMsg{ToolCall: tc}
