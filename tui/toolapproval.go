@@ -8,12 +8,13 @@ import (
 
 // ToolApprovalDialog is a Yes/No prompt shown when the model wants to run a tool.
 type ToolApprovalDialog struct {
-	modelName  string
-	toolName   string
-	cursor     int // 0 = Yes, 1 = No
-	active     bool
-	width      int
-	responseCh chan<- bool
+	modelName   string
+	toolName    string
+	previewText string
+	cursor      int // 0 = Yes, 1 = No
+	active      bool
+	width       int
+	responseCh  chan<- bool
 }
 
 // NewToolApprovalDialog returns an inactive approval dialog.
@@ -22,10 +23,12 @@ func NewToolApprovalDialog(width int) ToolApprovalDialog {
 }
 
 // Activate shows the dialog for the given model/tool pair with a response channel.
+// previewText is optional additional content shown above the Yes/No prompt (e.g. a diff).
 // The cursor is reset to Yes on each activation.
-func (d *ToolApprovalDialog) Activate(modelName, toolName string, responseCh chan<- bool) {
+func (d *ToolApprovalDialog) Activate(modelName, toolName, previewText string, responseCh chan<- bool) {
 	d.modelName = modelName
 	d.toolName = toolName
+	d.previewText = previewText
 	d.cursor = 0
 	d.responseCh = responseCh
 	d.active = true
@@ -91,9 +94,12 @@ func (d ToolApprovalDialog) View() string {
 	if !d.active {
 		return ""
 	}
-	prompt := d.modelName + " wants to run " + d.toolName
 	var sb strings.Builder
-	sb.WriteString(prompt)
+	sb.WriteString(d.modelName + " wants to run " + d.toolName)
+	if d.previewText != "" {
+		sb.WriteString("\n\n")
+		sb.WriteString(d.previewText)
+	}
 	sb.WriteString("\n")
 	options := []string{"Yes", "No"}
 	for i, opt := range options {

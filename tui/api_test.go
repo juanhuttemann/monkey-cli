@@ -256,6 +256,31 @@ func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
 	}
 }
 
+func TestSendPromptCmd_SendsAllFourTools(t *testing.T) {
+	var firstBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if firstBody == nil {
+			firstBody = body
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content":[{"type":"text","text":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	cmd, _ := SendPromptCmd(client, nil, "hi")
+	cmd()
+
+	body := string(firstBody)
+	for _, name := range []string{"bash", "read", "write", "edit"} {
+		if !strings.Contains(body, `"`+name+`"`) {
+			t.Errorf("expected tool %q in request body", name)
+		}
+	}
+}
+
 // SendPromptCmdWithTimeout is tested above - this tests the exported version
 func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

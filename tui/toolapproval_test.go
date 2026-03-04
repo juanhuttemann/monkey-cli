@@ -17,7 +17,7 @@ func TestToolApprovalDialog_InactiveByDefault(t *testing.T) {
 func TestToolApprovalDialog_ActivateDeactivate(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("claude-sonnet", "bash", ch)
+	d.Activate("claude-sonnet", "bash", "", ch)
 	if !d.IsActive() {
 		t.Error("After Activate, IsActive = false, want true")
 	}
@@ -30,7 +30,7 @@ func TestToolApprovalDialog_ActivateDeactivate(t *testing.T) {
 func TestToolApprovalDialog_DefaultCursorIsYes(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	if !d.IsApproved() {
 		t.Error("Default cursor should be on Yes (IsApproved = true)")
 	}
@@ -39,7 +39,7 @@ func TestToolApprovalDialog_DefaultCursorIsYes(t *testing.T) {
 func TestToolApprovalDialog_NavigateDown_MovesToNo(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
 	if d.IsApproved() {
 		t.Error("After Down, cursor should be on No (IsApproved = false)")
@@ -49,7 +49,7 @@ func TestToolApprovalDialog_NavigateDown_MovesToNo(t *testing.T) {
 func TestToolApprovalDialog_NavigateUp_AtYes_IsNoop(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyUp})
 	if !d.IsApproved() {
 		t.Error("Up at Yes should be noop (IsApproved stays true)")
@@ -59,7 +59,7 @@ func TestToolApprovalDialog_NavigateUp_AtYes_IsNoop(t *testing.T) {
 func TestToolApprovalDialog_NavigateDown_AtNo_IsNoop(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
 	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
 	if d.IsApproved() {
@@ -70,7 +70,7 @@ func TestToolApprovalDialog_NavigateDown_AtNo_IsNoop(t *testing.T) {
 func TestToolApprovalDialog_Confirm_SendsTrueWhenYes(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d.Confirm()
 	select {
 	case approved := <-ch:
@@ -85,7 +85,7 @@ func TestToolApprovalDialog_Confirm_SendsTrueWhenYes(t *testing.T) {
 func TestToolApprovalDialog_Confirm_SendsFalseWhenNo(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
 	d.Confirm()
 	select {
@@ -101,7 +101,7 @@ func TestToolApprovalDialog_Confirm_SendsFalseWhenNo(t *testing.T) {
 func TestToolApprovalDialog_Confirm_DeactivatesDialog(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d.Confirm()
 	if d.IsActive() {
 		t.Error("After Confirm, dialog should be deactivated")
@@ -111,7 +111,7 @@ func TestToolApprovalDialog_Confirm_DeactivatesDialog(t *testing.T) {
 func TestToolApprovalDialog_Deny_SendsFalse(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d.Deny()
 	select {
 	case approved := <-ch:
@@ -126,7 +126,7 @@ func TestToolApprovalDialog_Deny_SendsFalse(t *testing.T) {
 func TestToolApprovalDialog_Deny_Deactivates(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d.Deny()
 	if d.IsActive() {
 		t.Error("After Deny, dialog should be deactivated")
@@ -143,7 +143,7 @@ func TestToolApprovalDialog_View_InactiveReturnsEmpty(t *testing.T) {
 func TestToolApprovalDialog_View_ContainsPrompt(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("claude-sonnet-4", "bash", ch)
+	d.Activate("claude-sonnet-4", "bash", "", ch)
 	view := d.View()
 	if !containsSubstring(view, "claude-sonnet-4") {
 		t.Errorf("View should contain model name 'claude-sonnet-4': %q", stripANSI(view))
@@ -159,7 +159,7 @@ func TestToolApprovalDialog_View_ContainsPrompt(t *testing.T) {
 func TestToolApprovalDialog_View_ContainsYesNo(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	view := d.View()
 	if !containsSubstring(view, "Yes") {
 		t.Errorf("View should contain 'Yes': %q", stripANSI(view))
@@ -172,7 +172,7 @@ func TestToolApprovalDialog_View_ContainsYesNo(t *testing.T) {
 func TestToolApprovalDialog_View_CursorOnYes_Default(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	view := stripANSI(d.View())
 	if !strings.Contains(view, "> Yes") {
 		t.Errorf("Default view should show '> Yes': %q", view)
@@ -182,10 +182,30 @@ func TestToolApprovalDialog_View_CursorOnYes_Default(t *testing.T) {
 	}
 }
 
+func TestToolApprovalDialog_View_WithPreview_ShowsPreviewText(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	ch := make(chan bool, 1)
+	d.Activate("model", "edit", "--- a\n+++ b\n-old\n+new\n", ch)
+	view := stripANSI(d.View())
+	if !strings.Contains(view, "--- a") {
+		t.Errorf("View with preview should contain diff text: %q", view)
+	}
+}
+
+func TestToolApprovalDialog_View_EmptyPreview_NoExtraContent(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	ch := make(chan bool, 1)
+	d.Activate("model", "bash", "", ch)
+	view := stripANSI(d.View())
+	if !strings.Contains(view, "wants to run") {
+		t.Errorf("View should still show prompt: %q", view)
+	}
+}
+
 func TestToolApprovalDialog_View_CursorOnNo_AfterDown(t *testing.T) {
 	d := NewToolApprovalDialog(80)
 	ch := make(chan bool, 1)
-	d.Activate("model", "bash", ch)
+	d.Activate("model", "bash", "", ch)
 	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
 	view := stripANSI(d.View())
 	if !strings.Contains(view, "  Yes") {

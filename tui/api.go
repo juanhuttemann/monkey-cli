@@ -90,17 +90,26 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 			})
 		}
 
+		// Build the multi-executor with all supported tools.
+		multi := api.NewMultiExecutor()
+		multi.Register("bash", api.BashExecutor{})
+		multi.Register("read", api.ReadExecutor{})
+		multi.Register("write", api.WriteExecutor{})
+		multi.Register("edit", api.EditExecutor{})
+
+		tools := []api.Tool{api.BashTool(), api.ReadTool(), api.WriteTool(), api.EditTool()}
+
 		// Use ApprovingExecutor when approvalCh is set, otherwise run tools directly.
-		var executor api.ToolExecutor = api.BashExecutor{}
+		var executor api.ToolExecutor = multi
 		if approvalCh != nil {
 			modelName := ""
 			if client != nil {
 				modelName = client.GetModel()
 			}
-			executor = ApprovingExecutor{inner: api.BashExecutor{}, modelName: modelName, approvalCh: approvalCh}
+			executor = ApprovingExecutor{inner: multi, modelName: modelName, approvalCh: approvalCh}
 		}
 
-		response, err := client.SendMessageWithTools(ctx, apiMessages, []api.Tool{api.BashTool()}, executor,
+		response, err := client.SendMessageWithTools(ctx, apiMessages, tools, executor,
 			func(tc api.ToolCallResult) {
 				if toolCallCh != nil {
 					toolCallCh <- ToolCallMsg{ToolCall: tc}

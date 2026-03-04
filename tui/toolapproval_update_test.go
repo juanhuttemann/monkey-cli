@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -153,6 +155,51 @@ func TestView_ToolApprovalDialog_Active_ShowsInView(t *testing.T) {
 	}
 	if !containsSubstring(view, "No") {
 		t.Errorf("View with active dialog should contain 'No': %q", stripANSI(view))
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_EditTool_ShowsDiffInDialog(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "file.txt")
+	os.WriteFile(path, []byte("hello world\n"), 0o644)
+
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	msg := ToolApprovalRequestMsg{
+		ModelName: "m",
+		ToolName:  "edit",
+		Input: map[string]any{
+			"path":       path,
+			"old_string": "hello",
+			"new_string": "goodbye",
+		},
+		ResponseCh: ch,
+	}
+	updatedModel, _ := model.Update(msg)
+	m := updatedModel.(Model)
+	view := stripANSI(m.approvalDialog.View())
+	if !strings.Contains(view, "-hello") || !strings.Contains(view, "+goodbye") {
+		t.Errorf("edit approval dialog should show diff in view: %q", view)
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_EditTool_BadFile_StillActivates(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	msg := ToolApprovalRequestMsg{
+		ModelName: "m",
+		ToolName:  "edit",
+		Input: map[string]any{
+			"path":       "/nonexistent/file.txt",
+			"old_string": "x",
+			"new_string": "y",
+		},
+		ResponseCh: ch,
+	}
+	updatedModel, _ := model.Update(msg)
+	m := updatedModel.(Model)
+	if !m.approvalDialog.IsActive() {
+		t.Error("dialog should still activate even if diff computation fails")
 	}
 }
 

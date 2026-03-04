@@ -488,7 +488,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Tool call channel closed; the API result will arrive separately.
 
 	case ToolApprovalRequestMsg:
-		m.approvalDialog.Activate(msg.ModelName, msg.ToolName, msg.ResponseCh)
+		preview := ""
+		if msg.ToolName == "edit" {
+			path, _ := msg.Input["path"].(string)
+			oldStr, _ := msg.Input["old_string"].(string)
+			newStr, _ := msg.Input["new_string"].(string)
+			if diff, err := api.DiffEdit(path, oldStr, newStr); err == nil {
+				preview = diff
+			}
+		}
+		m.approvalDialog.Activate(msg.ModelName, msg.ToolName, preview, msg.ResponseCh)
 		if m.approvalCh != nil {
 			cmds = append(cmds, waitForApproval(m.approvalCh))
 		}
