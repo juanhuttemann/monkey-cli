@@ -16,6 +16,7 @@ type SlashCommand struct {
 var slashCommands = []SlashCommand{
 	{Name: "exit", Desc: "quit monkey"},
 	{Name: "clear", Desc: "start a fresh session"},
+	{Name: "model", Desc: "switch model"},
 }
 
 // CommandPicker is a keyboard-navigable dropdown for slash command completion.

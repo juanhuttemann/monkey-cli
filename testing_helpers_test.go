@@ -17,8 +17,8 @@ func TestSetupTestEnv_SetsAllVars(t *testing.T) {
 	if got := os.Getenv("ANTHROPIC_BASE_URL"); got != "http://test-url" {
 		t.Errorf("ANTHROPIC_BASE_URL = %q, want %q", got, "http://test-url")
 	}
-	if got := os.Getenv("ANTHROPIC_MODEL"); got != "test-model" {
-		t.Errorf("ANTHROPIC_MODEL = %q, want %q", got, "test-model")
+	if got := os.Getenv("ANTHROPIC_DEFAULT_OPUS_MODEL"); got != "test-model" {
+		t.Errorf("ANTHROPIC_DEFAULT_OPUS_MODEL = %q, want %q", got, "test-model")
 	}
 }
 
@@ -26,7 +26,7 @@ func TestSetupTestEnv_CleanupRemovesVars(t *testing.T) {
 	// Ensure vars are not set before test
 	os.Unsetenv("ANTHROPIC_API_KEY")
 	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Unsetenv("ANTHROPIC_MODEL")
+	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 
 	cleanup := setupTestEnv("test-api-key", "http://test-url", "test-model")
 	cleanup()
@@ -37,8 +37,8 @@ func TestSetupTestEnv_CleanupRemovesVars(t *testing.T) {
 	if got := os.Getenv("ANTHROPIC_BASE_URL"); got != "" {
 		t.Errorf("ANTHROPIC_BASE_URL should be unset after cleanup, got %q", got)
 	}
-	if got := os.Getenv("ANTHROPIC_MODEL"); got != "" {
-		t.Errorf("ANTHROPIC_MODEL should be unset after cleanup, got %q", got)
+	if got := os.Getenv("ANTHROPIC_DEFAULT_OPUS_MODEL"); got != "" {
+		t.Errorf("ANTHROPIC_DEFAULT_OPUS_MODEL should be unset after cleanup, got %q", got)
 	}
 }
 
@@ -46,7 +46,7 @@ func TestSetupTestEnv_PartialVars(t *testing.T) {
 	// Ensure clean state
 	os.Unsetenv("ANTHROPIC_API_KEY")
 	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Unsetenv("ANTHROPIC_MODEL")
+	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 
 	// Set only some vars
 	cleanup := setupTestEnv("", "http://test-url", "")
@@ -58,8 +58,8 @@ func TestSetupTestEnv_PartialVars(t *testing.T) {
 	if got := os.Getenv("ANTHROPIC_BASE_URL"); got != "http://test-url" {
 		t.Errorf("ANTHROPIC_BASE_URL = %q, want %q", got, "http://test-url")
 	}
-	if got := os.Getenv("ANTHROPIC_MODEL"); got != "" {
-		t.Errorf("ANTHROPIC_MODEL should be empty, got %q", got)
+	if got := os.Getenv("ANTHROPIC_DEFAULT_OPUS_MODEL"); got != "" {
+		t.Errorf("ANTHROPIC_DEFAULT_OPUS_MODEL should be empty, got %q", got)
 	}
 }
 
@@ -161,7 +161,7 @@ func TestSetupTestEnv_PreservesExistingVars(t *testing.T) {
 	// Set up initial values
 	os.Setenv("ANTHROPIC_API_KEY", "original-key")
 	os.Setenv("ANTHROPIC_BASE_URL", "original-url")
-	os.Setenv("ANTHROPIC_MODEL", "original-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "original-model")
 
 	cleanup := setupTestEnv("new-key", "new-url", "new-model")
 	cleanup()
@@ -173,12 +173,12 @@ func TestSetupTestEnv_PreservesExistingVars(t *testing.T) {
 	if got := os.Getenv("ANTHROPIC_BASE_URL"); got != "original-url" {
 		t.Errorf("ANTHROPIC_BASE_URL = %q, want %q", got, "original-url")
 	}
-	if got := os.Getenv("ANTHROPIC_MODEL"); got != "original-model" {
-		t.Errorf("ANTHROPIC_MODEL = %q, want %q", got, "original-model")
+	if got := os.Getenv("ANTHROPIC_DEFAULT_OPUS_MODEL"); got != "original-model" {
+		t.Errorf("ANTHROPIC_DEFAULT_OPUS_MODEL = %q, want %q", got, "original-model")
 	}
 
 	// Clean up
 	os.Unsetenv("ANTHROPIC_API_KEY")
 	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Unsetenv("ANTHROPIC_MODEL")
+	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 }

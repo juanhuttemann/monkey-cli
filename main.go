@@ -28,7 +28,7 @@ func systemPromptCandidates() []string {
 // including the system prompt loaded from the first system.md found.
 func buildClientOpts(cfg config.Config) ([]api.ClientOption, error) {
 	opts := []api.ClientOption{
-		api.WithModel(cfg.Model),
+		api.WithModel(cfg.DefaultModel()),
 		api.WithMaxRetries(3),
 		api.WithRetryDelay(time.Second),
 	}
@@ -112,6 +112,7 @@ func launchTUI() {
 	}
 	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
 	model := tui.NewModel(client)
+	model.SetModels(cfg.AvailableModels())
 	model.SetIntro(introContent())
 	model.SetIntroTitle(AppTitle)
 	model.SetIntroVersion("v" + Version)

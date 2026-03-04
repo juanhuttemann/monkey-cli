@@ -7,19 +7,11 @@ import (
 )
 
 func TestLoad_AllVarsPresent(t *testing.T) {
-	// Clean up before and after
-	os.Unsetenv(EnvAPIKey)
-	os.Unsetenv(EnvBaseURL)
-	os.Unsetenv(EnvModel)
-	defer func() {
-		os.Unsetenv(EnvAPIKey)
-		os.Unsetenv(EnvBaseURL)
-		os.Unsetenv(EnvModel)
-	}()
-
-	os.Setenv(EnvAPIKey, "test-api-key-123")
-	os.Setenv(EnvBaseURL, "https://api.example.com")
-	os.Setenv(EnvModel, "claude-3-test")
+	t.Setenv(EnvAPIKey, "test-api-key-123")
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	t.Setenv(EnvOpusModel, "claude-opus-test")
+	t.Setenv(EnvSonnetModel, "claude-sonnet-test")
+	t.Setenv(EnvHaikuModel, "claude-haiku-test")
 
 	loader := NewEnvLoader()
 	cfg, err := loader.Load()
@@ -33,82 +25,124 @@ func TestLoad_AllVarsPresent(t *testing.T) {
 	if cfg.BaseURL != "https://api.example.com" {
 		t.Errorf("BaseURL = %q, want %q", cfg.BaseURL, "https://api.example.com")
 	}
-	if cfg.Model != "claude-3-test" {
-		t.Errorf("Model = %q, want %q", cfg.Model, "claude-3-test")
+	if cfg.OpusModel != "claude-opus-test" {
+		t.Errorf("OpusModel = %q, want %q", cfg.OpusModel, "claude-opus-test")
+	}
+	if cfg.SonnetModel != "claude-sonnet-test" {
+		t.Errorf("SonnetModel = %q, want %q", cfg.SonnetModel, "claude-sonnet-test")
+	}
+	if cfg.HaikuModel != "claude-haiku-test" {
+		t.Errorf("HaikuModel = %q, want %q", cfg.HaikuModel, "claude-haiku-test")
 	}
 }
 
 func TestLoad_MissingAPIKey(t *testing.T) {
 	os.Unsetenv(EnvAPIKey)
-	os.Setenv(EnvBaseURL, "https://api.example.com")
-	os.Setenv(EnvModel, "test-model")
-	defer func() {
-		os.Unsetenv(EnvBaseURL)
-		os.Unsetenv(EnvModel)
-	}()
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	t.Setenv(EnvOpusModel, "test-model")
 
 	loader := NewEnvLoader()
 	_, err := loader.Load()
 	if err == nil {
 		t.Fatal("Load() should return error when ANTHROPIC_API_KEY is missing")
 	}
-
 	if !strings.Contains(err.Error(), EnvAPIKey) {
 		t.Errorf("error should mention %s, got: %v", EnvAPIKey, err)
 	}
 }
 
 func TestLoad_MissingBaseURL(t *testing.T) {
-	os.Setenv(EnvAPIKey, "test-key")
+	t.Setenv(EnvAPIKey, "test-key")
 	os.Unsetenv(EnvBaseURL)
-	os.Setenv(EnvModel, "test-model")
-	defer func() {
-		os.Unsetenv(EnvAPIKey)
-		os.Unsetenv(EnvModel)
-	}()
+	t.Setenv(EnvOpusModel, "test-model")
 
 	loader := NewEnvLoader()
 	_, err := loader.Load()
 	if err == nil {
 		t.Fatal("Load() should return error when ANTHROPIC_BASE_URL is missing")
 	}
-
 	if !strings.Contains(err.Error(), EnvBaseURL) {
 		t.Errorf("error should mention %s, got: %v", EnvBaseURL, err)
 	}
 }
 
-func TestLoad_MissingModel(t *testing.T) {
-	os.Setenv(EnvAPIKey, "test-key")
-	os.Setenv(EnvBaseURL, "https://api.example.com")
-	os.Unsetenv(EnvModel)
-	defer func() {
-		os.Unsetenv(EnvAPIKey)
-		os.Unsetenv(EnvBaseURL)
-	}()
+func TestLoad_NoModels(t *testing.T) {
+	t.Setenv(EnvAPIKey, "test-key")
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	os.Unsetenv(EnvOpusModel)
+	os.Unsetenv(EnvSonnetModel)
+	os.Unsetenv(EnvHaikuModel)
 
 	loader := NewEnvLoader()
 	_, err := loader.Load()
 	if err == nil {
-		t.Fatal("Load() should return error when ANTHROPIC_MODEL is missing")
+		t.Fatal("Load() should return error when no model env vars are set")
 	}
+	if !strings.Contains(err.Error(), EnvOpusModel) {
+		t.Errorf("error should mention %s, got: %v", EnvOpusModel, err)
+	}
+}
 
-	if !strings.Contains(err.Error(), EnvModel) {
-		t.Errorf("error should mention %s, got: %v", EnvModel, err)
+func TestLoad_OnlyOpusModel(t *testing.T) {
+	t.Setenv(EnvAPIKey, "test-key")
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	t.Setenv(EnvOpusModel, "claude-opus-4")
+	os.Unsetenv(EnvSonnetModel)
+	os.Unsetenv(EnvHaikuModel)
+
+	cfg, err := NewEnvLoader().Load()
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if cfg.DefaultModel() != "claude-opus-4" {
+		t.Errorf("DefaultModel() = %q, want %q", cfg.DefaultModel(), "claude-opus-4")
+	}
+}
+
+func TestLoad_OnlySonnetModel(t *testing.T) {
+	t.Setenv(EnvAPIKey, "test-key")
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	os.Unsetenv(EnvOpusModel)
+	t.Setenv(EnvSonnetModel, "claude-sonnet-4")
+	os.Unsetenv(EnvHaikuModel)
+
+	cfg, err := NewEnvLoader().Load()
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if cfg.DefaultModel() != "claude-sonnet-4" {
+		t.Errorf("DefaultModel() = %q, want %q", cfg.DefaultModel(), "claude-sonnet-4")
+	}
+}
+
+func TestLoad_OnlyHaikuModel(t *testing.T) {
+	t.Setenv(EnvAPIKey, "test-key")
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	os.Unsetenv(EnvOpusModel)
+	os.Unsetenv(EnvSonnetModel)
+	t.Setenv(EnvHaikuModel, "claude-haiku-4")
+
+	cfg, err := NewEnvLoader().Load()
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if cfg.DefaultModel() != "claude-haiku-4" {
+		t.Errorf("DefaultModel() = %q, want %q", cfg.DefaultModel(), "claude-haiku-4")
 	}
 }
 
 func TestLoad_MissingAllVars(t *testing.T) {
 	os.Unsetenv(EnvAPIKey)
 	os.Unsetenv(EnvBaseURL)
-	os.Unsetenv(EnvModel)
+	os.Unsetenv(EnvOpusModel)
+	os.Unsetenv(EnvSonnetModel)
+	os.Unsetenv(EnvHaikuModel)
 
 	loader := NewEnvLoader()
 	_, err := loader.Load()
 	if err == nil {
 		t.Fatal("Load() should return error when all vars are missing")
 	}
-
 	// Should report the first missing var (API_KEY)
 	if !strings.Contains(err.Error(), EnvAPIKey) {
 		t.Errorf("error should mention %s, got: %v", EnvAPIKey, err)
@@ -116,15 +150,20 @@ func TestLoad_MissingAllVars(t *testing.T) {
 }
 
 func TestEnvConstants(t *testing.T) {
-	// Verify environment variable constants are correct
 	if EnvAPIKey != "ANTHROPIC_API_KEY" {
 		t.Errorf("EnvAPIKey = %q, want %q", EnvAPIKey, "ANTHROPIC_API_KEY")
 	}
 	if EnvBaseURL != "ANTHROPIC_BASE_URL" {
 		t.Errorf("EnvBaseURL = %q, want %q", EnvBaseURL, "ANTHROPIC_BASE_URL")
 	}
-	if EnvModel != "ANTHROPIC_MODEL" {
-		t.Errorf("EnvModel = %q, want %q", EnvModel, "ANTHROPIC_MODEL")
+	if EnvOpusModel != "ANTHROPIC_DEFAULT_OPUS_MODEL" {
+		t.Errorf("EnvOpusModel = %q, want %q", EnvOpusModel, "ANTHROPIC_DEFAULT_OPUS_MODEL")
+	}
+	if EnvSonnetModel != "ANTHROPIC_DEFAULT_SONNET_MODEL" {
+		t.Errorf("EnvSonnetModel = %q, want %q", EnvSonnetModel, "ANTHROPIC_DEFAULT_SONNET_MODEL")
+	}
+	if EnvHaikuModel != "ANTHROPIC_DEFAULT_HAIKU_MODEL" {
+		t.Errorf("EnvHaikuModel = %q, want %q", EnvHaikuModel, "ANTHROPIC_DEFAULT_HAIKU_MODEL")
 	}
 	if EnvMaxTokens != "CLAUDE_CODE_MAX_OUTPUT_TOKENS" {
 		t.Errorf("EnvMaxTokens = %q, want %q", EnvMaxTokens, "CLAUDE_CODE_MAX_OUTPUT_TOKENS")
@@ -135,7 +174,7 @@ func setRequiredEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv(EnvAPIKey, "test-key")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
-	t.Setenv(EnvModel, "test-model")
+	t.Setenv(EnvOpusModel, "test-model")
 }
 
 func TestLoad_MaxTokens_NotSet_DefaultsToZero(t *testing.T) {
@@ -203,6 +242,87 @@ func TestLoad_MaxTokens_Negative(t *testing.T) {
 	}
 }
 
+func TestConfig_DefaultModel_OpusFirst(t *testing.T) {
+	cfg := Config{OpusModel: "opus", SonnetModel: "sonnet", HaikuModel: "haiku"}
+	if got := cfg.DefaultModel(); got != "opus" {
+		t.Errorf("DefaultModel() = %q, want %q", got, "opus")
+	}
+}
+
+func TestConfig_DefaultModel_SonnetWhenNoOpus(t *testing.T) {
+	cfg := Config{SonnetModel: "sonnet", HaikuModel: "haiku"}
+	if got := cfg.DefaultModel(); got != "sonnet" {
+		t.Errorf("DefaultModel() = %q, want %q", got, "sonnet")
+	}
+}
+
+func TestConfig_DefaultModel_HaikuWhenOnlyHaiku(t *testing.T) {
+	cfg := Config{HaikuModel: "haiku"}
+	if got := cfg.DefaultModel(); got != "haiku" {
+		t.Errorf("DefaultModel() = %q, want %q", got, "haiku")
+	}
+}
+
+func TestConfig_DefaultModel_EmptyWhenNone(t *testing.T) {
+	cfg := Config{}
+	if got := cfg.DefaultModel(); got != "" {
+		t.Errorf("DefaultModel() = %q, want ''", got)
+	}
+}
+
+func TestConfig_AvailableModels_All(t *testing.T) {
+	cfg := Config{OpusModel: "opus", SonnetModel: "sonnet", HaikuModel: "haiku"}
+	got := cfg.AvailableModels()
+	if len(got) != 3 {
+		t.Fatalf("AvailableModels() len = %d, want 3", len(got))
+	}
+	if got[0] != "opus" || got[1] != "sonnet" || got[2] != "haiku" {
+		t.Errorf("AvailableModels() = %v, want [opus sonnet haiku]", got)
+	}
+}
+
+func TestConfig_AvailableModels_OnlyOpus(t *testing.T) {
+	cfg := Config{OpusModel: "opus"}
+	got := cfg.AvailableModels()
+	if len(got) != 1 || got[0] != "opus" {
+		t.Errorf("AvailableModels() = %v, want [opus]", got)
+	}
+}
+
+func TestConfig_AvailableModels_Empty(t *testing.T) {
+	cfg := Config{}
+	got := cfg.AvailableModels()
+	if len(got) != 0 {
+		t.Errorf("AvailableModels() = %v, want []", got)
+	}
+}
+
+func TestConfig_Validate_Valid(t *testing.T) {
+	cfg := Config{APIKey: "key", BaseURL: "url", OpusModel: "model"}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate() = %v, want nil", err)
+	}
+}
+
+func TestConfig_Validate_NoModel(t *testing.T) {
+	cfg := Config{APIKey: "key", BaseURL: "url"}
+	if err := cfg.Validate(); err == nil {
+		t.Error("Validate() = nil, want error when no model set")
+	}
+}
+
+func TestConfig_EmptyValues(t *testing.T) {
+	t.Setenv(EnvAPIKey, "")
+	t.Setenv(EnvBaseURL, "https://api.example.com")
+	t.Setenv(EnvOpusModel, "test-model")
+
+	loader := NewEnvLoader()
+	_, err := loader.Load()
+	if err == nil {
+		t.Fatal("Load() should return error when ANTHROPIC_API_KEY is empty string")
+	}
+}
+
 func TestLoadSystemPromptFile_FileExists(t *testing.T) {
 	f, err := os.CreateTemp("", "system*.md")
 	if err != nil {
@@ -246,23 +366,5 @@ func TestLoadSystemPromptFile_EmptyFile_ReturnsEmpty(t *testing.T) {
 	}
 	if got != "" {
 		t.Errorf("LoadSystemPromptFile() = %q, want empty string for empty file", got)
-	}
-}
-
-func TestConfig_EmptyValues(t *testing.T) {
-	// Setting empty string should be treated as missing
-	os.Setenv(EnvAPIKey, "")
-	os.Setenv(EnvBaseURL, "https://api.example.com")
-	os.Setenv(EnvModel, "test-model")
-	defer func() {
-		os.Unsetenv(EnvAPIKey)
-		os.Unsetenv(EnvBaseURL)
-		os.Unsetenv(EnvModel)
-	}()
-
-	loader := NewEnvLoader()
-	_, err := loader.Load()
-	if err == nil {
-		t.Fatal("Load() should return error when ANTHROPIC_API_KEY is empty string")
 	}
 }

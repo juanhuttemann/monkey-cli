@@ -126,6 +126,16 @@ func WithRetryDelay(d time.Duration) ClientOption {
 	}
 }
 
+// SetModel changes the model used for subsequent API requests.
+func (c *Client) SetModel(model string) {
+	c.model = model
+}
+
+// GetModel returns the model currently configured on the client.
+func (c *Client) GetModel() string {
+	return c.model
+}
+
 // effectiveMaxTokens returns the configured max tokens, falling back to DefaultMaxTokens.
 func (c *Client) effectiveMaxTokens() int {
 	if c.maxTokens > 0 {

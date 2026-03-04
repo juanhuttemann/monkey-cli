@@ -8,17 +8,18 @@ import (
 )
 
 // setupTestEnv sets environment variables and returns a cleanup function
-// that restores the original values (or unsets if they were not set)
+// that restores the original values (or unsets if they were not set).
+// model is set as ANTHROPIC_DEFAULT_OPUS_MODEL.
 func setupTestEnv(apiKey, baseURL, model string) func() {
 	// Save original values
 	originalAPIKey := os.Getenv("ANTHROPIC_API_KEY")
 	originalBaseURL := os.Getenv("ANTHROPIC_BASE_URL")
-	originalModel := os.Getenv("ANTHROPIC_MODEL")
+	originalModel := os.Getenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 
 	// Set new values
 	os.Setenv("ANTHROPIC_API_KEY", apiKey)
 	os.Setenv("ANTHROPIC_BASE_URL", baseURL)
-	os.Setenv("ANTHROPIC_MODEL", model)
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", model)
 
 	// Return cleanup function
 	return func() {
@@ -33,9 +34,9 @@ func setupTestEnv(apiKey, baseURL, model string) func() {
 			os.Setenv("ANTHROPIC_BASE_URL", originalBaseURL)
 		}
 		if originalModel == "" {
-			os.Unsetenv("ANTHROPIC_MODEL")
+			os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 		} else {
-			os.Setenv("ANTHROPIC_MODEL", originalModel)
+			os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", originalModel)
 		}
 	}
 }

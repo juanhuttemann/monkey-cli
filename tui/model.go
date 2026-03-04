@@ -48,6 +48,8 @@ type Model struct {
 	introVersion   string
 	filePicker     FilePicker
 	commandPicker  CommandPicker
+	modelPicker    ModelPicker
+	models         []string
 }
 
 // NewModel creates a new TUI model with initialized components
@@ -77,6 +79,7 @@ func NewModel(client *api.Client) Model {
 		scrollToBottom: true,
 		filePicker:     NewFilePicker(80),
 		commandPicker:  NewCommandPicker(80),
+		modelPicker:    NewModelPicker(80),
 	}
 }
 
@@ -134,6 +137,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEsc, tea.KeyCtrlC:
 			// Esc dismisses pickers or cancels loading; Ctrl+C always quits.
 			if msg.Type == tea.KeyEsc {
+				if m.modelPicker.IsActive() {
+					m.modelPicker.Deactivate()
+					return m, nil
+				}
 				if m.filePicker.IsActive() {
 					m.filePicker.Deactivate()
 					return m, nil
@@ -177,7 +184,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport, vpCmd = m.viewport.Update(msg)
 			cmds = append(cmds, vpCmd)
 		case tea.KeyUp:
-			if m.filePicker.IsActive() {
+			if m.modelPicker.IsActive() {
+				var mpCmd tea.Cmd
+				m.modelPicker, mpCmd = m.modelPicker.Update(msg)
+				cmds = append(cmds, mpCmd)
+			} else if m.filePicker.IsActive() {
 				var fpCmd tea.Cmd
 				m.filePicker, fpCmd = m.filePicker.Update(msg)
 				cmds = append(cmds, fpCmd)
@@ -191,7 +202,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, inputCmd)
 			}
 		case tea.KeyDown:
-			if m.filePicker.IsActive() {
+			if m.modelPicker.IsActive() {
+				var mpCmd tea.Cmd
+				m.modelPicker, mpCmd = m.modelPicker.Update(msg)
+				cmds = append(cmds, mpCmd)
+			} else if m.filePicker.IsActive() {
 				var fpCmd tea.Cmd
 				m.filePicker, fpCmd = m.filePicker.Update(msg)
 				cmds = append(cmds, fpCmd)
@@ -205,15 +220,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, inputCmd)
 			}
 		case tea.KeyTab:
-			if m.filePicker.IsActive() {
+			if m.modelPicker.IsActive() {
+				if selected := m.modelPicker.SelectedModel(); selected != "" {
+					m.applyModelSelection(selected)
+				}
+			} else if m.filePicker.IsActive() {
 				if selected := m.filePicker.SelectedFile(); selected != "" {
 					m.input.SetValue(replaceCurrentMention(m.input.Value(), selected))
 					m.filePicker.Deactivate()
 				}
 			} else if m.commandPicker.IsActive() {
 				if selected := m.commandPicker.SelectedCommand(); selected != "" {
-					m.input.SetValue(selected)
 					m.commandPicker.Deactivate()
+					if selected == "/model" && len(m.models) > 0 {
+						// Transition directly to model picker.
+						m.input.SetValue("/model")
+						m.modelPicker.SetModels(m.models)
+						if m.client != nil {
+							m.modelPicker.SetCursor(m.client.GetModel())
+						}
+						m.modelPicker.Activate()
+					} else {
+						m.input.SetValue(selected)
+					}
 				}
 			} else {
 				var inputCmd tea.Cmd
@@ -221,6 +250,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, inputCmd)
 			}
 		case tea.KeyCtrlM:
+			// Model picker selection takes priority when active.
+			if m.modelPicker.IsActive() {
+				if selected := m.modelPicker.SelectedModel(); selected != "" {
+					m.applyModelSelection(selected)
+				}
+				return m, nil
+			}
 			// If command picker is active, Tab should select; Enter executes current input.
 			inputVal := strings.TrimSpace(m.input.Value())
 			if cmd, ok := parseSlashCommand(inputVal); ok {
@@ -232,6 +268,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.input.SetValue("")
 					m.commandPicker.Deactivate()
 					m.filePicker.Deactivate()
+					return m, nil
+				case "/model":
+					m.input.SetValue("")
+					m.commandPicker.Deactivate()
+					m.modelPicker.SetModels(m.models)
+					if m.client != nil {
+						m.modelPicker.SetCursor(m.client.GetModel())
+					}
+					m.modelPicker.Activate()
 					return m, nil
 				}
 			}
@@ -265,11 +310,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, inputCmd)
 			// Sync command picker state (slash commands take priority over file picker).
 			if cmdQuery, cpActive := detectCommandQuery(m.input.Value()); cpActive {
-				m.commandPicker.Activate()
-				m.commandPicker.SetQuery(cmdQuery)
-				m.filePicker.Deactivate()
+				if cmdQuery == "model" && len(m.models) > 0 {
+					// Exact "/model" typed → show model picker inline (like @file picker).
+					m.commandPicker.Deactivate()
+					m.filePicker.Deactivate()
+					m.modelPicker.SetModels(m.models)
+					if m.client != nil {
+						m.modelPicker.SetCursor(m.client.GetModel())
+					}
+					m.modelPicker.Activate()
+				} else {
+					m.commandPicker.Activate()
+					m.commandPicker.SetQuery(cmdQuery)
+					m.filePicker.Deactivate()
+					m.modelPicker.Deactivate()
+				}
 			} else {
 				m.commandPicker.Deactivate()
+				m.modelPicker.Deactivate()
 				// Sync file picker state with the new input value.
 				query, fpActive := detectMentionQuery(m.input.Value())
 				if fpActive {
@@ -294,6 +352,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.SetWidth(msg.Width - 4)
 		m.filePicker.SetWidth(msg.Width)
 		m.commandPicker.SetWidth(msg.Width)
+		m.modelPicker.SetWidth(msg.Width)
 		vpHeight := msg.Height - 6
 		if vpHeight < 1 {
 			vpHeight = 1
@@ -401,6 +460,10 @@ func (m Model) View() string {
 	view.WriteString(m.viewport.View())
 	view.WriteString("\n")
 
+	if m.modelPicker.IsActive() {
+		view.WriteString(m.modelPicker.View())
+		view.WriteString("\n")
+	}
 	if m.filePicker.IsActive() {
 		view.WriteString(m.filePicker.View())
 		view.WriteString("\n")
@@ -482,6 +545,7 @@ func (m *Model) SetDimensions(width, height int) {
 	m.input.SetWidth(width - 4)
 	m.filePicker.SetWidth(width)
 	m.commandPicker.SetWidth(width)
+	m.modelPicker.SetWidth(width)
 	vpHeight := height - 6
 	if vpHeight < 1 {
 		vpHeight = 1
@@ -521,6 +585,25 @@ func (m *Model) SetIntroTitle(title string) {
 // SetIntroVersion sets the version string displayed next to the title in the intro block's border.
 func (m *Model) SetIntroVersion(version string) {
 	m.introVersion = version
+}
+
+// SetModels sets the available models shown in the /model picker.
+func (m *Model) SetModels(models []string) {
+	m.models = models
+	m.modelPicker.SetModels(models)
+}
+
+// applyModelSelection switches to the selected model and dismisses the picker.
+func (m *Model) applyModelSelection(model string) {
+	if m.client != nil {
+		m.client.SetModel(model)
+	}
+	m.modelPicker.Deactivate()
+	m.input.SetValue("")
+	m.messages = append(m.messages, Message{Role: "system", Content: "model: " + model, Timestamp: time.Now()})
+	m.scrollToBottom = true
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
 }
 
 // AddMessage appends a message to the conversation history (pointer receiver to mutate in place)

@@ -347,6 +347,42 @@ func TestConstants(t *testing.T) {
 	}
 }
 
+func TestClient_SetModel_ChangesModel(t *testing.T) {
+	var lastModel string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body apiRequest
+		b, _ := io.ReadAll(r.Body)
+		json.Unmarshal(b, &body)
+		lastModel = body.Model
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "key", WithModel("original"))
+	client.SetModel("updated")
+
+	_, err := client.SendMessage(context.Background(), "hi")
+	if err != nil {
+		t.Fatalf("SendMessage() error: %v", err)
+	}
+	if lastModel != "updated" {
+		t.Errorf("model in request = %q, want %q", lastModel, "updated")
+	}
+}
+
+func TestClient_GetModel(t *testing.T) {
+	client := NewClient("https://api.example.com", "key", WithModel("claude-opus-4"))
+	if got := client.GetModel(); got != "claude-opus-4" {
+		t.Errorf("GetModel() = %q, want %q", got, "claude-opus-4")
+	}
+
+	client.SetModel("claude-sonnet-4")
+	if got := client.GetModel(); got != "claude-sonnet-4" {
+		t.Errorf("GetModel() after SetModel = %q, want %q", got, "claude-sonnet-4")
+	}
+}
+
 func TestSendMessageWithHistory_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

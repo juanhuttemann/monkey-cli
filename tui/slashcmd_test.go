@@ -215,6 +215,15 @@ func TestCommandPicker_ContainsExitAndClear(t *testing.T) {
 	}
 }
 
+func TestCommandPicker_ContainsModel(t *testing.T) {
+	cp := NewCommandPicker(80)
+	cp.Activate()
+	cp.SetQuery("model")
+	if cp.SelectedCommand() != "/model" {
+		t.Errorf("expected /model in commands, SelectedCommand = %q", cp.SelectedCommand())
+	}
+}
+
 // --- Model integration: /exit ---
 
 func TestUpdate_SlashExit_Quits(t *testing.T) {
@@ -316,6 +325,185 @@ func TestUpdate_TypeSlash_ActivatesCommandPicker(t *testing.T) {
 
 	if !model.commandPicker.IsActive() {
 		t.Error("CommandPicker should activate when input starts with '/'")
+	}
+}
+
+// --- Model integration: /model inline (activates while typing) ---
+
+func TestUpdate_TypeSlashModel_ShowsModelPicker(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"claude-opus-4", "claude-sonnet-4"})
+
+	// Simulate typing the final 'l' of "/model" — textarea appends 'l' to "/mode"
+	model.SetInput("/mode")
+	runeKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}}
+	updatedModel, _ := model.Update(runeKey)
+
+	m := updatedModel.(Model)
+	if !m.modelPicker.IsActive() {
+		t.Error("modelPicker should activate when input is '/model'")
+	}
+	if m.commandPicker.IsActive() {
+		t.Error("commandPicker should be inactive when modelPicker is active")
+	}
+}
+
+func TestUpdate_TypeSlashMod_ShowsCommandPickerNotModelPicker(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"claude-opus-4"})
+
+	model.SetInput("/mod")
+	runeKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}}
+	updatedModel, _ := model.Update(runeKey)
+
+	m := updatedModel.(Model)
+	if m.modelPicker.IsActive() {
+		t.Error("modelPicker should NOT activate for partial query '/mod'")
+	}
+	if !m.commandPicker.IsActive() {
+		t.Error("commandPicker should activate for '/mod'")
+	}
+}
+
+func TestUpdate_TypeSlashModelX_DeactivatesModelPicker(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"claude-opus-4"})
+	// Start with model picker active (user had "/model")
+	model.modelPicker.Activate()
+
+	// Now input changes to "/modelx" — model picker should deactivate
+	model.SetInput("/modelx")
+	runeKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}}
+	updatedModel, _ := model.Update(runeKey)
+
+	m := updatedModel.(Model)
+	if m.modelPicker.IsActive() {
+		t.Error("modelPicker should deactivate when input is '/modelx' (not exact match)")
+	}
+}
+
+func TestUpdate_TabOnCommandPicker_SlashModel_ShowsModelPicker(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"claude-opus-4", "claude-sonnet-4"})
+	model.SetInput("/model")
+	model.commandPicker.Activate()
+	model.commandPicker.SetQuery("model")
+
+	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+	updatedModel, _ := model.Update(tabKey)
+
+	m := updatedModel.(Model)
+	if !m.modelPicker.IsActive() {
+		t.Error("modelPicker should activate after Tab-selecting /model from command picker")
+	}
+	if m.commandPicker.IsActive() {
+		t.Error("commandPicker should be inactive after Tab-selecting /model")
+	}
+}
+
+func TestUpdate_ModelPickerInline_TabClearsInput(t *testing.T) {
+	client := newTestClientWithModel("old-model")
+	model := NewModel(client)
+	model.SetModels([]string{"claude-opus-4"})
+	model.SetInput("/model")
+	model.modelPicker.SetModels([]string{"claude-opus-4"})
+	model.modelPicker.Activate()
+
+	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+	updatedModel, _ := model.Update(tabKey)
+
+	m := updatedModel.(Model)
+	if m.GetInput() != "" {
+		t.Errorf("input after model selection = %q, want ''", m.GetInput())
+	}
+}
+
+// --- Model integration: /model ---
+
+func TestUpdate_SlashModel_ActivatesModelPicker(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"claude-opus-4", "claude-sonnet-4"})
+	model.SetInput("/model")
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel, _ := model.Update(ctrlEnter)
+
+	m := updatedModel.(Model)
+	if !m.modelPicker.IsActive() {
+		t.Error("modelPicker should be active after /model command")
+	}
+	if m.GetInput() != "" {
+		t.Errorf("input should be cleared after /model, got %q", m.GetInput())
+	}
+}
+
+func TestUpdate_ModelPicker_Tab_SwitchesModel(t *testing.T) {
+	client := newTestClientWithModel("original-model")
+	model := NewModel(client)
+	model.SetModels([]string{"claude-opus-4", "claude-sonnet-4"})
+	model.modelPicker.SetModels([]string{"claude-opus-4", "claude-sonnet-4"})
+	model.modelPicker.Activate()
+	// Navigate to second model
+	model.modelPicker, _ = model.modelPicker.Update(tea.KeyMsg{Type: tea.KeyDown})
+
+	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+	updatedModel, _ := model.Update(tabKey)
+
+	m := updatedModel.(Model)
+	if m.modelPicker.IsActive() {
+		t.Error("modelPicker should be inactive after Tab selection")
+	}
+	if client.GetModel() != "claude-sonnet-4" {
+		t.Errorf("client model = %q, want %q", client.GetModel(), "claude-sonnet-4")
+	}
+}
+
+func TestUpdate_ModelPicker_Enter_SwitchesModel(t *testing.T) {
+	client := newTestClientWithModel("original-model")
+	model := NewModel(client)
+	model.SetModels([]string{"claude-opus-4"})
+	model.modelPicker.SetModels([]string{"claude-opus-4"})
+	model.modelPicker.Activate()
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel, _ := model.Update(ctrlEnter)
+
+	m := updatedModel.(Model)
+	if m.modelPicker.IsActive() {
+		t.Error("modelPicker should be inactive after Enter selection")
+	}
+	if client.GetModel() != "claude-opus-4" {
+		t.Errorf("client model = %q, want %q", client.GetModel(), "claude-opus-4")
+	}
+}
+
+func TestUpdate_ModelPicker_Esc_Dismisses(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"claude-opus-4"})
+	model.modelPicker.SetModels([]string{"claude-opus-4"})
+	model.modelPicker.Activate()
+
+	escKey := tea.KeyMsg{Type: tea.KeyEsc}
+	updatedModel, _ := model.Update(escKey)
+
+	m := updatedModel.(Model)
+	if m.modelPicker.IsActive() {
+		t.Error("modelPicker should be inactive after Esc")
+	}
+}
+
+func TestUpdate_ModelPicker_Navigate(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"a", "b", "c"})
+	model.modelPicker.SetModels([]string{"a", "b", "c"})
+	model.modelPicker.Activate()
+
+	downKey := tea.KeyMsg{Type: tea.KeyDown}
+	updatedModel, _ := model.Update(downKey)
+
+	m := updatedModel.(Model)
+	if m.modelPicker.SelectedModel() != "b" {
+		t.Errorf("after Down, SelectedModel = %q, want %q", m.modelPicker.SelectedModel(), "b")
 	}
 }
 

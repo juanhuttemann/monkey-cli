@@ -22,11 +22,11 @@ func TestSendPrompt_Success(t *testing.T) {
 	// Set environment variables
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
 	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	got, err := sendPrompt("What is the capital of France?")
@@ -53,11 +53,11 @@ func TestSendPrompt_SendsCorrectPrompt(t *testing.T) {
 
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
 	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	_, err := sendPrompt("custom test prompt")
@@ -78,10 +78,10 @@ func TestSendPrompt_MissingAPIKey(t *testing.T) {
 	// Ensure API key is not set
 	os.Unsetenv("ANTHROPIC_API_KEY")
 	os.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	_, err := sendPrompt("test prompt")
@@ -98,10 +98,10 @@ func TestSendPrompt_MissingBaseURL(t *testing.T) {
 	// Ensure base URL is not set
 	os.Setenv("ANTHROPIC_API_KEY", "test-key")
 	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	_, err := sendPrompt("test prompt")
@@ -115,10 +115,12 @@ func TestSendPrompt_MissingBaseURL(t *testing.T) {
 }
 
 func TestSendPrompt_MissingModel(t *testing.T) {
-	// Ensure model is not set
+	// Ensure all model env vars are not set
 	os.Setenv("ANTHROPIC_API_KEY", "test-key")
 	os.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
-	os.Unsetenv("ANTHROPIC_MODEL")
+	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
+	os.Unsetenv("ANTHROPIC_DEFAULT_SONNET_MODEL")
+	os.Unsetenv("ANTHROPIC_DEFAULT_HAIKU_MODEL")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
@@ -126,11 +128,11 @@ func TestSendPrompt_MissingModel(t *testing.T) {
 
 	_, err := sendPrompt("test prompt")
 	if err == nil {
-		t.Fatal("sendPrompt() should return error when ANTHROPIC_MODEL is missing")
+		t.Fatal("sendPrompt() should return error when no model env vars are set")
 	}
 
-	if !strings.Contains(err.Error(), "ANTHROPIC_MODEL") {
-		t.Errorf("error should mention ANTHROPIC_MODEL, got: %v", err)
+	if !strings.Contains(err.Error(), "ANTHROPIC_DEFAULT_OPUS_MODEL") {
+		t.Errorf("error should mention ANTHROPIC_DEFAULT_OPUS_MODEL, got: %v", err)
 	}
 }
 
@@ -143,11 +145,11 @@ func TestSendPrompt_HTTPError(t *testing.T) {
 
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
 	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	_, err := sendPrompt("test prompt")
@@ -171,11 +173,11 @@ func TestSendPrompt_Non200Status(t *testing.T) {
 
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
 	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	_, err := sendPrompt("test prompt")
@@ -202,11 +204,11 @@ func TestSendPrompt_InvalidJSON(t *testing.T) {
 
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
 	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	_, err := sendPrompt("test prompt")
@@ -230,11 +232,11 @@ func TestSendPrompt_EmptyContent(t *testing.T) {
 
 	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
 	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_MODEL", "test-model")
+	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 	defer func() {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_MODEL")
+		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	}()
 
 	_, err := sendPrompt("test prompt")

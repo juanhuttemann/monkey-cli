@@ -10,18 +10,48 @@ import (
 
 // Environment variable names
 const (
-	EnvAPIKey    = "ANTHROPIC_API_KEY"
-	EnvBaseURL   = "ANTHROPIC_BASE_URL"
-	EnvModel     = "ANTHROPIC_MODEL"
-	EnvMaxTokens = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"
+	EnvAPIKey      = "ANTHROPIC_API_KEY"
+	EnvBaseURL     = "ANTHROPIC_BASE_URL"
+	EnvOpusModel   = "ANTHROPIC_DEFAULT_OPUS_MODEL"
+	EnvSonnetModel = "ANTHROPIC_DEFAULT_SONNET_MODEL"
+	EnvHaikuModel  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+	EnvMaxTokens   = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"
 )
 
 // Config holds the application configuration
 type Config struct {
-	APIKey    string
-	BaseURL   string
-	Model     string
-	MaxTokens int // 0 means use the API client's default
+	APIKey      string
+	BaseURL     string
+	OpusModel   string
+	SonnetModel string
+	HaikuModel  string
+	MaxTokens   int // 0 means use the API client's default
+}
+
+// AvailableModels returns configured model values in priority order (opus, sonnet, haiku).
+func (c Config) AvailableModels() []string {
+	var m []string
+	if c.OpusModel != "" {
+		m = append(m, c.OpusModel)
+	}
+	if c.SonnetModel != "" {
+		m = append(m, c.SonnetModel)
+	}
+	if c.HaikuModel != "" {
+		m = append(m, c.HaikuModel)
+	}
+	return m
+}
+
+// DefaultModel returns the highest-priority configured model (opus > sonnet > haiku).
+func (c Config) DefaultModel() string {
+	if c.OpusModel != "" {
+		return c.OpusModel
+	}
+	if c.SonnetModel != "" {
+		return c.SonnetModel
+	}
+	return c.HaikuModel
 }
 
 // Loader defines the interface for loading configuration
@@ -49,15 +79,17 @@ func (l *envLoader) Load() (Config, error) {
 		return Config{}, errors.New("missing required environment variable: " + EnvBaseURL)
 	}
 
-	model := os.Getenv(EnvModel)
-	if model == "" {
-		return Config{}, errors.New("missing required environment variable: " + EnvModel)
+	cfg := Config{
+		APIKey:      apiKey,
+		BaseURL:     baseURL,
+		OpusModel:   os.Getenv(EnvOpusModel),
+		SonnetModel: os.Getenv(EnvSonnetModel),
+		HaikuModel:  os.Getenv(EnvHaikuModel),
 	}
 
-	cfg := Config{
-		APIKey:  apiKey,
-		BaseURL: baseURL,
-		Model:   model,
+	if cfg.DefaultModel() == "" {
+		return Config{}, fmt.Errorf("at least one model must be set (%s, %s, or %s)",
+			EnvOpusModel, EnvSonnetModel, EnvHaikuModel)
 	}
 
 	if s := os.Getenv(EnvMaxTokens); s != "" {
@@ -92,8 +124,8 @@ func (c Config) Validate() error {
 	if c.BaseURL == "" {
 		return fmt.Errorf("BaseURL is required")
 	}
-	if c.Model == "" {
-		return fmt.Errorf("Model is required")
+	if c.DefaultModel() == "" {
+		return fmt.Errorf("at least one model must be set")
 	}
 	return nil
 }
