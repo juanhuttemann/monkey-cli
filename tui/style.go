@@ -218,6 +218,16 @@ func FilePickerCursorStyle() lipgloss.Style {
 		Bold(true)
 }
 
+// ApeModeActiveStyle returns banana-yellow styling for the ape mode indicator when enabled.
+func ApeModeActiveStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
+}
+
+// ApeModeInactiveStyle returns grey styling for the ape mode indicator when disabled.
+func ApeModeInactiveStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+}
+
 // MessageTimestampStyle returns the styling for per-message timestamps: gray, right-aligned.
 func MessageTimestampStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().

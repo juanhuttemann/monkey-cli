@@ -17,6 +17,7 @@ var slashCommands = []SlashCommand{
 	{Name: "exit", Desc: "quit monkey"},
 	{Name: "clear", Desc: "start a fresh session"},
 	{Name: "model", Desc: "switch model"},
+	{Name: "ape", Desc: "toggle unrestricted mode (skip tool approval)"},
 }
 
 // CommandPicker is a keyboard-navigable dropdown for slash command completion.

@@ -54,7 +54,11 @@ type Model struct {
 	helpPanel      HelpPanel
 	approvalDialog ToolApprovalDialog
 	models         []string
+	apeMode        bool
 }
+
+// IsApeMode reports whether tool approval is disabled.
+func (m Model) IsApeMode() bool { return m.apeMode }
 
 // NewModel creates a new TUI model with initialized components
 func NewModel(client *api.Client) Model {
@@ -328,6 +332,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.modelPicker.Activate()
 					return m, nil
+				case "/ape":
+					m.apeMode = !m.apeMode
+					m.input.SetValue("")
+					return m, nil
 				}
 				return m, nil
 			}
@@ -351,6 +359,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.modelPicker.Activate()
 					return m, nil
+				case "/ape":
+					m.apeMode = !m.apeMode
+					m.input.SetValue("")
+					m.commandPicker.Deactivate()
+					return m, nil
 				}
 			}
 			if m.CanSubmit() {
@@ -373,11 +386,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.retryCh = retryCh
 				toolCallCh := make(chan ToolCallMsg, 10)
 				m.toolCallCh = toolCallCh
-				approvalCh := make(chan ToolApprovalRequestMsg, 1)
+				var approvalCh chan ToolApprovalRequestMsg
+				if !m.apeMode {
+					approvalCh = make(chan ToolApprovalRequestMsg, 1)
+				}
 				m.approvalCh = approvalCh
 				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, expandedInput, APITimeout, toolCallCh, approvalCh, retryCh)
 				m.cancelFn = cancel
-				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh), waitForApproval(approvalCh))
+				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh))
+				if approvalCh != nil {
+					cmds = append(cmds, waitForApproval(approvalCh))
+				}
 			}
 		default:
 			var inputCmd tea.Cmd
@@ -437,7 +456,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.modelPicker.SetWidth(msg.Width)
 		m.helpPanel.SetWidth(msg.Width)
 		m.approvalDialog.SetWidth(msg.Width)
-		vpHeight := msg.Height - 6
+		vpHeight := msg.Height - 8
 		if vpHeight < 1 {
 			vpHeight = 1
 		}
@@ -604,6 +623,13 @@ func (m Model) View() string {
 	// Render input area: use raw value + block cursor so tests can find the
 	// text as a contiguous string while still providing a visible cursor.
 	view.WriteString(InputStyle(m.width, 3).Render(m.input.Value() + "▌"))
+	view.WriteString("\n")
+	if m.apeMode {
+		view.WriteString(ApeModeActiveStyle().Render("🍌 Ape Mode: Enabled"))
+	} else {
+		view.WriteString(ApeModeInactiveStyle().Render("Ape Mode: Disabled"))
+	}
+	view.WriteString("\n")
 
 	if m.helpPanel.IsActive() {
 		view.WriteString("\n")
@@ -662,7 +688,7 @@ func (m *Model) SetDimensions(width, height int) {
 	m.modelPicker.SetWidth(width)
 	m.helpPanel.SetWidth(width)
 	m.approvalDialog.SetWidth(width)
-	vpHeight := height - 6
+	vpHeight := height - 8
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
