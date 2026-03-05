@@ -309,7 +309,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			// If command picker is active, Tab should select; Enter executes current input.
+			// If command picker is active, Enter executes the highlighted command directly.
+			if m.commandPicker.IsActive() {
+				selected := m.commandPicker.SelectedCommand()
+				m.commandPicker.Deactivate()
+				switch selected {
+				case "/exit":
+					return m, tea.Quit
+				case "/clear":
+					m.messages = nil
+					m.input.SetValue("")
+					return m, nil
+				case "/model":
+					m.input.SetValue("")
+					m.modelPicker.SetModels(m.models)
+					if m.client != nil {
+						m.modelPicker.SetCursor(m.client.GetModel())
+					}
+					m.modelPicker.Activate()
+					return m, nil
+				}
+				return m, nil
+			}
 			inputVal := strings.TrimSpace(m.input.Value())
 			if cmd, ok := parseSlashCommand(inputVal); ok {
 				switch cmd {

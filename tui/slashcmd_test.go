@@ -507,6 +507,77 @@ func TestUpdate_ModelPicker_Navigate(t *testing.T) {
 	}
 }
 
+// --- Model integration: Enter with command picker active ---
+
+// Pressing Enter while hovering /exit in the picker should quit immediately.
+func TestUpdate_Enter_CommandPicker_Exit_Quits(t *testing.T) {
+	model := NewModel(nil)
+	model.SetInput("/")
+	model.commandPicker.Activate()
+	model.commandPicker.SetQuery("")
+	// Navigate to /exit
+	for model.commandPicker.SelectedCommand() != "/exit" {
+		model.commandPicker, _ = model.commandPicker.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	_, cmd := model.Update(ctrlEnter)
+
+	if cmd == nil {
+		t.Fatal("Enter on /exit in picker returned nil cmd, want tea.Quit")
+	}
+	result := cmd()
+	if _, isQuit := result.(tea.QuitMsg); !isQuit {
+		t.Errorf("Enter on /exit in picker produced %T, want tea.QuitMsg", result)
+	}
+}
+
+// Pressing Enter while hovering /clear in the picker should clear history.
+func TestUpdate_Enter_CommandPicker_Clear_ClearsHistory(t *testing.T) {
+	model := NewModel(nil)
+	model.AddMessage("user", "hello")
+	model.SetInput("/")
+	model.commandPicker.Activate()
+	model.commandPicker.SetQuery("")
+	for model.commandPicker.SelectedCommand() != "/clear" {
+		model.commandPicker, _ = model.commandPicker.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel, _ := model.Update(ctrlEnter)
+
+	m := updatedModel.(Model)
+	if len(m.GetHistory()) != 0 {
+		t.Errorf("History after Enter+/clear picker = %d messages, want 0", len(m.GetHistory()))
+	}
+	if m.GetInput() != "" {
+		t.Errorf("Input after Enter+/clear picker = %q, want ''", m.GetInput())
+	}
+}
+
+// Pressing Enter while hovering /model in the picker should activate the model picker.
+func TestUpdate_Enter_CommandPicker_Model_ShowsModelPicker(t *testing.T) {
+	model := NewModel(nil)
+	model.SetModels([]string{"claude-opus-4"})
+	model.SetInput("/")
+	model.commandPicker.Activate()
+	model.commandPicker.SetQuery("")
+	for model.commandPicker.SelectedCommand() != "/model" {
+		model.commandPicker, _ = model.commandPicker.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel, _ := model.Update(ctrlEnter)
+
+	m := updatedModel.(Model)
+	if !m.modelPicker.IsActive() {
+		t.Error("modelPicker should activate after Enter+/model in picker")
+	}
+	if m.commandPicker.IsActive() {
+		t.Error("commandPicker should be inactive after Enter+/model")
+	}
+}
+
 // --- Esc no longer quits when StateReady ---
 
 func TestUpdate_Esc_WhenReady_NoLongerQuits(t *testing.T) {
