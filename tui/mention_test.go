@@ -226,3 +226,55 @@ func TestMention_View_HidesPickerWhenInactive(t *testing.T) {
 	// messages, but there are none here so any occurrence is from the picker)
 	_ = view // Just verify View() doesn't panic
 }
+
+// collectBatchFilesLoaded executes a command (possibly a tea.BatchMsg) and
+// returns any FilesLoadedMsg found within it.
+func collectBatchFilesLoaded(cmd tea.Cmd) (FilesLoadedMsg, bool) {
+	if cmd == nil {
+		return FilesLoadedMsg{}, false
+	}
+	msg := cmd()
+	if fm, ok := msg.(FilesLoadedMsg); ok {
+		return fm, true
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if c == nil {
+				continue
+			}
+			if fm, ok := c().(FilesLoadedMsg); ok {
+				return fm, true
+			}
+		}
+	}
+	return FilesLoadedMsg{}, false
+}
+
+// TestMention_AtSymbol_TriggersFileReload verifies that typing '@' when the
+// picker is inactive dispatches LoadFilesCmd so newly-created files appear.
+func TestMention_AtSymbol_TriggersFileReload(t *testing.T) {
+	m := setupModelWithFiles([]string{"existing.go"})
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'@'}})
+
+	_, found := collectBatchFilesLoaded(cmd)
+	if !found {
+		t.Error("typing '@' should dispatch LoadFilesCmd to pick up new files, but no FilesLoadedMsg was produced")
+	}
+}
+
+// TestMention_AtQuery_DoesNotReloadOnEveryKeystroke verifies that subsequent
+// keystrokes while the picker is already active do NOT re-trigger the reload.
+func TestMention_AtQuery_DoesNotReloadOnEveryKeystroke(t *testing.T) {
+	m := setupModelWithFiles([]string{"main.go", "tui/model.go"})
+	// Activate picker first (simulates '@' having been typed already)
+	m.filePicker.Activate()
+	m.SetInput("@mai")
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+
+	_, found := collectBatchFilesLoaded(cmd)
+	if found {
+		t.Error("additional keystrokes while picker is active should not re-trigger file reload")
+	}
+}

@@ -431,8 +431,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Sync file picker state with the new input value.
 					query, fpActive := detectMentionQuery(m.input.Value())
 					if fpActive {
+						wasActive := m.filePicker.IsActive()
 						m.filePicker.Activate()
 						m.filePicker.SetQuery(query)
+						if !wasActive {
+							// Rescan filesystem so files created after boot appear.
+							cmds = append(cmds, LoadFilesCmd())
+						}
 					} else {
 						m.filePicker.Deactivate()
 					}
