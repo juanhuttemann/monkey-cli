@@ -544,6 +544,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if diff, err := tools.DiffEdit(path, oldStr, newStr); err == nil {
 				preview = diff
 			}
+		} else if msg.ToolName == "bash" {
+			preview, _ = msg.Input["command"].(string)
 		}
 		m.approvalDialog.Activate(msg.ModelName, msg.ToolName, preview, msg.ResponseCh)
 		if m.approvalCh != nil {

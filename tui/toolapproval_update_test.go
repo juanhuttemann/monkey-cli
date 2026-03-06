@@ -184,6 +184,23 @@ func TestUpdate_ToolApprovalRequestMsg_EditTool_ShowsDiffInDialog(t *testing.T) 
 	}
 }
 
+func TestUpdate_ToolApprovalRequestMsg_BashTool_ShowsCommandInDialog(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	msg := ToolApprovalRequestMsg{
+		ModelName: "m",
+		ToolName:  "bash",
+		Input:     map[string]any{"command": "ls -la /tmp"},
+		ResponseCh: ch,
+	}
+	updatedModel, _ := model.Update(msg)
+	m := updatedModel.(Model)
+	view := stripANSI(m.approvalDialog.View())
+	if !strings.Contains(view, "$ ls -la /tmp") {
+		t.Errorf("bash approval dialog should show command with $ prefix in view: %q", view)
+	}
+}
+
 func TestUpdate_ToolApprovalRequestMsg_EditTool_BadFile_StillActivates(t *testing.T) {
 	model := NewModel(nil)
 	ch := make(chan bool, 1)
