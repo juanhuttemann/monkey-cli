@@ -117,7 +117,7 @@ func (m Model) renderMessages() string {
 		var rendered string
 		switch msg.Role {
 		case "user":
-			rendered = UserMessageStyle(sw).Render(msg.Content)
+			rendered = RenderUserBlock(sw, msg.Content)
 		case "assistant":
 			md := strings.TrimRight(RenderMarkdown(msg.Content, sw-8), "\n")
 			modelName := ""
@@ -130,7 +130,7 @@ func (m Model) renderMessages() string {
 				rendered = AssistantMessageStyle(sw).Render(md)
 			}
 		case "tool":
-			rendered = ToolMessageStyle(sw).Render(msg.Content)
+			rendered = RenderToolBlock(sw, msg.Content)
 		case "system":
 			rendered = SystemMessageStyle(sw).Render(msg.Content)
 		default:
@@ -461,7 +461,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.modelPicker.SetWidth(msg.Width)
 		m.helpPanel.SetWidth(msg.Width)
 		m.approvalDialog.SetWidth(msg.Width)
-		vpHeight := msg.Height - 8
+		vpHeight := msg.Height - 9
 		if vpHeight < 1 {
 			vpHeight = 1
 		}
@@ -634,7 +634,7 @@ func (m Model) View() string {
 	} else {
 		view.WriteString(ApeModeInactiveStyle().Render("Ape Mode: Disabled"))
 	}
-	view.WriteString("\n")
+	view.WriteString("\n\n")
 
 	if m.helpPanel.IsActive() {
 		view.WriteString("\n")
@@ -693,7 +693,7 @@ func (m *Model) SetDimensions(width, height int) {
 	m.modelPicker.SetWidth(width)
 	m.helpPanel.SetWidth(width)
 	m.approvalDialog.SetWidth(width)
-	vpHeight := height - 8
+	vpHeight := height - 9
 	if vpHeight < 1 {
 		vpHeight = 1
 	}

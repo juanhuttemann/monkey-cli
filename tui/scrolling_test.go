@@ -13,7 +13,7 @@ import (
 // (not 0), confirming SetContent + GotoBottom are called in Update, not just View.
 func TestScrolling_ViewportOffsetAtBottomAfterNewMessage(t *testing.T) {
 	model := NewModel(nil)
-	model.SetDimensions(80, 10) // viewport height = 10 - 6 = 4 lines
+	model.SetDimensions(80, 10) // viewport height = 10 - 9 = 1 line
 
 	for i := 0; i < 15; i++ {
 		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
@@ -60,7 +60,7 @@ func TestScrolling_MouseWheelUp_DecreasesYOffset(t *testing.T) {
 // to the top, View() renders earlier messages, not always the bottom.
 func TestScrolling_ScrolledUp_ViewShowsScrolledContent(t *testing.T) {
 	model := NewModel(nil)
-	model.SetDimensions(80, 10)
+	model.SetDimensions(80, 15)
 
 	for i := 0; i < 15; i++ {
 		model.AddMessage("user", fmt.Sprintf("user message number %d", i))

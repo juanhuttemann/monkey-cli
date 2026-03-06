@@ -202,6 +202,59 @@ func RenderAssistantBlock(width int, modelName, content string) string {
 	return sb.String()
 }
 
+// RenderUserBlock renders a user message inside a purple rounded border
+// with "You" embedded in the top border: ╭─ You ──────╮
+func RenderUserBlock(width int, content string) string {
+	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(UserBorderColor))
+	labelFg := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+
+	innerW := width - 4
+	paddedContent := lipgloss.NewStyle().Width(innerW).Padding(0, 1).Render(content)
+	contentLines := strings.Split(paddedContent, "\n")
+
+	label := "You"
+	titleW := 2 + lipgloss.Width(label) + 1
+	dashLen := max(0, innerW-titleW)
+	topLine := bdr.Render("╭─ ") + labelFg.Render(label) + bdr.Render(" "+strings.Repeat("─", dashLen)+"╮")
+
+	var sb strings.Builder
+	sb.WriteString(topLine)
+	for _, line := range contentLines {
+		sb.WriteByte('\n')
+		sb.WriteString(bdr.Render("│") + line + bdr.Render("│"))
+	}
+	sb.WriteByte('\n')
+	sb.WriteString(bdr.Render("╰" + strings.Repeat("─", innerW) + "╯"))
+
+	return sb.String()
+}
+
+// RenderToolBlock renders a tool call message inside a cyan rounded border
+// with a wrench emoji embedded in the top border: ╭─ 🔧 ──────╮
+func RenderToolBlock(width int, content string) string {
+	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(ToolBorderColor))
+
+	innerW := width - 4
+	paddedContent := lipgloss.NewStyle().Width(innerW).Padding(0, 1).Render(content)
+	contentLines := strings.Split(paddedContent, "\n")
+
+	label := "🔧"
+	titleW := 2 + lipgloss.Width(label) + 1
+	dashLen := max(0, innerW-titleW)
+	topLine := bdr.Render("╭─ "+label+" "+strings.Repeat("─", dashLen)+"╮")
+
+	var sb strings.Builder
+	sb.WriteString(topLine)
+	for _, line := range contentLines {
+		sb.WriteByte('\n')
+		sb.WriteString(bdr.Render("│") + line + bdr.Render("│"))
+	}
+	sb.WriteByte('\n')
+	sb.WriteString(bdr.Render("╰" + strings.Repeat("─", innerW) + "╯"))
+
+	return sb.String()
+}
+
 // FilePickerStyle returns the styling for the file picker dropdown border.
 func FilePickerStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().

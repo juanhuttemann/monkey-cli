@@ -260,3 +260,69 @@ func TestRenderAssistantBlock_HasANSI(t *testing.T) {
 		t.Error("RenderAssistantBlock should produce ANSI escape codes for styling")
 	}
 }
+
+func TestRenderUserBlock_ShowsYouInBorder(t *testing.T) {
+	rendered := RenderUserBlock(80, "hello")
+	if !strings.Contains(stripANSI(rendered), "You") {
+		t.Error("RenderUserBlock should show 'You' in the border")
+	}
+}
+
+func TestRenderUserBlock_YouInTopBorder(t *testing.T) {
+	rendered := RenderUserBlock(80, "hello")
+	stripped := stripANSI(rendered)
+	lines := strings.Split(stripped, "\n")
+	firstLine := lines[0]
+	if !strings.Contains(firstLine, "You") {
+		t.Errorf("RenderUserBlock 'You' label should be in the top border, got: %q", firstLine)
+	}
+}
+
+func TestRenderUserBlock_ShowsContent(t *testing.T) {
+	rendered := RenderUserBlock(80, "hello world")
+	if !strings.Contains(stripANSI(rendered), "hello world") {
+		t.Error("RenderUserBlock should include the message content")
+	}
+}
+
+func TestRenderUserBlock_HasBorder(t *testing.T) {
+	rendered := RenderUserBlock(80, "text")
+	if len(rendered) <= len("text") {
+		t.Error("RenderUserBlock should add a border around the content")
+	}
+}
+
+func TestRenderUserBlock_HasANSI(t *testing.T) {
+	rendered := RenderUserBlock(80, "text")
+	if !strings.Contains(rendered, "\x1b[") {
+		t.Error("RenderUserBlock should produce ANSI escape codes for styling")
+	}
+}
+
+func TestRenderToolBlock_ShowsWrenchInBorder(t *testing.T) {
+	rendered := RenderToolBlock(80, "$ ls")
+	if !strings.Contains(stripANSI(rendered), "🔧") {
+		t.Error("RenderToolBlock should show '🔧' in the top border")
+	}
+}
+
+func TestRenderToolBlock_ShowsContent(t *testing.T) {
+	rendered := RenderToolBlock(80, "$ ls -la")
+	if !strings.Contains(stripANSI(rendered), "$ ls -la") {
+		t.Error("RenderToolBlock should include the message content")
+	}
+}
+
+func TestRenderToolBlock_HasBorder(t *testing.T) {
+	rendered := RenderToolBlock(80, "text")
+	if len(rendered) <= len("text") {
+		t.Error("RenderToolBlock should add a border around the content")
+	}
+}
+
+func TestRenderToolBlock_HasANSI(t *testing.T) {
+	rendered := RenderToolBlock(80, "text")
+	if !strings.Contains(rendered, "\x1b[") {
+		t.Error("RenderToolBlock should produce ANSI escape codes for styling")
+	}
+}

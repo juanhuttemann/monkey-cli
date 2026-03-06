@@ -321,6 +321,22 @@ func TestView_ShowsCanceled_AfterEscWhileLoading(t *testing.T) {
 	}
 }
 
+func TestView_UserHeader_VisibleAfterFirstSubmit(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	model.SetIntro("ASCII ART")
+	model.SetIntroTitle("Monkey")
+	model.SetIntroVersion("v1.0")
+	model.SetInput("Hello!")
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlM})
+	view := stripANSI(updated.(Model).View())
+
+	if !strings.Contains(view, "╭─ You") {
+		t.Error("View() should show '╭─ You' header after submitting first prompt")
+	}
+}
+
 func TestView_ShowsCursorInInputArea(t *testing.T) {
 	model := NewModel(nil)
 	model.SetDimensions(80, 24)
