@@ -183,6 +183,36 @@ func TestUpdate_QuestionMark_DoesNotActivateCommandPicker(t *testing.T) {
 	}
 }
 
+func TestHelpPanel_View_WhenActive_ContainsAllSlashCommands(t *testing.T) {
+	hp := NewHelpPanel(80)
+	hp.Activate()
+	v := stripANSI(hp.View())
+	
+	// Check that all slash commands are mentioned in the help
+	// These are the commands defined in slashcmd.go
+	expectedCommands := []string{"/exit", "/clear", "/model", "/ape", "/copy", "/compact"}
+	for _, cmd := range expectedCommands {
+		if !strings.Contains(v, cmd) {
+			t.Errorf("HelpPanel.View() should mention '%s' in slash commands summary", cmd)
+		}
+	}
+}
+
+func TestHelpPanel_View_WhenActive_MatchesSlashCommandsSource(t *testing.T) {
+	hp := NewHelpPanel(80)
+	hp.Activate()
+	v := stripANSI(hp.View())
+	
+	// The help panel should list all commands from the slashCommands variable
+	// This ensures the help stays in sync with the actual available commands
+	for _, cmd := range slashCommands {
+		expectedCmd := "/" + cmd.Name
+		if !strings.Contains(v, expectedCmd) {
+			t.Errorf("HelpPanel.View() should mention '%s' to match slashCommands source", expectedCmd)
+		}
+	}
+}
+
 func TestUpdate_QuestionMark_DoesNotActivateFilePicker(t *testing.T) {
 	m := NewModel(nil)
 	m.SetInput("")

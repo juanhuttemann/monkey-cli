@@ -9,7 +9,7 @@ type helpItem struct {
 
 var helpItems = []helpItem{
 	{Trigger: "?", Desc: "show this help"},
-	{Trigger: "/", Desc: "slash commands  /exit  /clear  /model  /ape"},
+	{Trigger: "/", Desc: "slash commands  /exit  /clear  /model  /ape  /copy  /compact"},
 	{Trigger: "@", Desc: "mention files"},
 }
 
