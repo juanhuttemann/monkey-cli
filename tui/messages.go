@@ -64,3 +64,11 @@ type toolApprovalDoneMsg struct{}
 type CompactResponseMsg struct {
 	Summary string
 }
+
+// PartialResponseMsg carries a single streamed text token from the assistant.
+type PartialResponseMsg struct {
+	Token string
+}
+
+// tokenDoneMsg is sent when the token channel is closed (streaming finished).
+type tokenDoneMsg struct{}

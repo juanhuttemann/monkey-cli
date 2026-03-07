@@ -8,6 +8,7 @@ type apiRequest struct {
 	System    string    `json:"system,omitempty"`
 	Messages  []Message `json:"messages"`
 	Tools     []Tool    `json:"tools,omitempty"`
+	Stream    bool      `json:"stream,omitempty"`
 }
 
 // Message represents a single message in the conversation.

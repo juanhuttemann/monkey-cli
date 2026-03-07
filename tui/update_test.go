@@ -761,6 +761,96 @@ func TestUpdate_CompactResponseMsg_ReplacesHistory(t *testing.T) {
 	}
 }
 
+// --- Streaming (PartialResponseMsg) ---
+
+func TestUpdate_PartialResponseMsg_CreatesAssistantMessage(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+	model.streaming = true
+
+	m1, _ := model.Update(PartialResponseMsg{Token: "Hello"})
+	msgs := m1.(Model).GetHistory()
+	if len(msgs) != 1 {
+		t.Fatalf("history length = %d, want 1", len(msgs))
+	}
+	if msgs[0].Role != "assistant" {
+		t.Errorf("role = %q, want assistant", msgs[0].Role)
+	}
+	if msgs[0].Content != "Hello" {
+		t.Errorf("content = %q, want Hello", msgs[0].Content)
+	}
+}
+
+func TestUpdate_PartialResponseMsg_AppendsToLastAssistantMessage(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+	model.streaming = true
+
+	m1, _ := model.Update(PartialResponseMsg{Token: "foo"})
+	m2, _ := m1.(Model).Update(PartialResponseMsg{Token: "bar"})
+	msgs := m2.(Model).GetHistory()
+	if len(msgs) != 1 {
+		t.Fatalf("history length = %d, want 1", len(msgs))
+	}
+	if msgs[0].Content != "foobar" {
+		t.Errorf("content = %q, want foobar", msgs[0].Content)
+	}
+}
+
+func TestUpdate_PartialResponseMsg_IgnoredWhenNotStreaming(t *testing.T) {
+	// Late/stale tokens after streaming ends should be silently dropped.
+	model := NewModel(nil)
+	model.streaming = false
+
+	m1, _ := model.Update(PartialResponseMsg{Token: "stale"})
+	if len(m1.(Model).GetHistory()) != 0 {
+		t.Error("late token should not add a message when streaming=false")
+	}
+}
+
+func TestUpdate_PromptResponseMsg_ReplacesLastAssistantContent(t *testing.T) {
+	// Simulates streaming: some tokens arrived, then PromptResponseMsg confirms the final text.
+	model := NewModel(nil)
+	model.SetLoading(true)
+	model.streaming = true
+
+	m1, _ := model.Update(PartialResponseMsg{Token: "partial"})
+	finalMsg := PromptResponseMsg{
+		Response:    "complete response",
+		APIMessages: []api.Message{{Role: "user", Content: "q"}, {Role: "assistant", Content: "complete response"}},
+	}
+	m2, _ := m1.(Model).Update(finalMsg)
+
+	m := m2.(Model)
+	msgs := m.GetHistory()
+	if len(msgs) != 1 {
+		t.Fatalf("history length = %d, want 1 (partial replaced, not appended)", len(msgs))
+	}
+	if msgs[0].Content != "complete response" {
+		t.Errorf("content = %q, want complete response", msgs[0].Content)
+	}
+	if m.streaming {
+		t.Error("streaming should be false after PromptResponseMsg")
+	}
+}
+
+func TestUpdate_PromptResponseMsg_AppendsIfNoStreamingMessage(t *testing.T) {
+	// Non-streaming path: no tokens arrived, PromptResponseMsg appends normally.
+	model := NewModel(nil)
+	model.SetLoading(true)
+
+	finalMsg := PromptResponseMsg{
+		Response:    "answer",
+		APIMessages: []api.Message{{Role: "user", Content: "q"}, {Role: "assistant", Content: "answer"}},
+	}
+	m1, _ := model.Update(finalMsg)
+
+	msgs := m1.(Model).GetHistory()
+	if len(msgs) != 1 || msgs[0].Content != "answer" {
+		t.Errorf("expected one assistant message with 'answer', got %v", msgs)
+	}
+}
+
 func TestUpdate_CompactResponseMsg_ResetsAPIMessages(t *testing.T) {
 	model := NewModel(nil)
 	model.AddMessage("user", "hello")

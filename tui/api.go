@@ -47,7 +47,7 @@ const APITimeout = 60 * time.Second
 // apiMessages is the full API-layer history (including tool_use/tool_result from prior turns).
 // The returned CancelFunc can be called to cancel the in-flight request.
 func SendPromptCmd(client *api.Client, apiMessages []api.Message, prompt string) (tea.Cmd, context.CancelFunc) {
-	return SendPromptCmdWithTimeout(client, apiMessages, prompt, APITimeout, nil, nil)
+	return SendPromptCmdWithTimeout(client, apiMessages, prompt, APITimeout, nil, nil, nil)
 }
 
 // SendPromptCmdWithTimeout creates a tea.Cmd that sends the prompt with a per-attempt timeout.
@@ -56,8 +56,9 @@ func SendPromptCmd(client *api.Client, apiMessages []api.Message, prompt string)
 // toolCallCh, if non-nil, receives a ToolCallMsg for each tool call as it completes and is closed when done.
 // approvalCh, if non-nil, enables the approval harness: each tool call sends a ToolApprovalRequestMsg
 // and blocks until the TUI responds. When nil, tools execute without approval.
+// tokenCh, if non-nil, uses the streaming SSE API and receives a PartialResponseMsg for each text token.
 // An optional retryCh receives a RetryingMsg before each retry attempt and is closed when done.
-func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, prompt string, timeout time.Duration, toolCallCh chan<- ToolCallMsg, approvalCh chan<- ToolApprovalRequestMsg, retryChs ...chan<- RetryingMsg) (tea.Cmd, context.CancelFunc) {
+func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, prompt string, timeout time.Duration, toolCallCh chan<- ToolCallMsg, approvalCh chan<- ToolApprovalRequestMsg, tokenCh chan<- PartialResponseMsg, retryChs ...chan<- RetryingMsg) (tea.Cmd, context.CancelFunc) {
 	// Use a cancel-only parent so that each retry gets a fresh per-attempt timeout
 	// rather than sharing an already-expired deadline.
 	parentCtx, parentCancel := context.WithCancel(context.Background())
@@ -78,6 +79,9 @@ func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, pro
 		}
 		if approvalCh != nil {
 			defer close(approvalCh)
+		}
+		if tokenCh != nil {
+			defer close(tokenCh)
 		}
 
 		// Build full message list: accumulated API history + new user prompt.
@@ -114,13 +118,32 @@ func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, pro
 			executor = ApprovingExecutor{inner: multi, modelName: modelName, approvalCh: approvalCh}
 		}
 
-		response, accumulated, usage, err := client.SendMessageWithTools(ctx, msgs, toolList, executor,
-			func(tc api.ToolCallResult) {
-				if toolCallCh != nil && tc.Err != errToolDeclined {
-					toolCallCh <- ToolCallMsg{ToolCall: tc}
-				}
-			},
+		onCall := func(tc api.ToolCallResult) {
+			if toolCallCh != nil && tc.Err != errToolDeclined {
+				toolCallCh <- ToolCallMsg{ToolCall: tc}
+			}
+		}
+
+		var (
+			response    string
+			accumulated []api.Message
+			usage       api.Usage
+			err         error
 		)
+
+		if tokenCh != nil {
+			// Streaming path: deliver text tokens incrementally.
+			onToken := func(tok string) {
+				select {
+				case tokenCh <- PartialResponseMsg{Token: tok}:
+				case <-parentCtx.Done():
+				}
+			}
+			response, accumulated, usage, err = client.SendMessageWithToolsStreaming(ctx, msgs, toolList, executor, onToken, onCall)
+		} else {
+			response, accumulated, usage, err = client.SendMessageWithTools(ctx, msgs, toolList, executor, onCall)
+		}
+
 		if err != nil {
 			if parentCtx.Err() == context.Canceled {
 				return PromptCancelledMsg{}
@@ -188,6 +211,18 @@ func waitForRetry(ch <-chan RetryingMsg) tea.Cmd {
 		msg, ok := <-ch
 		if !ok {
 			return retryDoneMsg{}
+		}
+		return msg
+	}
+}
+
+// waitForToken returns a tea.Cmd that blocks until it receives a PartialResponseMsg from ch,
+// or returns tokenDoneMsg when ch is closed.
+func waitForToken(ch <-chan PartialResponseMsg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return tokenDoneMsg{}
 		}
 		return msg
 	}

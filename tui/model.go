@@ -52,6 +52,8 @@ type Model struct {
 	retryCh        chan RetryingMsg
 	toolCallCh     chan ToolCallMsg
 	approvalCh     chan ToolApprovalRequestMsg
+	tokenCh        chan PartialResponseMsg
+	streaming      bool
 	intro          string
 	introTitle     string
 	introVersion   string
@@ -384,7 +386,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				case "/copy":
 					if text := m.lastAssistantContent(); text != "" {
-						clipboard.WriteAll(text)
+						if err := clipboard.WriteAll(text); err != nil {
+							m.messages = append(m.messages, Message{Role: "error", Content: "clipboard: " + err.Error(), Timestamp: time.Now()})
+						}
 					}
 					m.input.SetValue("")
 					return m, nil
@@ -460,9 +464,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					approvalCh = make(chan ToolApprovalRequestMsg, 1)
 				}
 				m.approvalCh = approvalCh
-				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.apiMessages, expandedInput, APITimeout, toolCallCh, approvalCh, retryCh)
+				tokenCh := make(chan PartialResponseMsg, 64)
+				m.tokenCh = tokenCh
+				m.streaming = true
+				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.apiMessages, expandedInput, APITimeout, toolCallCh, approvalCh, tokenCh, retryCh)
 				m.cancelFn = cancel
-				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh))
+				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh), waitForToken(tokenCh))
 				if approvalCh != nil {
 					cmds = append(cmds, waitForApproval(approvalCh))
 				}
@@ -561,8 +568,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport, vpCmd = m.viewport.Update(msg)
 		cmds = append(cmds, vpCmd)
 
+	case PartialResponseMsg:
+		if m.streaming {
+			n := len(m.messages)
+			if n > 0 && m.messages[n-1].Role == "assistant" {
+				m.messages[n-1].Content += msg.Token
+			} else {
+				m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Token, Timestamp: time.Now()})
+			}
+			m.scrollToBottom = true
+			m.viewport.SetContent(m.renderMessages())
+			m.viewport.GotoBottom()
+		}
+		if m.tokenCh != nil {
+			cmds = append(cmds, waitForToken(m.tokenCh))
+		}
+
+	case tokenDoneMsg:
+		// Token channel closed; the PromptResponseMsg will arrive separately.
+
 	case PromptResponseMsg:
-		m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
+		m.streaming = false
+		m.tokenCh = nil
+		// Replace last assistant message with complete response (handles any race with PartialResponseMsg),
+		// or append if streaming didn't produce one yet.
+		n := len(m.messages)
+		if n > 0 && m.messages[n-1].Role == "assistant" {
+			m.messages[n-1].Content = msg.Response
+		} else {
+			m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
+		}
 		m.apiMessages = msg.APIMessages
 		m.totalUsage = m.totalUsage.Add(msg.Usage)
 		m.state = StateReady
@@ -593,6 +628,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 
 	case PromptErrorMsg:
+		m.streaming = false
+		m.tokenCh = nil
 		m.messages = append(m.messages, Message{Role: "error", Content: msg.Err.Error(), Timestamp: time.Now()})
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
@@ -605,6 +642,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 
 	case PromptCancelledMsg:
+		m.streaming = false
+		m.tokenCh = nil
 		if m.state == StateLoading {
 			m.state = StateReady
 			m.timerActive = false

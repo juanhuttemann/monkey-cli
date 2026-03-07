@@ -57,7 +57,7 @@ func TestSendPromptCmdWithTimeout_SendsRetryNotifications(t *testing.T) {
 	messages := []api.Message{}
 
 	retryCh := make(chan RetryingMsg, 10)
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, retryCh)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, nil, retryCh)
 
 	// Drain retryCh in a goroutine while cmd runs
 	var retryMsgs []RetryingMsg
@@ -94,7 +94,7 @@ func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnSuccess(t *testing.T) {
 	messages := []api.Message{}
 
 	retryCh := make(chan RetryingMsg, 10)
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, retryCh)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, nil, retryCh)
 	cmd()
 
 	select {
@@ -118,7 +118,7 @@ func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnError(t *testing.T) {
 	messages := []api.Message{}
 
 	retryCh := make(chan RetryingMsg, 10)
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, retryCh)
+	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, nil, retryCh)
 	cmd()
 
 	select {

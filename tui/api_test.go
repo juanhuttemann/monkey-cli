@@ -149,7 +149,7 @@ func TestSendPromptCmd_TimeoutError(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
 	// Use a short timeout for testing
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 100*time.Millisecond, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 100*time.Millisecond, nil, nil, nil)
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -175,7 +175,7 @@ func TestSendPromptCmdWithTimeout_RespectsTimeout(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
 	timeout := 100 * time.Millisecond
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", timeout, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", timeout, nil, nil, nil)
 	_ = cmd()
 
 	elapsed := time.Since(startTime)
@@ -224,7 +224,7 @@ func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
 	toolCallCh := make(chan ToolCallMsg, 10)
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, toolCallCh, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, toolCallCh, nil, nil)
 	result := cmd()
 
 	// Channel should have received the tool call
@@ -247,7 +247,7 @@ func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
 	}
 }
 
-func TestSendPromptCmd_SendsAllFourTools(t *testing.T) {
+func TestSendPromptCmd_SendsAllTools(t *testing.T) {
 	var firstBody []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
@@ -265,7 +265,7 @@ func TestSendPromptCmd_SendsAllFourTools(t *testing.T) {
 	cmd()
 
 	body := string(firstBody)
-	for _, name := range []string{"bash", "read", "write", "edit"} {
+	for _, name := range []string{"bash", "read", "write", "edit", "glob", "grep"} {
 		if !strings.Contains(body, `"`+name+`"`) {
 			t.Errorf("expected tool %q in request body", name)
 		}
@@ -353,7 +353,7 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 5*time.Second, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 5*time.Second, nil, nil, nil)
 	if cmd == nil {
 		t.Fatal("SendPromptCmdWithTimeout() returned nil, want non-nil tea.Cmd")
 	}

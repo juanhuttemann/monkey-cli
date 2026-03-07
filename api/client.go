@@ -144,21 +144,29 @@ func (c *Client) effectiveMaxTokens() int {
 	return DefaultMaxTokens
 }
 
-// doSingleAttempt sends one HTTP request and returns the full API response.
-func (c *Client) doSingleAttempt(ctx context.Context, jsonBody []byte) (apiResponse, error) {
-	url := c.baseURL + MessagesEndpoint
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
+// sendRawRequest creates and sends one HTTP POST to the messages endpoint with
+// standard headers. The caller is responsible for closing resp.Body.
+func (c *Client) sendRawRequest(ctx context.Context, jsonBody []byte) (*http.Response, error) {
+	reqURL := c.baseURL + MessagesEndpoint
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", AnthropicVersion)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	return resp, nil
+}
+
+// doSingleAttempt sends one HTTP request and returns the full API response.
+func (c *Client) doSingleAttempt(ctx context.Context, jsonBody []byte) (apiResponse, error) {
+	resp, err := c.sendRawRequest(ctx, jsonBody)
+	if err != nil {
+		return apiResponse{}, err
 	}
 	defer resp.Body.Close()
 
@@ -183,16 +191,21 @@ func (c *Client) doSingleAttempt(ctx context.Context, jsonBody []byte) (apiRespo
 	return apiResp, nil
 }
 
+// applyPerAttemptTimeout wraps ctx in a fresh timeout if perAttemptTimeoutKey is set.
+// The returned CancelFunc must always be called (safe to call on a no-op cancel).
+func applyPerAttemptTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if d, ok := ctx.Value(perAttemptTimeoutKey{}).(time.Duration); ok && d > 0 {
+		return context.WithTimeout(ctx, d)
+	}
+	return ctx, func() {}
+}
+
 // doAttempt wraps doSingleAttempt with a per-attempt timeout if one is configured
 // in the context via WithPerAttemptTimeout. This lets each retry get a fresh timeout
 // even after the previous attempt's deadline expired.
 func (c *Client) doAttempt(parentCtx context.Context, jsonBody []byte) (apiResponse, error) {
-	ctx := parentCtx
-	if d, ok := ctx.Value(perAttemptTimeoutKey{}).(time.Duration); ok && d > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(parentCtx, d)
-		defer cancel()
-	}
+	ctx, cancel := applyPerAttemptTimeout(parentCtx)
+	defer cancel()
 	return c.doSingleAttempt(ctx, jsonBody)
 }
 
@@ -277,6 +290,73 @@ func extractText(resp apiResponse) (string, error) {
 	return strings.Join(parts, "\n"), nil
 }
 
+// collectToolUseBlocks returns all tool_use content blocks from resp.Content.
+func collectToolUseBlocks(content []ContentBlock) []ContentBlock {
+	var blocks []ContentBlock
+	for _, b := range content {
+		if b.Type == "tool_use" {
+			blocks = append(blocks, b)
+		}
+	}
+	return blocks
+}
+
+// runToolCalls appends the assistant message, executes every tool call, fires
+// onCall callbacks, and appends the tool_result user message. Returns updated msgs.
+func runToolCalls(msgs []Message, respContent []ContentBlock, toolUseBlocks []ContentBlock, executor ToolExecutor, onCall []func(ToolCallResult)) []Message {
+	msgs = append(msgs, Message{Role: "assistant", Content: respContent})
+	toolResults := make([]ContentBlock, 0, len(toolUseBlocks))
+	for _, tu := range toolUseBlocks {
+		output, execErr := executor.ExecuteTool(tu.Name, tu.Input)
+		content := output
+		if execErr != nil && content == "" {
+			content = fmt.Sprintf("error: %v", execErr)
+		}
+		toolResults = append(toolResults, ContentBlock{
+			Type:      "tool_result",
+			ToolUseID: tu.ID,
+			Content:   content,
+		})
+		for _, fn := range onCall {
+			fn(ToolCallResult{Name: tu.Name, Input: tu.Input, Output: output, Err: execErr})
+		}
+	}
+	return append(msgs, Message{Role: "user", Content: toolResults})
+}
+
+// runToolLoop drives the agentic tool-calling loop. fetch is called for each turn;
+// tool results are fed back until the model returns a final text-only response.
+func runToolLoop(
+	msgs []Message,
+	tools []Tool,
+	executor ToolExecutor,
+	onCall []func(ToolCallResult),
+	fetch func(msgs []Message, tools []Tool) (apiResponse, error),
+) (string, []Message, Usage, error) {
+	var totalUsage Usage
+	for {
+		resp, err := fetch(msgs, tools)
+		if err != nil {
+			return "", nil, Usage{}, err
+		}
+		totalUsage = totalUsage.Add(Usage{
+			InputTokens:  resp.Usage.InputTokens,
+			OutputTokens: resp.Usage.OutputTokens,
+		})
+
+		toolUseBlocks := collectToolUseBlocks(resp.Content)
+		if len(toolUseBlocks) == 0 {
+			text, err := extractText(resp)
+			if err != nil {
+				return "", nil, Usage{}, err
+			}
+			return text, append(msgs, Message{Role: "assistant", Content: text}), totalUsage, nil
+		}
+
+		msgs = runToolCalls(msgs, resp.Content, toolUseBlocks, executor, onCall)
+	}
+}
+
 // SendMessage sends a single user message and returns the response text.
 func (c *Client) SendMessage(ctx context.Context, prompt string) (string, error) {
 	resp, err := c.doRequest(ctx, apiRequest{
@@ -319,67 +399,14 @@ func (c *Client) SendMessageWithTools(ctx context.Context, messages []Message, t
 	if len(messages) == 0 {
 		return "", nil, Usage{}, errors.New("no messages provided")
 	}
-
 	msgs := make([]Message, len(messages))
 	copy(msgs, messages)
-
-	var totalUsage Usage
-
-	for {
-		resp, err := c.doRequest(ctx, apiRequest{
+	return runToolLoop(msgs, tools, executor, onCall, func(msgs []Message, tools []Tool) (apiResponse, error) {
+		return c.doRequest(ctx, apiRequest{
 			Model:     c.model,
 			MaxTokens: c.effectiveMaxTokens(),
 			Messages:  msgs,
 			Tools:     tools,
 		})
-		if err != nil {
-			return "", nil, Usage{}, err
-		}
-		totalUsage = totalUsage.Add(Usage{
-			InputTokens:  resp.Usage.InputTokens,
-			OutputTokens: resp.Usage.OutputTokens,
-		})
-
-		// Collect any tool_use blocks.
-		var toolUseBlocks []ContentBlock
-		for _, block := range resp.Content {
-			if block.Type == "tool_use" {
-				toolUseBlocks = append(toolUseBlocks, block)
-			}
-		}
-
-		// No tool calls → extract text, append final assistant message, return full history.
-		if len(toolUseBlocks) == 0 {
-			text, err := extractText(resp)
-			if err != nil {
-				return "", nil, Usage{}, err
-			}
-			msgs = append(msgs, Message{Role: "assistant", Content: text})
-			return text, msgs, totalUsage, nil
-		}
-
-		// Append the assistant's tool_use message to history.
-		msgs = append(msgs, Message{Role: "assistant", Content: resp.Content})
-
-		// Execute each tool and collect results.
-		toolResults := make([]ContentBlock, 0, len(toolUseBlocks))
-		for _, tu := range toolUseBlocks {
-			output, execErr := executor.ExecuteTool(tu.Name, tu.Input)
-			content := output
-			if execErr != nil && content == "" {
-				content = fmt.Sprintf("error: %v", execErr)
-			}
-			toolResults = append(toolResults, ContentBlock{
-				Type:      "tool_result",
-				ToolUseID: tu.ID,
-				Content:   content,
-			})
-			for _, fn := range onCall {
-				fn(ToolCallResult{Name: tu.Name, Input: tu.Input, Output: output, Err: execErr})
-			}
-		}
-
-		// Append tool results as a user message.
-		msgs = append(msgs, Message{Role: "user", Content: toolResults})
-	}
+	})
 }
