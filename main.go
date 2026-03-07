@@ -15,11 +15,11 @@ import (
 )
 
 // systemPromptCandidates returns the paths to check for the system prompt, in priority order.
-// Local system.md takes precedence over the global ~/.config/monkey/system.md.
+// Local MONKEY.md takes precedence over the global ~/.config/monkey/MONKEY.md.
 func systemPromptCandidates() []string {
-	candidates := []string{"system.md"}
+	candidates := []string{"MONKEY.md"}
 	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, home+"/.config/monkey/system.md")
+		candidates = append(candidates, home+"/.config/monkey/MONKEY.md")
 	}
 	return candidates
 }
@@ -34,7 +34,7 @@ func claudeMDCandidates() []string {
 }
 
 // buildClientOpts returns the client options for the given config,
-// including the system prompt loaded from the first system.md found.
+// including the system prompt loaded from the first MONKEY.md found.
 func buildClientOpts(cfg config.Config) ([]api.ClientOption, error) {
 	opts := []api.ClientOption{
 		api.WithModel(cfg.DefaultModel()),

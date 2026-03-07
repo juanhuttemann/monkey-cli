@@ -6,7 +6,7 @@ import _ "embed"
 const AppName = "monkey"
 
 // AppTitle is the display name used in the intro block title.
-const AppTitle = "Monkey"
+const AppTitle = "monkey CLI"
 
 // Version is the application version.
 const Version = "0.1.0"

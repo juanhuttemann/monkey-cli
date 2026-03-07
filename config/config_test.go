@@ -343,7 +343,7 @@ func TestLoadSystemPromptFile_FileExists(t *testing.T) {
 }
 
 func TestLoadSystemPromptFile_FileNotExist_ReturnsEmpty(t *testing.T) {
-	got, err := LoadSystemPromptFile("/nonexistent/path/system.md")
+	got, err := LoadSystemPromptFile("/nonexistent/path/MONKEY.md")
 	if err != nil {
 		t.Fatalf("LoadSystemPromptFile() returned error for non-existent file: %v", err)
 	}

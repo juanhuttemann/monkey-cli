@@ -17,7 +17,7 @@ A Go CLI/TUI for chatting with Claude (Anthropic's LLM API). Run it without argu
 - **Session persistence** — resume your last conversation with `--continue`
 - **Model switching** — cycle between Opus, Sonnet, and Haiku at runtime with `/model`
 - **Conversation compaction** — compress long histories with `/compact` to save tokens
-- **Custom system prompts** — drop a `system.md` in your project root or `~/.config/monkey/system.md`
+- **Custom system prompts** — drop a `MONKEY.md` in your project root or `~/.config/monkey/MONKEY.md`
 
 ## Installation
 
@@ -91,7 +91,7 @@ monkey --continue
 
 ### System prompt
 
-Create a `system.md` in your working directory (or `~/.config/monkey/system.md` for a global default) and monkey will include it as the system prompt for every conversation.
+Create a `MONKEY.md` in your working directory (or `~/.config/monkey/MONKEY.md` for a global default) and monkey will include it as the system prompt for every conversation.
 
 ## Agentic tools
 
