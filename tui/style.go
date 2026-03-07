@@ -313,6 +313,21 @@ func ApeModeInactiveStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGrayDeep))
 }
 
+// StatusBarModelStyle renders the current model name in the status bar.
+func StatusBarModelStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGrayLight))
+}
+
+// StatusBarSepStyle renders the "|" separator between status bar segments.
+func StatusBarSepStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGrayDeep))
+}
+
+// StatusBarTokenStyle renders the token count in the status bar.
+func StatusBarTokenStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGrayLight))
+}
+
 // ToolApprovalModelStyle returns styling for the model name in the approval dialog.
 // Uses ColorApprovalModel (green) — the assistant is the one requesting action.
 func ToolApprovalModelStyle() lipgloss.Style {

@@ -42,18 +42,20 @@ const APITimeout = 60 * time.Second
 
 // SendPromptCmd creates a tea.Cmd that sends the conversation history plus
 // the new prompt to the API using the default timeout.
+// apiMessages is the full API-layer history (including tool_use/tool_result from prior turns).
 // The returned CancelFunc can be called to cancel the in-flight request.
-func SendPromptCmd(client *api.Client, messages []Message, prompt string) (tea.Cmd, context.CancelFunc) {
-	return SendPromptCmdWithTimeout(client, messages, prompt, APITimeout, nil, nil)
+func SendPromptCmd(client *api.Client, apiMessages []api.Message, prompt string) (tea.Cmd, context.CancelFunc) {
+	return SendPromptCmdWithTimeout(client, apiMessages, prompt, APITimeout, nil, nil)
 }
 
 // SendPromptCmdWithTimeout creates a tea.Cmd that sends the prompt with a per-attempt timeout.
+// apiMessages is the full API-layer history (including tool_use/tool_result from prior turns).
 // The returned CancelFunc can be called to cancel the in-flight request.
 // toolCallCh, if non-nil, receives a ToolCallMsg for each tool call as it completes and is closed when done.
 // approvalCh, if non-nil, enables the approval harness: each tool call sends a ToolApprovalRequestMsg
 // and blocks until the TUI responds. When nil, tools execute without approval.
 // An optional retryCh receives a RetryingMsg before each retry attempt and is closed when done.
-func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt string, timeout time.Duration, toolCallCh chan<- ToolCallMsg, approvalCh chan<- ToolApprovalRequestMsg, retryChs ...chan<- RetryingMsg) (tea.Cmd, context.CancelFunc) {
+func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, prompt string, timeout time.Duration, toolCallCh chan<- ToolCallMsg, approvalCh chan<- ToolApprovalRequestMsg, retryChs ...chan<- RetryingMsg) (tea.Cmd, context.CancelFunc) {
 	// Use a cancel-only parent so that each retry gets a fresh per-attempt timeout
 	// rather than sharing an already-expired deadline.
 	parentCtx, parentCancel := context.WithCancel(context.Background())
@@ -76,14 +78,9 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 			defer close(approvalCh)
 		}
 
-		// Build full message list: history (user/assistant only) + new user prompt
-		var apiMessages []api.Message
-		for _, m := range messages {
-			if m.Role == "user" || m.Role == "assistant" {
-				apiMessages = append(apiMessages, api.Message{Role: m.Role, Content: m.Content})
-			}
-		}
-		apiMessages = append(apiMessages, api.Message{Role: "user", Content: prompt})
+		// Build full message list: accumulated API history + new user prompt.
+		// apiMessages already contains all prior tool_use/tool_result context.
+		msgs := append(append([]api.Message(nil), apiMessages...), api.Message{Role: "user", Content: prompt})
 
 		if retryCh != nil {
 			ctx = api.WithRetryNotifier(ctx, func(attempt int, err error) {
@@ -115,7 +112,7 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 			executor = ApprovingExecutor{inner: multi, modelName: modelName, approvalCh: approvalCh}
 		}
 
-		response, err := client.SendMessageWithTools(ctx, apiMessages, toolList, executor,
+		response, accumulated, usage, err := client.SendMessageWithTools(ctx, msgs, toolList, executor,
 			func(tc api.ToolCallResult) {
 				if toolCallCh != nil && tc.Err != errToolDeclined {
 					toolCallCh <- ToolCallMsg{ToolCall: tc}
@@ -128,7 +125,7 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 			}
 			return PromptErrorMsg{Err: err}
 		}
-		return PromptResponseMsg{Response: response}
+		return PromptResponseMsg{Response: response, APIMessages: accumulated, Usage: usage}
 	}
 
 	return cmd, parentCancel

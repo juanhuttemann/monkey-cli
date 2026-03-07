@@ -54,7 +54,7 @@ func TestSendMessageWithTools_NoToolUse(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key")
-	result, err := client.SendMessageWithTools(context.Background(),
+	result, _, _, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "hello"}},
 		[]Tool{stubBashTool()},
 		mockExecutor{result: "unused"},
@@ -82,7 +82,7 @@ func TestSendMessageWithTools_SingleToolCall(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key")
-	result, err := client.SendMessageWithTools(context.Background(),
+	result, _, _, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "run echo"}},
 		[]Tool{stubBashTool()},
 		mockExecutor{result: "hi\n"},
@@ -112,7 +112,7 @@ func TestSendMessageWithTools_SendsToolsInFirstRequest(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key")
-	_, err := client.SendMessageWithTools(context.Background(),
+	_, _, _, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "hi"}},
 		[]Tool{stubBashTool()},
 		mockExecutor{result: ""},
@@ -151,7 +151,7 @@ func TestSendMessageWithTools_SendsToolResultInSecondRequest(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key")
-	_, err := client.SendMessageWithTools(context.Background(),
+	_, _, _, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "where am I?"}},
 		[]Tool{stubBashTool()},
 		mockExecutor{result: "/home/user\n"},
@@ -202,7 +202,7 @@ func TestSendMessageWithTools_AssistantToolUseAddedToHistory(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-key")
-	_, err := client.SendMessageWithTools(context.Background(),
+	_, _, _, err := client.SendMessageWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "list files"}},
 		[]Tool{stubBashTool()},
 		mockExecutor{result: "file.txt\n"},
@@ -229,8 +229,113 @@ func TestSendMessageWithTools_AssistantToolUseAddedToHistory(t *testing.T) {
 
 func TestSendMessageWithTools_EmptyMessages(t *testing.T) {
 	client := NewClient("http://localhost", "key")
-	_, err := client.SendMessageWithTools(context.Background(), nil, []Tool{stubBashTool()}, mockExecutor{})
+	_, _, _, err := client.SendMessageWithTools(context.Background(), nil, []Tool{stubBashTool()}, mockExecutor{})
 	if err == nil {
 		t.Error("SendMessageWithTools() should return error for nil messages")
+	}
+}
+
+func TestSendMessageWithTools_AccumulatesUsage(t *testing.T) {
+	var requestCount atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := requestCount.Add(1)
+		w.WriteHeader(http.StatusOK)
+		if n == 1 {
+			w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"date"}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}}`))
+		} else {
+			w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{"input_tokens":20,"output_tokens":3}}`))
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	_, _, usage, err := client.SendMessageWithTools(context.Background(),
+		[]Message{{Role: "user", Content: "hi"}},
+		[]Tool{stubBashTool()},
+		mockExecutor{result: "output"},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if usage.InputTokens != 30 {
+		t.Errorf("InputTokens = %d, want 30 (10+20)", usage.InputTokens)
+	}
+	if usage.OutputTokens != 8 {
+		t.Errorf("OutputTokens = %d, want 8 (5+3)", usage.OutputTokens)
+	}
+}
+
+func TestSendMessageWithTools_ReturnsAccumulatedMessages(t *testing.T) {
+	var requestCount atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := requestCount.Add(1)
+		w.WriteHeader(http.StatusOK)
+		if n == 1 {
+			w.Write([]byte(toolUseResponse("toolu_99", "bash", map[string]any{"command": "date"})))
+		} else {
+			w.Write([]byte(textResponse("today")))
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	_, msgs, _, err := client.SendMessageWithTools(context.Background(),
+		[]Message{{Role: "user", Content: "what day is it?"}},
+		[]Tool{stubBashTool()},
+		mockExecutor{result: "Monday\n"},
+	)
+	if err != nil {
+		t.Fatalf("SendMessageWithTools() returned error: %v", err)
+	}
+
+	// Expect: [user, assistant(tool_use), user(tool_result), assistant(final)]
+	if len(msgs) != 4 {
+		t.Fatalf("expected 4 accumulated messages, got %d", len(msgs))
+	}
+	if msgs[0].Role != "user" {
+		t.Errorf("msgs[0].Role = %q, want user", msgs[0].Role)
+	}
+	if msgs[1].Role != "assistant" {
+		t.Errorf("msgs[1].Role = %q, want assistant", msgs[1].Role)
+	}
+	if msgs[2].Role != "user" {
+		t.Errorf("msgs[2].Role = %q, want user (tool_result)", msgs[2].Role)
+	}
+	// Final assistant message contains the text response
+	if msgs[3].Role != "assistant" {
+		t.Errorf("msgs[3].Role = %q, want assistant", msgs[3].Role)
+	}
+	if msgs[3].Content != "today" {
+		t.Errorf("msgs[3].Content = %v, want %q", msgs[3].Content, "today")
+	}
+}
+
+func TestSendMessageWithTools_NoToolUse_ReturnsMessages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(textResponse("simple answer")))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	text, msgs, _, err := client.SendMessageWithTools(context.Background(),
+		[]Message{{Role: "user", Content: "hello"}},
+		[]Tool{stubBashTool()},
+		mockExecutor{result: ""},
+	)
+	if err != nil {
+		t.Fatalf("SendMessageWithTools() returned error: %v", err)
+	}
+	if text != "simple answer" {
+		t.Errorf("text = %q, want %q", text, "simple answer")
+	}
+	// Expect: [user, assistant(final)]
+	if len(msgs) != 2 {
+		t.Fatalf("expected 2 accumulated messages, got %d", len(msgs))
+	}
+	if msgs[1].Role != "assistant" || msgs[1].Content != "simple answer" {
+		t.Errorf("msgs[1] = {%q, %v}, want {assistant, simple answer}", msgs[1].Role, msgs[1].Content)
 	}
 }

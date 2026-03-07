@@ -28,6 +28,8 @@ const (
 // Model is the main bubbletea model for the TUI
 type Model struct {
 	messages       []Message
+	apiMessages    []api.Message // full API-layer history (includes tool_use/tool_result)
+	totalUsage     api.Usage     // cumulative token counts for the session
 	input          textarea.Model
 	viewport       viewport.Model
 	state          State
@@ -334,6 +336,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				case "/clear":
 					m.messages = nil
+					m.apiMessages = nil
+					m.totalUsage = api.Usage{}
 					m.input.SetValue("")
 					return m, nil
 				case "/model":
@@ -364,6 +368,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				case "/clear":
 					m.messages = nil
+					m.apiMessages = nil
+					m.totalUsage = api.Usage{}
 					m.input.SetValue("")
 					m.commandPicker.Deactivate()
 					m.filePicker.Deactivate()
@@ -411,7 +417,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					approvalCh = make(chan ToolApprovalRequestMsg, 1)
 				}
 				m.approvalCh = approvalCh
-				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.messages, expandedInput, APITimeout, toolCallCh, approvalCh, retryCh)
+				cmd, cancel := SendPromptCmdWithTimeout(m.client, m.apiMessages, expandedInput, APITimeout, toolCallCh, approvalCh, retryCh)
 				m.cancelFn = cancel
 				cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh))
 				if approvalCh != nil {
@@ -497,6 +503,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case PromptResponseMsg:
 		m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
+		m.apiMessages = msg.APIMessages
+		m.totalUsage = m.totalUsage.Add(msg.Usage)
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
 		m.timerActive = false
@@ -681,11 +689,7 @@ func (m Model) View() string {
 	// text as a contiguous string while still providing a visible cursor.
 	view.WriteString(InputStyle(m.width, 3).Render(m.input.Value() + "▌"))
 	view.WriteString("\n")
-	if m.apeMode {
-		view.WriteString(ApeModeActiveStyle().Render("🍌 Ape Mode: Enabled"))
-	} else {
-		view.WriteString(ApeModeInactiveStyle().Render("Ape Mode: Disabled"))
-	}
+	view.WriteString(m.renderStatusBar())
 	view.WriteString("\n\n")
 
 	if m.helpPanel.IsActive() {
@@ -855,6 +859,49 @@ func (m *Model) AddMessage(role, content string) {
 		Content:   content,
 		Timestamp: time.Now(),
 	})
+}
+
+// renderStatusBar renders a 1-line footer: model | ape | tokens.
+func (m Model) renderStatusBar() string {
+	sep := StatusBarSepStyle().Render(" | ")
+
+	model := ""
+	if m.client != nil {
+		model = m.client.GetModel()
+	}
+	modelSeg := StatusBarModelStyle().Render(model)
+
+	var apeSeg string
+	if m.apeMode {
+		apeSeg = ApeModeActiveStyle().Render("ape: on")
+	} else {
+		apeSeg = ApeModeInactiveStyle().Render("ape: off")
+	}
+
+	total := m.totalUsage.InputTokens + m.totalUsage.OutputTokens
+	var tokenSeg string
+	if total > 0 {
+		tokenSeg = StatusBarTokenStyle().Render(fmt.Sprintf("%s tokens", formatTokenCount(total)))
+		return modelSeg + sep + apeSeg + sep + tokenSeg
+	}
+	return modelSeg + sep + apeSeg
+}
+
+// formatTokenCount formats an integer token count with commas (e.g. 8341 → "8,341").
+func formatTokenCount(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	// Insert commas every 3 digits from the right.
+	var out []byte
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, byte(c))
+	}
+	return string(out)
 }
 
 // lastAssistantContent returns the content of the most recent assistant message, or "".

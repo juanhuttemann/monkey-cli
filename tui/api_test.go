@@ -20,7 +20,7 @@ func TestSendPromptCmd_ReturnsCmd(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := []api.Message{{Role: "user", Content: "test"}}
 
 	cmd, _ := SendPromptCmd(client, messages, "test prompt")
 	if cmd == nil {
@@ -39,7 +39,7 @@ func TestSendPromptCmd_SendsWithContext(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{{Role: "user", Content: "test"}}
+	messages := []api.Message{{Role: "user", Content: "test"}}
 
 	cmd, _ := SendPromptCmd(client, messages, "test prompt")
 	result := cmd()
@@ -71,7 +71,7 @@ func TestSendPromptCmd_UsesConversationHistory(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{
+	messages := []api.Message{
 		{Role: "user", Content: "first message"},
 		{Role: "assistant", Content: "first response"},
 		{Role: "user", Content: "second message"},
@@ -102,9 +102,8 @@ func TestSendPromptCmd_SuccessResponse(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{}
 
-	cmd, _ := SendPromptCmd(client, messages, "test prompt")
+	cmd, _ := SendPromptCmd(client, nil, "test prompt")
 	result := cmd()
 
 	response, ok := result.(PromptResponseMsg)
@@ -128,9 +127,8 @@ func TestSendPromptCmd_ErrorResponse(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{}
 
-	cmd, _ := SendPromptCmd(client, messages, "test prompt")
+	cmd, _ := SendPromptCmd(client, nil, "test prompt")
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -152,10 +150,9 @@ func TestSendPromptCmd_TimeoutError(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{}
 
 	// Use a short timeout for testing
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 100*time.Millisecond, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 100*time.Millisecond, nil, nil)
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -179,10 +176,9 @@ func TestSendPromptCmdWithTimeout_RespectsTimeout(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{}
 
 	timeout := 100 * time.Millisecond
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", timeout, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", timeout, nil, nil)
 	_ = cmd()
 
 	elapsed := time.Since(startTime)
@@ -201,9 +197,8 @@ func TestSendPromptCmd_Cancel_ReturnsCancelledMsg(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{}
 
-	cmd, cancel := SendPromptCmd(client, messages, "test prompt")
+	cmd, cancel := SendPromptCmd(client, nil, "test prompt")
 
 	// Cancel immediately before executing the cmd
 	cancel()
@@ -230,10 +225,9 @@ func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{}
 
 	toolCallCh := make(chan ToolCallMsg, 10)
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, toolCallCh, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, toolCallCh, nil)
 	result := cmd()
 
 	// Channel should have received the tool call
@@ -281,6 +275,76 @@ func TestSendPromptCmd_SendsAllFourTools(t *testing.T) {
 	}
 }
 
+func TestSendPromptCmd_PromptResponseContainsAPIMessages(t *testing.T) {
+	var requestCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		requestCount++
+		if requestCount == 1 {
+			w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}`))
+		} else {
+			w.Write([]byte(`{"content":[{"type":"text","text":"files listed"}]}`))
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	cmd, _ := SendPromptCmd(client, nil, "list my files")
+	result := cmd()
+
+	resp, ok := result.(PromptResponseMsg)
+	if !ok {
+		t.Fatalf("result = %T, want PromptResponseMsg", result)
+	}
+	// APIMessages should contain: [user, assistant(tool_use), user(tool_result), assistant(final)]
+	if len(resp.APIMessages) != 4 {
+		t.Fatalf("APIMessages length = %d, want 4", len(resp.APIMessages))
+	}
+	if resp.APIMessages[0].Role != "user" {
+		t.Errorf("APIMessages[0].Role = %q, want user", resp.APIMessages[0].Role)
+	}
+	if resp.APIMessages[3].Role != "assistant" {
+		t.Errorf("APIMessages[3].Role = %q, want assistant", resp.APIMessages[3].Role)
+	}
+}
+
+func TestSendPromptCmd_APIMessagesPassedAsPriorHistory(t *testing.T) {
+	var bodies [][]byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content":[{"type":"text","text":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	// Simulate prior turn: accumulated messages that include a tool_use/tool_result exchange
+	prior := []api.Message{
+		{Role: "user", Content: "first question"},
+		{Role: "assistant", Content: "first answer"},
+	}
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	cmd, _ := SendPromptCmd(client, prior, "follow-up")
+	cmd()
+
+	if len(bodies) == 0 {
+		t.Fatal("no requests received")
+	}
+	body := string(bodies[0])
+	if !strings.Contains(body, "first question") {
+		t.Error("request should contain prior history 'first question'")
+	}
+	if !strings.Contains(body, "first answer") {
+		t.Error("request should contain prior history 'first answer'")
+	}
+	if !strings.Contains(body, "follow-up") {
+		t.Error("request should contain new prompt 'follow-up'")
+	}
+}
+
 // SendPromptCmdWithTimeout is tested above - this tests the exported version
 func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -291,9 +355,8 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	messages := []Message{}
 
-	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test prompt", 5*time.Second, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 5*time.Second, nil, nil)
 	if cmd == nil {
 		t.Fatal("SendPromptCmdWithTimeout() returned nil, want non-nil tea.Cmd")
 	}

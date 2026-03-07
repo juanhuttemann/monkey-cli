@@ -311,14 +311,19 @@ func (c *Client) SendMessageWithHistory(ctx context.Context, messages []Message)
 
 // SendMessageWithTools sends a conversation with tool definitions, executing any tool calls
 // the model makes and continuing the loop until the model returns a final text response.
+// It returns the final text response, the full accumulated message history (including
+// tool_use/tool_result exchanges and the final assistant message), the total token usage
+// across all API calls in the loop, and any error.
 // The optional onCall callback is invoked after each tool execution with the result.
-func (c *Client) SendMessageWithTools(ctx context.Context, messages []Message, tools []Tool, executor ToolExecutor, onCall ...func(ToolCallResult)) (string, error) {
+func (c *Client) SendMessageWithTools(ctx context.Context, messages []Message, tools []Tool, executor ToolExecutor, onCall ...func(ToolCallResult)) (string, []Message, Usage, error) {
 	if len(messages) == 0 {
-		return "", errors.New("no messages provided")
+		return "", nil, Usage{}, errors.New("no messages provided")
 	}
 
 	msgs := make([]Message, len(messages))
 	copy(msgs, messages)
+
+	var totalUsage Usage
 
 	for {
 		resp, err := c.doRequest(ctx, apiRequest{
@@ -328,8 +333,12 @@ func (c *Client) SendMessageWithTools(ctx context.Context, messages []Message, t
 			Tools:     tools,
 		})
 		if err != nil {
-			return "", err
+			return "", nil, Usage{}, err
 		}
+		totalUsage = totalUsage.Add(Usage{
+			InputTokens:  resp.Usage.InputTokens,
+			OutputTokens: resp.Usage.OutputTokens,
+		})
 
 		// Collect any tool_use blocks.
 		var toolUseBlocks []ContentBlock
@@ -339,9 +348,14 @@ func (c *Client) SendMessageWithTools(ctx context.Context, messages []Message, t
 			}
 		}
 
-		// No tool calls → return the final text.
+		// No tool calls → extract text, append final assistant message, return full history.
 		if len(toolUseBlocks) == 0 {
-			return extractText(resp)
+			text, err := extractText(resp)
+			if err != nil {
+				return "", nil, Usage{}, err
+			}
+			msgs = append(msgs, Message{Role: "assistant", Content: text})
+			return text, msgs, totalUsage, nil
 		}
 
 		// Append the assistant's tool_use message to history.

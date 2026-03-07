@@ -348,3 +348,57 @@ func TestView_ShowsCursorInInputArea(t *testing.T) {
 		t.Error("View() should show a cursor indicator (▌) in the input area")
 	}
 }
+
+func TestView_StatusBar_ShowsModelName(t *testing.T) {
+	client := api.NewClient("http://example.com", "key", api.WithModel("claude-sonnet-4-6"))
+	model := NewModel(client)
+	model.SetDimensions(80, 24)
+
+	view := stripANSI(model.View())
+
+	if !strings.Contains(view, "claude-sonnet-4-6") {
+		t.Errorf("status bar should show model name, got:\n%s", view)
+	}
+}
+
+func TestView_StatusBar_ShowsTokenCount(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	model.totalUsage = api.Usage{InputTokens: 1000, OutputTokens: 341}
+
+	view := stripANSI(model.View())
+
+	if !strings.Contains(view, "1,341 tokens") {
+		t.Errorf("status bar should show '1,341 tokens', got:\n%s", view)
+	}
+}
+
+func TestView_StatusBar_NoTokensWhenZero(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+
+	view := stripANSI(model.View())
+
+	if strings.Contains(view, "tokens") {
+		t.Errorf("status bar should not show token count when zero, got:\n%s", view)
+	}
+}
+
+func TestFormatTokenCount(t *testing.T) {
+	tests := []struct {
+		n    int
+		want string
+	}{
+		{0, "0"},
+		{999, "999"},
+		{1000, "1,000"},
+		{8341, "8,341"},
+		{1234567, "1,234,567"},
+	}
+	for _, tc := range tests {
+		got := formatTokenCount(tc.n)
+		if got != tc.want {
+			t.Errorf("formatTokenCount(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}

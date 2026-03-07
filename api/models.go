@@ -17,6 +17,20 @@ type Message struct {
 	Content any    `json:"content"`
 }
 
+// Usage holds the token counts reported by the API.
+type Usage struct {
+	InputTokens  int
+	OutputTokens int
+}
+
+// Add returns the sum of two Usage values.
+func (u Usage) Add(other Usage) Usage {
+	return Usage{
+		InputTokens:  u.InputTokens + other.InputTokens,
+		OutputTokens: u.OutputTokens + other.OutputTokens,
+	}
+}
+
 // apiResponse represents the response from the LLM API
 type apiResponse struct {
 	Content    []ContentBlock `json:"content"`

@@ -31,8 +31,10 @@ type SendPromptMsg struct {
 
 // PromptResponseMsg is returned when the API responds successfully
 type PromptResponseMsg struct {
-	Response string
-	Err      error
+	Response    string
+	APIMessages []api.Message // full accumulated history including tool_use/tool_result
+	Usage       api.Usage     // token counts for this turn
+	Err         error
 }
 
 // PromptErrorMsg is returned when the API returns an error

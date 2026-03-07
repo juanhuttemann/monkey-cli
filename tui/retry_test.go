@@ -54,7 +54,7 @@ func TestSendPromptCmdWithTimeout_SendsRetryNotifications(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "key", api.WithModel("m"), api.WithMaxRetries(2), api.WithRetryDelay(0))
-	messages := []Message{}
+	messages := []api.Message{}
 
 	retryCh := make(chan RetryingMsg, 10)
 	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, retryCh)
@@ -91,7 +91,7 @@ func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnSuccess(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "key", api.WithModel("m"))
-	messages := []Message{}
+	messages := []api.Message{}
 
 	retryCh := make(chan RetryingMsg, 10)
 	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, retryCh)
@@ -115,7 +115,7 @@ func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnError(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(server.URL, "key", api.WithModel("m"))
-	messages := []Message{}
+	messages := []api.Message{}
 
 	retryCh := make(chan RetryingMsg, 10)
 	cmd, _ := SendPromptCmdWithTimeout(client, messages, "test", 5*time.Second, nil, nil, retryCh)

@@ -607,6 +607,67 @@ func TestUpdate_CtrlJ_DoesNotSubmit(t *testing.T) {
 	}
 }
 
+func TestUpdate_PromptResponse_AccumulatesTokens(t *testing.T) {
+	model := NewModel(nil)
+	model.totalUsage = api.Usage{InputTokens: 100, OutputTokens: 50}
+
+	msg := PromptResponseMsg{Response: "hi", Usage: api.Usage{InputTokens: 200, OutputTokens: 30}}
+	updated, _ := model.Update(msg)
+
+	m := updated.(Model)
+	if m.totalUsage.InputTokens != 300 {
+		t.Errorf("totalUsage.InputTokens = %d, want 300", m.totalUsage.InputTokens)
+	}
+	if m.totalUsage.OutputTokens != 80 {
+		t.Errorf("totalUsage.OutputTokens = %d, want 80", m.totalUsage.OutputTokens)
+	}
+}
+
+func TestUpdate_Clear_ResetsTokens(t *testing.T) {
+	model := NewModel(nil)
+	model.totalUsage = api.Usage{InputTokens: 500, OutputTokens: 200}
+
+	model.SetInput("/clear")
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlM})
+
+	m := updated.(Model)
+	if m.totalUsage.InputTokens != 0 || m.totalUsage.OutputTokens != 0 {
+		t.Errorf("totalUsage after /clear = {%d, %d}, want {0, 0}",
+			m.totalUsage.InputTokens, m.totalUsage.OutputTokens)
+	}
+}
+
+func TestUpdate_PromptResponse_StoresAPIMessages(t *testing.T) {
+	model := NewModel(nil)
+	prior := []api.Message{
+		{Role: "user", Content: "q"},
+		{Role: "assistant", Content: "a"},
+	}
+	responseMsg := PromptResponseMsg{Response: "reply", APIMessages: prior}
+	updated, _ := model.Update(responseMsg)
+
+	m := updated.(Model)
+	if len(m.apiMessages) != 2 {
+		t.Fatalf("apiMessages length = %d, want 2", len(m.apiMessages))
+	}
+	if m.apiMessages[1].Content != "a" {
+		t.Errorf("apiMessages[1].Content = %v, want %q", m.apiMessages[1].Content, "a")
+	}
+}
+
+func TestUpdate_Clear_ResetsAPIMessages(t *testing.T) {
+	model := NewModel(nil)
+	model.apiMessages = []api.Message{{Role: "user", Content: "prior"}}
+
+	model.SetInput("/clear")
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlM})
+
+	m := updated.(Model)
+	if len(m.apiMessages) != 0 {
+		t.Errorf("apiMessages after /clear = %d entries, want 0", len(m.apiMessages))
+	}
+}
+
 func TestNewModel_UsesMonkeySpinner(t *testing.T) {
 	model := NewModel(nil)
 
