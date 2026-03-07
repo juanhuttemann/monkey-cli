@@ -95,13 +95,16 @@ func (d ToolApprovalDialog) View() string {
 		return ""
 	}
 	var sb strings.Builder
-	sb.WriteString(d.modelName + " wants to run " + d.toolName)
+	sb.WriteString(ToolApprovalModelStyle().Render(d.modelName) +
+		" wants to run " +
+		ToolApprovalToolStyle().Render(d.toolName) +
+		" tool")
 	if d.previewText != "" {
 		sb.WriteString("\n\n")
 		if d.toolName == "edit" {
 			sb.WriteString(RenderSplitDiff(d.previewText, d.width))
 		} else {
-			sb.WriteString("$ " + d.previewText)
+			sb.WriteString(ToolApprovalPreviewStyle().Render("$ " + d.previewText))
 		}
 	}
 	sb.WriteString("\n")

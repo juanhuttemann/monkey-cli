@@ -2,13 +2,16 @@ package tui
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"monkey/api"
 	"monkey/tools"
 )
+
+// errToolDeclined is returned by ApprovingExecutor when the user declines a tool call.
+var errToolDeclined = errors.New("tool call declined by user")
 
 // ApprovingExecutor wraps a ToolExecutor and requests user approval before each tool call.
 // It sends a ToolApprovalRequestMsg on approvalCh and blocks until the TUI responds.
@@ -29,7 +32,7 @@ func (a ApprovingExecutor) ExecuteTool(name string, input map[string]any) (strin
 	}
 	approved := <-responseCh
 	if !approved {
-		return "", fmt.Errorf("tool call declined by user")
+		return "", errToolDeclined
 	}
 	return a.inner.ExecuteTool(name, input)
 }
@@ -113,7 +116,7 @@ func SendPromptCmdWithTimeout(client *api.Client, messages []Message, prompt str
 
 		response, err := client.SendMessageWithTools(ctx, apiMessages, toolList, executor,
 			func(tc api.ToolCallResult) {
-				if toolCallCh != nil {
+				if toolCallCh != nil && tc.Err != errToolDeclined {
 					toolCallCh <- ToolCallMsg{ToolCall: tc}
 				}
 			},

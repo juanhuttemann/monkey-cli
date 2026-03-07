@@ -316,8 +316,8 @@ func TestView_ShowsCanceled_AfterEscWhileLoading(t *testing.T) {
 
 	view := updatedModel.(Model).View()
 
-	if !strings.Contains(stripANSI(view), "canceled") {
-		t.Error("View() should show 'canceled' after Esc while loading")
+	if !strings.Contains(stripANSI(view), "What should monkey do?") {
+		t.Error("View() should show 'What should monkey do?' after Esc while loading")
 	}
 }
 

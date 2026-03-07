@@ -620,7 +620,7 @@ func (m Model) View() string {
 		view.WriteString(line)
 		view.WriteString("\n")
 	} else if m.wasCancelled {
-		view.WriteString(TimerStyle().Render("canceled"))
+		view.WriteString(WaitingStyle().Render("What should monkey do?"))
 		view.WriteString("\n")
 	} else if m.lastElapsed > 0 {
 		view.WriteString(TimerStyle().Render("took " + m.lastElapsed.Round(time.Second).String()))

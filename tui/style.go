@@ -20,7 +20,7 @@ func UserMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(UserBorderColor)).
-		Width(width - 4).
+		Width(width-4).
 		Padding(0, 1)
 }
 
@@ -29,7 +29,7 @@ func AssistantMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(AssistantBorderColor)).
-		Width(width - 4).
+		Width(width-4).
 		Padding(0, 1)
 }
 
@@ -38,7 +38,7 @@ func ErrorMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ErrorBorderColor)).
-		Width(width - 4).
+		Width(width-4).
 		Padding(0, 1)
 }
 
@@ -47,7 +47,7 @@ func ToolMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ToolBorderColor)).
-		Width(width - 4).
+		Width(width-4).
 		Padding(0, 1)
 }
 
@@ -56,7 +56,7 @@ func SystemMessageStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(SystemBorderColor)).
-		Width(width - 4).
+		Width(width-4).
 		Padding(0, 1)
 }
 
@@ -79,6 +79,13 @@ func SpinnerStyle() lipgloss.Style {
 func TimerStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#AAAAAA"))
+}
+
+// WaitingStyle returns the styling for the idle/waiting prompt shown after cancellation.
+func WaitingStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#D4A017")).
+		Italic(true)
 }
 
 // IntroBorderColor is the dark brown color used for the intro block border and title.
@@ -148,11 +155,11 @@ func RenderIntroBlock(width int, title, version, content string) string {
 	// innerW+2 accounts for the two │ side chars; -1 for ╮
 	dashLen := max(0, innerW+2-lipgloss.Width(titleSection)-1)
 
-	topLine := bdr.Render(prefix+title)
+	topLine := bdr.Render(prefix + title)
 	if version != "" {
 		topLine += bdr.Render(" ") + verFg.Render(version)
 	}
-	topLine += bdr.Render(suffix+strings.Repeat("─", dashLen)+"╮")
+	topLine += bdr.Render(suffix + strings.Repeat("─", dashLen) + "╮")
 
 	var sb strings.Builder
 	sb.WriteString(topLine)
@@ -241,7 +248,7 @@ func RenderToolBlock(width int, content string) string {
 	label := "🔧"
 	titleW := 2 + lipgloss.Width(label) + 1
 	dashLen := max(0, innerW-titleW)
-	topLine := bdr.Render("╭─ "+label+" "+strings.Repeat("─", dashLen)+"╮")
+	topLine := bdr.Render("╭─ " + label + " " + strings.Repeat("─", dashLen) + "╮")
 
 	var sb strings.Builder
 	sb.WriteString(topLine)
@@ -260,7 +267,7 @@ func FilePickerStyle(width int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#666666")).
-		Width(width - 4).
+		Width(width-4).
 		Padding(0, 1)
 }
 
@@ -279,6 +286,27 @@ func ApeModeActiveStyle() lipgloss.Style {
 // ApeModeInactiveStyle returns grey styling for the ape mode indicator when disabled.
 func ApeModeInactiveStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+}
+
+// ToolApprovalModelStyle returns flashy vivid-violet bold styling for the model name in the approval dialog.
+func ToolApprovalModelStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#C084FC")).
+		Bold(true)
+}
+
+// ToolApprovalPreviewStyle returns a dark navy background style for the bash command preview line.
+func ToolApprovalPreviewStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Bold(true).
+		Padding(0, 1)
+}
+
+// ToolApprovalToolStyle returns flashy amber-gold bold styling for the tool name in the approval dialog.
+func ToolApprovalToolStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FBBF24")).
+		Bold(true)
 }
 
 // MessageTimestampStyle returns the styling for per-message timestamps: gray, right-aligned.
