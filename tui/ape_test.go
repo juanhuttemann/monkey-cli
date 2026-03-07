@@ -143,3 +143,56 @@ func TestView_ApeModeIndicator_EnabledUsesYellowColor(t *testing.T) {
 		t.Errorf("Enabled ape mode should use ColorAccent (168;146;40 in ANSI), got:\n%s", stripANSI(view))
 	}
 }
+
+// --- Ape mode: auto-approval of ToolApprovalRequestMsg ---
+
+func TestUpdate_ToolApprovalRequestMsg_ApeModeOn_AutoApproves(t *testing.T) {
+	model := NewModel(nil)
+	model.apeMode = true
+	ch := make(chan bool, 1)
+	msg := ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch}
+
+	model.Update(msg)
+
+	select {
+	case approved := <-ch:
+		if !approved {
+			t.Error("ape mode: ToolApprovalRequestMsg should auto-approve (send true)")
+		}
+	default:
+		t.Error("ape mode: ToolApprovalRequestMsg should have sent on ResponseCh without user interaction")
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_ApeModeOn_DoesNotActivateDialog(t *testing.T) {
+	model := NewModel(nil)
+	model.apeMode = true
+	ch := make(chan bool, 1)
+	msg := ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch}
+
+	updated, _ := model.Update(msg)
+	m := updated.(Model)
+
+	if m.approvalDialog.IsActive() {
+		t.Error("ape mode: approval dialog should not be activated")
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_ApeModeOff_ShowsDialog(t *testing.T) {
+	model := NewModel(nil)
+	model.apeMode = false
+	ch := make(chan bool, 1)
+	msg := ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch}
+
+	updated, _ := model.Update(msg)
+	m := updated.(Model)
+
+	if !m.approvalDialog.IsActive() {
+		t.Error("non-ape mode: approval dialog should be activated")
+	}
+	select {
+	case <-ch:
+		t.Error("non-ape mode: ResponseCh should not be sent to without user input")
+	default:
+	}
+}

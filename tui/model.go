@@ -287,10 +287,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, inputCmd)
 			}
 		case tea.KeyCtrlT:
-			// Ctrl+T toggles the collapsed state of the most recent tool message.
+			// ctrl+t expands the most recently collapsed tool message.
 			for i := len(m.messages) - 1; i >= 0; i-- {
-				if m.messages[i].Role == "tool" {
-					m.messages[i].Collapsed = !m.messages[i].Collapsed
+				if m.messages[i].Role == "tool" && m.messages[i].Collapsed {
+					m.messages[i].Collapsed = false
 					m.viewport.SetContent(m.renderMessages())
 					break
 				}
@@ -683,6 +683,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Tool call channel closed; the API result will arrive separately.
 
 	case ToolApprovalRequestMsg:
+		// Ape mode may have been enabled after this request started (during streaming).
+		// Auto-approve without showing the dialog.
+		if m.apeMode {
+			msg.ResponseCh <- true
+			if m.approvalCh != nil {
+				cmds = append(cmds, waitForApproval(m.approvalCh))
+			}
+			return m, tea.Batch(cmds...)
+		}
 		preview := ""
 		if msg.ToolName == "edit" {
 			path, _ := msg.Input["path"].(string)
@@ -1146,7 +1155,7 @@ func (m Model) renderSingleMessage(sw int, msg Message) string {
 		content := msg.Content
 		if msg.Collapsed {
 			lines := strings.Split(content, "\n")
-			content = fmt.Sprintf("%s\n[%d lines hidden — Ctrl+T to expand]", lines[0], len(lines)-1)
+			content = fmt.Sprintf("%s\n[%d lines hidden — ctrl+t to expand]", lines[0], len(lines)-1)
 		}
 		return RenderToolBlock(sw, msg.ToolName, content)
 	case "system":

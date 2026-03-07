@@ -64,7 +64,7 @@ func TestToolCallMsg_LongOutput_AutoCollapsed(t *testing.T) {
 	}
 }
 
-// --- CtrlT toggles last tool message ---
+// --- ctrl+t expands the last collapsed tool message ---
 
 func TestCtrlT_NoToolMessages_Noop(t *testing.T) {
 	m := NewModel(nil)
@@ -74,7 +74,7 @@ func TestCtrlT_NoToolMessages_Noop(t *testing.T) {
 	result := updated.(Model)
 	// Nothing should change; no tool messages
 	if len(result.GetHistory()) != 1 {
-		t.Errorf("history len changed after Ctrl+T with no tool messages")
+		t.Errorf("history len changed after ctrl+t with no tool messages")
 	}
 }
 
@@ -90,14 +90,14 @@ func TestCtrlT_ExpandsLastCollapsedTool(t *testing.T) {
 
 	history := result.GetHistory()
 	if history[0].Collapsed {
-		t.Error("Ctrl+T should expand a collapsed tool message")
+		t.Error("ctrl+t should expand a collapsed tool message")
 	}
 }
 
-func TestCtrlT_CollapsesLastExpandedTool(t *testing.T) {
+func TestCtrlT_NoopWhenNothingCollapsed(t *testing.T) {
 	m := NewModel(nil)
 	m.AddMessage("tool", makeToolContent(toolCollapseLines+5))
-	// Start expanded
+	// Start expanded — ctrl+t only expands, so this should be a noop
 	m.messages[0].Collapsed = false
 
 	ctrlT := tea.KeyMsg{Type: tea.KeyCtrlT}
@@ -105,12 +105,12 @@ func TestCtrlT_CollapsesLastExpandedTool(t *testing.T) {
 	result := updated.(Model)
 
 	history := result.GetHistory()
-	if !history[0].Collapsed {
-		t.Error("Ctrl+T should collapse an expanded long tool message")
+	if history[0].Collapsed {
+		t.Error("ctrl+t should not collapse an already-expanded tool message")
 	}
 }
 
-func TestCtrlT_TogglesLastToolWhenMultiple(t *testing.T) {
+func TestCtrlT_ExpandsLastCollapsedToolWhenMultiple(t *testing.T) {
 	m := NewModel(nil)
 	m.AddMessage("tool", makeToolContent(toolCollapseLines+5))
 	m.AddMessage("user", "next prompt")
@@ -123,9 +123,9 @@ func TestCtrlT_TogglesLastToolWhenMultiple(t *testing.T) {
 	result := updated.(Model)
 
 	history := result.GetHistory()
-	// Only the last tool message should be toggled
+	// Only the last collapsed tool message should be expanded
 	if history[2].Collapsed {
-		t.Error("Ctrl+T should toggle the last tool message (index 2)")
+		t.Error("ctrl+t should expand the last collapsed tool message (index 2)")
 	}
 	if !history[0].Collapsed {
 		t.Error("first tool message (index 0) should remain collapsed")
