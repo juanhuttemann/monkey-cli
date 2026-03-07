@@ -60,6 +60,6 @@ func LoadConfigFile(path string) (map[string]string, error) {
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return parseConfigFile(f)
 }

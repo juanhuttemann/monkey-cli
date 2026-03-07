@@ -96,9 +96,10 @@ func parseStream(r io.Reader, onToken func(string)) (apiResponse, error) {
 		case "content_block_start":
 			if ev.ContentBlock != nil {
 				bs := &streamBlock{blockType: ev.ContentBlock.Type}
-				if ev.ContentBlock.Type == "text" {
+				switch ev.ContentBlock.Type {
+				case "text":
 					bs.text.WriteString(ev.ContentBlock.Text)
-				} else if ev.ContentBlock.Type == "tool_use" {
+				case "tool_use":
 					bs.id = ev.ContentBlock.ID
 					bs.name = ev.ContentBlock.Name
 				}
@@ -225,7 +226,7 @@ func (c *Client) doStreamRequest(ctx context.Context, reqBody apiRequest, onToke
 		}
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			cancel()
 			lastErr = &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
 			if !isRetryableError(ctx, lastErr) {
@@ -237,7 +238,7 @@ func (c *Client) doStreamRequest(ctx context.Context, reqBody apiRequest, onToke
 		// 200 OK — begin streaming. No retry from this point: parseStream reads the
 		// body incrementally and may already have delivered tokens via onToken.
 		result, parseErr := parseStream(resp.Body, onToken)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		cancel()
 		return result, parseErr
 	}

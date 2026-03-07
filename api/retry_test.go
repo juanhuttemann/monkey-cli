@@ -303,7 +303,7 @@ func TestSendMessage_RetriesOnConnectionReset(t *testing.T) {
 				return
 			}
 			conn, _, _ := hj.Hijack()
-			conn.Close()
+			_ = conn.Close()
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -357,7 +357,7 @@ func TestSendMessage_RetriesAfterTimeoutThenConnectionReset(t *testing.T) {
 				return
 			}
 			conn, _, _ := hj.Hijack()
-			conn.Close()
+			_ = conn.Close()
 		default:
 			// Third attempt: success
 			w.WriteHeader(http.StatusOK)

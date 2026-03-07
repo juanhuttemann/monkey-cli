@@ -142,10 +142,10 @@ func unsetPricingEnv(t *testing.T) {
 	t.Helper()
 	old1 := os.Getenv(EnvPriceInput)
 	old2 := os.Getenv(EnvPriceOutput)
-	os.Unsetenv(EnvPriceInput)
-	os.Unsetenv(EnvPriceOutput)
+	_ = os.Unsetenv(EnvPriceInput)
+	_ = os.Unsetenv(EnvPriceOutput)
 	t.Cleanup(func() {
-		os.Setenv(EnvPriceInput, old1)
-		os.Setenv(EnvPriceOutput, old2)
+		_ = os.Setenv(EnvPriceInput, old1)
+		_ = os.Setenv(EnvPriceOutput, old2)
 	})
 }

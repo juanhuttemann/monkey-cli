@@ -97,9 +97,9 @@ func TestLoadConfigFile_ValidFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("api_key = \"test-key\"\nsonnet_model = \"claude-sonnet\"\n")
-	f.Close()
+	defer func() { _ = os.Remove(f.Name()) }()
+	_, _ = f.WriteString("api_key = \"test-key\"\nsonnet_model = \"claude-sonnet\"\n")
+	_ = f.Close()
 
 	kv, err := LoadConfigFile(f.Name())
 	if err != nil {
@@ -119,13 +119,13 @@ func TestLoad_ConfigFileUsedWhenEnvMissing(t *testing.T) {
 	// Write a temp config file
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.toml")
-	os.WriteFile(cfgPath, []byte("api_key = \"file-key\"\nsonnet_model = \"claude-sonnet-file\"\n"), 0600)
+	_ = os.WriteFile(cfgPath, []byte("api_key = \"file-key\"\nsonnet_model = \"claude-sonnet-file\"\n"), 0600)
 
 	// Unset the relevant env vars
-	os.Unsetenv(EnvAPIKey)
-	os.Unsetenv(EnvSonnetModel)
-	os.Unsetenv(EnvOpusModel)
-	os.Unsetenv(EnvHaikuModel)
+	_ = os.Unsetenv(EnvAPIKey)
+	_ = os.Unsetenv(EnvSonnetModel)
+	_ = os.Unsetenv(EnvOpusModel)
+	_ = os.Unsetenv(EnvHaikuModel)
 
 	loader := NewEnvLoaderWithConfigFile(cfgPath)
 	cfg, err := loader.Load()
@@ -143,12 +143,12 @@ func TestLoad_ConfigFileUsedWhenEnvMissing(t *testing.T) {
 func TestLoad_EnvVarOverridesConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.toml")
-	os.WriteFile(cfgPath, []byte("api_key = \"file-key\"\nsonnet_model = \"file-model\"\n"), 0600)
+	_ = os.WriteFile(cfgPath, []byte("api_key = \"file-key\"\nsonnet_model = \"file-model\"\n"), 0600)
 
 	t.Setenv(EnvAPIKey, "env-key")
 	t.Setenv(EnvSonnetModel, "env-model")
-	os.Unsetenv(EnvOpusModel)
-	os.Unsetenv(EnvHaikuModel)
+	_ = os.Unsetenv(EnvOpusModel)
+	_ = os.Unsetenv(EnvHaikuModel)
 
 	loader := NewEnvLoaderWithConfigFile(cfgPath)
 	cfg, err := loader.Load()

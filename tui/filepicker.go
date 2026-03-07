@@ -217,10 +217,10 @@ func expandMentions(text string) string {
 			content = string(data[:maxMentionBytes])
 			note = fmt.Sprintf("\n[truncated: file is %d bytes, showing first %d]", len(data), maxMentionBytes)
 		}
-		appendix.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&appendix,
 			"\n\n---\nFile: %s\n```%s\n%s\n```%s",
 			path, ext, content, note,
-		))
+		)
 	}
 
 	if appendix.Len() == 0 {

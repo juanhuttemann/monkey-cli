@@ -171,7 +171,7 @@ func TestUpdate_MouseWheel_ScrollsViewport(t *testing.T) {
 	}
 
 	// Simulate mouse wheel down
-	mouseDown := tea.MouseMsg{Type: tea.MouseWheelDown}
+	mouseDown := tea.MouseMsg{Button: tea.MouseButtonWheelDown}
 	updatedModel, _ := model.Update(mouseDown)
 
 	m := updatedModel.(Model)
@@ -181,7 +181,7 @@ func TestUpdate_MouseWheel_ScrollsViewport(t *testing.T) {
 	}
 
 	// Simulate mouse wheel up
-	mouseUp := tea.MouseMsg{Type: tea.MouseWheelUp}
+	mouseUp := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
 	updatedModel2, _ := m.Update(mouseUp)
 
 	m2 := updatedModel2.(Model)

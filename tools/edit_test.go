@@ -64,7 +64,7 @@ func TestEditTool_AllFieldsAreRequired(t *testing.T) {
 func TestEditExecutor_ReplacesString(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("hello world\n"), 0o644)
+	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	exec := EditExecutor{}
 	_, err := exec.ExecuteTool("edit", map[string]any{
@@ -85,7 +85,7 @@ func TestEditExecutor_ReplacesString(t *testing.T) {
 func TestEditExecutor_ReturnsDiff(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("hello world\n"), 0o644)
+	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	exec := EditExecutor{}
 	result, err := exec.ExecuteTool("edit", map[string]any{
@@ -107,7 +107,7 @@ func TestEditExecutor_ReturnsDiff(t *testing.T) {
 func TestEditExecutor_AmbiguousOldStringReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("foo foo foo\n"), 0o644)
+	_ = os.WriteFile(path, []byte("foo foo foo\n"), 0o644)
 
 	exec := EditExecutor{}
 	_, err := exec.ExecuteTool("edit", map[string]any{
@@ -127,10 +127,10 @@ func TestEditExecutor_AmbiguousOldString_FileUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
 	original := "foo foo foo\n"
-	os.WriteFile(path, []byte(original), 0o644)
+	_ = os.WriteFile(path, []byte(original), 0o644)
 
 	exec := EditExecutor{}
-	exec.ExecuteTool("edit", map[string]any{
+	_, _ = exec.ExecuteTool("edit", map[string]any{
 		"path":       path,
 		"old_string": "foo",
 		"new_string": "bar",
@@ -145,7 +145,7 @@ func TestEditExecutor_AmbiguousOldString_FileUnchanged(t *testing.T) {
 func TestEditExecutor_OldStringNotFoundReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("hello world\n"), 0o644)
+	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	exec := EditExecutor{}
 	_, err := exec.ExecuteTool("edit", map[string]any{
@@ -184,7 +184,7 @@ func TestEditExecutor_MissingPathReturnsError(t *testing.T) {
 func TestEditExecutor_MissingOldStringReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("hello\n"), 0o644)
+	_ = os.WriteFile(path, []byte("hello\n"), 0o644)
 
 	exec := EditExecutor{}
 	_, err := exec.ExecuteTool("edit", map[string]any{
@@ -201,7 +201,7 @@ func TestEditExecutor_MissingOldStringReturnsError(t *testing.T) {
 func TestDiffEdit_ReturnsDiff(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("hello world\n"), 0o644)
+	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	diff, err := DiffEdit(path, "hello", "goodbye")
 	if err != nil {
@@ -219,9 +219,9 @@ func TestDiffEdit_DoesNotModifyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
 	original := "hello world\n"
-	os.WriteFile(path, []byte(original), 0o644)
+	_ = os.WriteFile(path, []byte(original), 0o644)
 
-	DiffEdit(path, "hello", "goodbye")
+	_, _ = DiffEdit(path, "hello", "goodbye")
 
 	data, _ := os.ReadFile(path)
 	if string(data) != original {
@@ -239,7 +239,7 @@ func TestDiffEdit_FileNotFoundReturnsError(t *testing.T) {
 func TestDiffEdit_AmbiguousOldStringReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("foo foo foo\n"), 0o644)
+	_ = os.WriteFile(path, []byte("foo foo foo\n"), 0o644)
 
 	_, err := DiffEdit(path, "foo", "bar")
 	if err == nil {
@@ -253,7 +253,7 @@ func TestDiffEdit_AmbiguousOldStringReturnsError(t *testing.T) {
 func TestDiffEdit_OldStringNotFoundReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("hello world\n"), 0o644)
+	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	_, err := DiffEdit(path, "nothere", "x")
 	if err == nil {
@@ -265,10 +265,10 @@ func TestEditExecutor_DoesNotModifyFileOnError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
 	original := "hello world\n"
-	os.WriteFile(path, []byte(original), 0o644)
+	_ = os.WriteFile(path, []byte(original), 0o644)
 
 	exec := EditExecutor{}
-	exec.ExecuteTool("edit", map[string]any{
+	_, _ = exec.ExecuteTool("edit", map[string]any{
 		"path":       path,
 		"old_string": "nothere",
 		"new_string": "x",

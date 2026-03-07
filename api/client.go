@@ -168,7 +168,7 @@ func (c *Client) doSingleAttempt(ctx context.Context, jsonBody []byte) (apiRespo
 	if err != nil {
 		return apiResponse{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -270,10 +270,7 @@ func isRetryableError(ctx context.Context, err error) bool {
 	}
 	// Network-level transport errors (connection reset, EOF, etc.) are retryable.
 	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		return true
-	}
-	return false
+	return errors.As(err, &urlErr)
 }
 
 // extractText returns the concatenated text from all text blocks in a response.

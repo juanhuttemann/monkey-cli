@@ -66,7 +66,7 @@ func TestMultiExecutor_PassesInputToExecutor(t *testing.T) {
 	me.Register("capture", capture)
 
 	input := map[string]any{"key": "value"}
-	me.ExecuteTool("capture", input)
+	_, _ = me.ExecuteTool("capture", input)
 
 	if gotInput["key"] != "value" {
 		t.Errorf("executor received input %v, want key=value", gotInput)

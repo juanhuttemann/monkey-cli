@@ -37,7 +37,7 @@ func TestLoad_AllVarsPresent(t *testing.T) {
 }
 
 func TestLoad_MissingAPIKey(t *testing.T) {
-	os.Unsetenv(EnvAPIKey)
+	_ = os.Unsetenv(EnvAPIKey)
 	t.Setenv(EnvBaseURL, "https://api.example.com")
 	t.Setenv(EnvOpusModel, "test-model")
 
@@ -53,7 +53,7 @@ func TestLoad_MissingAPIKey(t *testing.T) {
 
 func TestLoad_MissingBaseURL_DefaultsToAnthropicAPI(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
-	os.Unsetenv(EnvBaseURL)
+	_ = os.Unsetenv(EnvBaseURL)
 	t.Setenv(EnvOpusModel, "test-model")
 
 	loader := NewEnvLoader()
@@ -69,9 +69,9 @@ func TestLoad_MissingBaseURL_DefaultsToAnthropicAPI(t *testing.T) {
 func TestLoad_NoModels(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
-	os.Unsetenv(EnvOpusModel)
-	os.Unsetenv(EnvSonnetModel)
-	os.Unsetenv(EnvHaikuModel)
+	_ = os.Unsetenv(EnvOpusModel)
+	_ = os.Unsetenv(EnvSonnetModel)
+	_ = os.Unsetenv(EnvHaikuModel)
 
 	loader := NewEnvLoader()
 	_, err := loader.Load()
@@ -87,8 +87,8 @@ func TestLoad_OnlyOpusModel(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
 	t.Setenv(EnvOpusModel, "claude-opus-4")
-	os.Unsetenv(EnvSonnetModel)
-	os.Unsetenv(EnvHaikuModel)
+	_ = os.Unsetenv(EnvSonnetModel)
+	_ = os.Unsetenv(EnvHaikuModel)
 
 	cfg, err := NewEnvLoader().Load()
 	if err != nil {
@@ -102,9 +102,9 @@ func TestLoad_OnlyOpusModel(t *testing.T) {
 func TestLoad_OnlySonnetModel(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
-	os.Unsetenv(EnvOpusModel)
+	_ = os.Unsetenv(EnvOpusModel)
 	t.Setenv(EnvSonnetModel, "claude-sonnet-4")
-	os.Unsetenv(EnvHaikuModel)
+	_ = os.Unsetenv(EnvHaikuModel)
 
 	cfg, err := NewEnvLoader().Load()
 	if err != nil {
@@ -118,8 +118,8 @@ func TestLoad_OnlySonnetModel(t *testing.T) {
 func TestLoad_OnlyHaikuModel(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
-	os.Unsetenv(EnvOpusModel)
-	os.Unsetenv(EnvSonnetModel)
+	_ = os.Unsetenv(EnvOpusModel)
+	_ = os.Unsetenv(EnvSonnetModel)
 	t.Setenv(EnvHaikuModel, "claude-haiku-4")
 
 	cfg, err := NewEnvLoader().Load()
@@ -132,11 +132,11 @@ func TestLoad_OnlyHaikuModel(t *testing.T) {
 }
 
 func TestLoad_MissingAllVars(t *testing.T) {
-	os.Unsetenv(EnvAPIKey)
-	os.Unsetenv(EnvBaseURL)
-	os.Unsetenv(EnvOpusModel)
-	os.Unsetenv(EnvSonnetModel)
-	os.Unsetenv(EnvHaikuModel)
+	_ = os.Unsetenv(EnvAPIKey)
+	_ = os.Unsetenv(EnvBaseURL)
+	_ = os.Unsetenv(EnvOpusModel)
+	_ = os.Unsetenv(EnvSonnetModel)
+	_ = os.Unsetenv(EnvHaikuModel)
 
 	loader := NewEnvLoader()
 	_, err := loader.Load()

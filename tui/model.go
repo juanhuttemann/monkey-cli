@@ -47,7 +47,6 @@ type Model struct {
 	retryAttempt   int
 	width          int
 	height         int
-	err            error
 	scrollToBottom bool
 	retryCh        chan RetryingMsg
 	toolCallCh     chan ToolCallMsg
@@ -702,19 +701,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 		preview := ""
-		if msg.ToolName == "edit" {
+		switch msg.ToolName {
+		case "edit":
 			path, _ := msg.Input["path"].(string)
 			oldStr, _ := msg.Input["old_string"].(string)
 			newStr, _ := msg.Input["new_string"].(string)
 			if diff, err := tools.DiffEdit(path, oldStr, newStr); err == nil {
 				preview = diff
 			}
-		} else if msg.ToolName == "bash" {
+		case "bash":
 			preview, _ = msg.Input["command"].(string)
-		} else if msg.ToolName == "read" {
-			path, _ := msg.Input["path"].(string)
-			preview = path
-		} else if msg.ToolName == "write" {
+		case "read":
+			preview, _ = msg.Input["path"].(string)
+		case "write":
 			path, _ := msg.Input["path"].(string)
 			content, _ := msg.Input["content"].(string)
 			lines := strings.SplitN(content, "\n", 6)
@@ -722,14 +721,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				lines = append(lines[:5], "...")
 			}
 			preview = path + "\n" + strings.Join(lines, "\n")
-		} else if msg.ToolName == "glob" {
+		case "glob":
 			path, _ := msg.Input["path"].(string)
 			pattern, _ := msg.Input["pattern"].(string)
 			if path == "" {
 				path = "."
 			}
 			preview = pattern + " in " + path
-		} else if msg.ToolName == "grep" {
+		case "grep":
 			pattern, _ := msg.Input["pattern"].(string)
 			path, _ := msg.Input["path"].(string)
 			if path == "" {

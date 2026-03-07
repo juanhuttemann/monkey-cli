@@ -22,7 +22,7 @@ func RenderMarkdown(content string, width int) string {
 	style := glamourstyles.DarkStyleConfig
 	zero := uint(0)
 	style.Document.Margin = &zero
-	style.Document.StylePrimitive.BlockPrefix = ""
+	style.Document.BlockPrefix = ""
 
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStyles(style),

@@ -15,19 +15,14 @@ func TestSendPrompt_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "The capital of France is Paris."}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "The capital of France is Paris."}]}`))
 	}))
 	defer server.Close()
 
 	// Set environment variables
-	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
-	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
+	t.Setenv("ANTHROPIC_API_KEY", "test-api-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 
 	got, err := sendPrompt("What is the capital of France?")
 	if err != nil {
@@ -44,21 +39,16 @@ func TestSendPrompt_SendsCorrectPrompt(t *testing.T) {
 	var requestBody map[string]interface{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &requestBody)
+		_ = json.Unmarshal(body, &requestBody)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
 	}))
 	defer server.Close()
 
-	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
-	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
+	t.Setenv("ANTHROPIC_API_KEY", "test-api-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 
 	_, err := sendPrompt("custom test prompt")
 	if err != nil {
@@ -76,13 +66,9 @@ func TestSendPrompt_SendsCorrectPrompt(t *testing.T) {
 
 func TestSendPrompt_MissingAPIKey(t *testing.T) {
 	// Ensure API key is not set
-	os.Unsetenv("ANTHROPIC_API_KEY")
-	os.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
+	_ = os.Unsetenv("ANTHROPIC_API_KEY")
+	t.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 
 	_, err := sendPrompt("test prompt")
 	if err == nil {
@@ -94,18 +80,13 @@ func TestSendPrompt_MissingAPIKey(t *testing.T) {
 	}
 }
 
-
 func TestSendPrompt_MissingModel(t *testing.T) {
 	// Ensure all model env vars are not set
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	os.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
-	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	os.Unsetenv("ANTHROPIC_DEFAULT_SONNET_MODEL")
-	os.Unsetenv("ANTHROPIC_DEFAULT_HAIKU_MODEL")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-	}()
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
+	_ = os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
+	_ = os.Unsetenv("ANTHROPIC_DEFAULT_SONNET_MODEL")
+	_ = os.Unsetenv("ANTHROPIC_DEFAULT_HAIKU_MODEL")
 
 	_, err := sendPrompt("test prompt")
 	if err == nil {
@@ -124,14 +105,9 @@ func TestSendPrompt_HTTPError(t *testing.T) {
 	}))
 	server.Close()
 
-	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
-	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
+	t.Setenv("ANTHROPIC_API_KEY", "test-api-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 
 	_, err := sendPrompt("test prompt")
 	if err == nil {
@@ -148,18 +124,13 @@ func TestSendPrompt_Non200Status(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error": "internal server error"}`))
+		_, _ = w.Write([]byte(`{"error": "internal server error"}`))
 	}))
 	defer server.Close()
 
-	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
-	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
+	t.Setenv("ANTHROPIC_API_KEY", "test-api-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 
 	_, err := sendPrompt("test prompt")
 	if err == nil {
@@ -179,18 +150,13 @@ func TestSendPrompt_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [}`)) // Invalid JSON
+		_, _ = w.Write([]byte(`{"content": [}`)) // Invalid JSON
 	}))
 	defer server.Close()
 
-	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
-	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
+	t.Setenv("ANTHROPIC_API_KEY", "test-api-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 
 	_, err := sendPrompt("test prompt")
 	if err == nil {
@@ -207,18 +173,13 @@ func TestSendPrompt_EmptyContent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": []}`))
+		_, _ = w.Write([]byte(`{"content": []}`))
 	}))
 	defer server.Close()
 
-	os.Setenv("ANTHROPIC_API_KEY", "test-api-key")
-	os.Setenv("ANTHROPIC_BASE_URL", server.URL)
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
+	t.Setenv("ANTHROPIC_API_KEY", "test-api-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
 
 	_, err := sendPrompt("test prompt")
 	if err == nil {
@@ -239,11 +200,11 @@ func TestPrintUsage(t *testing.T) {
 
 	printUsage()
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf strings.Builder
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify output contains expected strings
@@ -341,11 +302,11 @@ func TestRun_WithPrompt_PrintsResponse(t *testing.T) {
 
 	run("hello", func() {})
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	var buf strings.Builder
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 
 	if !strings.Contains(buf.String(), "hello back") {
 		t.Errorf("run() output = %q, want to contain %q", buf.String(), "hello back")

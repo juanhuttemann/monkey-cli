@@ -262,9 +262,9 @@ func TestGlobExecutor_SortedByModTimeNewestFirst(t *testing.T) {
 	}
 	base := time.Now()
 	for i, p := range paths {
-		os.WriteFile(p, []byte("x"), 0o644)
+		_ = os.WriteFile(p, []byte("x"), 0o644)
 		ts := base.Add(time.Duration(i) * time.Second)
-		os.Chtimes(p, ts, ts)
+		_ = os.Chtimes(p, ts, ts)
 	}
 
 	exec := GlobExecutor{}

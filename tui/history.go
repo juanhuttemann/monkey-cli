@@ -27,7 +27,7 @@ func loadHistoryFromPath(path string) History {
 	if err != nil {
 		return h
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -73,8 +73,8 @@ func (h *History) Add(entry string) {
 	if h.path != "" {
 		f, err := os.OpenFile(h.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if err == nil {
-			fmt.Fprintln(f, entry)
-			f.Close()
+			_, _ = fmt.Fprintln(f, entry)
+			_ = f.Close()
 		}
 	}
 }

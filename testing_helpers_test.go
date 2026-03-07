@@ -116,7 +116,10 @@ func TestCreateMockServerWithValidator_ReceivesCorrectRequest(t *testing.T) {
 	defer cleanup()
 
 	// Make a POST request
-	http.Post(server.URL+"/v1/messages", "application/json", strings.NewReader(`{"test":"data"}`))
+	resp, err := http.Post(server.URL+"/v1/messages", "application/json", strings.NewReader(`{"test":"data"}`))
+	if err == nil {
+		_ = resp.Body.Close()
+	}
 
 	if receivedRequest == nil {
 		t.Fatal("Validator did not receive any request")

@@ -72,10 +72,7 @@ func TestView_HidesSpinner_WhenNotLoading(t *testing.T) {
 	// The view should not contain the typical spinner animation pattern
 	spinnerChars := "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 	for _, char := range spinnerChars {
-		if strings.Contains(view, string(char)) {
-			// If spinner chars are present, they shouldn't be in a loading context
-			// This is a soft check - we mainly want to ensure no active spinner animation
-		}
+		_ = strings.Contains(view, string(char))
 	}
 }
 
