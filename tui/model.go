@@ -17,6 +17,9 @@ import (
 	"monkey/tools"
 )
 
+// toolCollapseLines is the line count above which tool output is auto-collapsed.
+const toolCollapseLines = 20
+
 // State represents the current UI state
 type State int
 
@@ -60,6 +63,7 @@ type Model struct {
 	models         []string
 	apeMode        bool
 	promptHistory  History
+	searchBar      SearchBar
 }
 
 // IsApeMode reports whether tool approval is disabled.
@@ -119,28 +123,12 @@ func (m Model) messageStyleWidth() int {
 func (m Model) renderMessages() string {
 	sw := m.messageStyleWidth()
 	var sb strings.Builder
-	for _, msg := range m.messages {
-		var rendered string
-		switch msg.Role {
-		case "user":
-			rendered = RenderUserBlock(sw, msg.Content)
-		case "assistant":
-			md := strings.TrimRight(RenderMarkdown(msg.Content, sw-8), "\n")
-			modelName := ""
-			if m.client != nil {
-				modelName = m.client.GetModel()
-			}
-			if modelName != "" {
-				rendered = RenderAssistantBlock(sw, modelName, md)
-			} else {
-				rendered = AssistantMessageStyle(sw).Render(md)
-			}
-		case "tool":
-			rendered = RenderToolBlock(sw, msg.ToolName, msg.Content)
-		case "system":
-			rendered = SystemMessageStyle(sw).Render(msg.Content)
-		default:
-			rendered = ErrorMessageStyle(sw).Render(msg.Content)
+	for i, msg := range m.messages {
+		rendered := m.renderSingleMessage(sw, msg)
+		// When search is active, prefix matching messages with a highlight marker.
+		if m.searchBar.IsActive() && m.searchBar.IsMatch(i) {
+			matchLabel := SearchMatchStyle().Render("▶ match")
+			rendered = matchLabel + "\n" + rendered
 		}
 		sb.WriteString(rendered)
 		sb.WriteString("\n")
@@ -161,6 +149,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEsc, tea.KeyCtrlC:
 			// Esc dismisses pickers or cancels loading; Ctrl+C always quits.
 			if msg.Type == tea.KeyEsc {
+				if m.searchBar.IsActive() {
+					m.searchBar.Deactivate()
+					m.viewport.SetContent(m.renderMessages())
+					return m, nil
+				}
 				if m.helpPanel.IsActive() {
 					m.helpPanel.Deactivate()
 					return m, nil
@@ -291,6 +284,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input, inputCmd = m.input.Update(msg)
 				cmds = append(cmds, inputCmd)
 			}
+		case tea.KeyCtrlT:
+			// Ctrl+T toggles the collapsed state of the most recent tool message.
+			for i := len(m.messages) - 1; i >= 0; i-- {
+				if m.messages[i].Role == "tool" {
+					m.messages[i].Collapsed = !m.messages[i].Collapsed
+					m.viewport.SetContent(m.renderMessages())
+					break
+				}
+			}
+			return m, nil
+
+		case tea.KeyCtrlF:
+			// Ctrl+F toggles the search bar.
+			if m.searchBar.IsActive() {
+				m.searchBar.Deactivate()
+			} else {
+				m.searchBar.Activate()
+			}
+			m.viewport.SetContent(m.renderMessages())
+			return m, nil
+
+		case tea.KeyCtrlN:
+			// Ctrl+N advances to next search match.
+			if m.searchBar.IsActive() {
+				m.searchBar.NextMatch()
+				m.scrollToMatch()
+				return m, nil
+			}
+
+		case tea.KeyCtrlP:
+			// Ctrl+P retreats to previous search match.
+			if m.searchBar.IsActive() {
+				m.searchBar.PrevMatch()
+				m.scrollToMatch()
+				return m, nil
+			}
+
 		case tea.KeyCtrlJ:
 			// Ctrl+J inserts a newline into the input (multiline support).
 			var inputCmd tea.Cmd
@@ -358,6 +388,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.input.SetValue("")
 					return m, nil
+				case "/compact":
+					m.input.SetValue("")
+					if cmd := m.startCompact(); cmd != nil {
+						return m, cmd
+					}
+					return m, nil
 				}
 				return m, nil
 			}
@@ -387,6 +423,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.apeMode = !m.apeMode
 					m.input.SetValue("")
 					m.commandPicker.Deactivate()
+					return m, nil
+				case "/compact":
+					m.input.SetValue("")
+					m.commandPicker.Deactivate()
+					if cmd := m.startCompact(); cmd != nil {
+						return m, cmd
+					}
 					return m, nil
 				}
 			}
@@ -425,6 +468,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		default:
+			// When search is active, rune keys update the search query.
+			if m.searchBar.IsActive() {
+				if msg.Type == tea.KeyRunes || msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete {
+					switch msg.Type {
+					case tea.KeyBackspace, tea.KeyDelete:
+						q := m.searchBar.Query()
+						if len(q) > 0 {
+							m.searchBar.SetQuery(q[:len(q)-1], m.messages)
+						}
+					default:
+						m.searchBar.SetQuery(m.searchBar.Query()+string(msg.Runes), m.messages)
+					}
+					m.viewport.SetContent(m.renderMessages())
+					m.scrollToMatch()
+					return m, nil
+				}
+			}
 			var inputCmd tea.Cmd
 			m.input, inputCmd = m.input.Update(msg)
 			cmds = append(cmds, inputCmd)
@@ -515,6 +575,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
+	case CompactResponseMsg:
+		// Replace entire message history with a single summary context message.
+		m.messages = []Message{{Role: "system", Content: msg.Summary, Timestamp: time.Now()}}
+		// Seed apiMessages so the next turn has the summary as prior context.
+		m.apiMessages = []api.Message{
+			{Role: "user", Content: "Conversation context (summarized):\n" + msg.Summary},
+			{Role: "assistant", Content: "Understood. I have the conversation context."},
+		}
+		m.state = StateReady
+		m.lastElapsed = time.Since(m.startTime)
+		m.timerActive = false
+		m.wasCancelled = false
+		m.scrollToBottom = true
+		m.syncViewportHeight()
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+
 	case PromptErrorMsg:
 		m.messages = append(m.messages, Message{Role: "error", Content: msg.Err.Error(), Timestamp: time.Now()})
 		m.state = StateReady
@@ -547,11 +624,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ToolCallMsg:
 		if content := formatToolCall(msg.ToolCall); content != "" {
+			collapsed := strings.Count(content, "\n") >= toolCollapseLines
 			m.messages = append(m.messages, Message{
 				Role:      "tool",
 				Content:   content,
 				ToolName:  msg.ToolCall.Name,
 				Timestamp: time.Now(),
+				Collapsed: collapsed,
 			})
 		}
 		m.scrollToBottom = true
@@ -703,6 +782,23 @@ func (m Model) View() string {
 // GetHistory returns the conversation history
 func (m Model) GetHistory() []Message {
 	return m.messages
+}
+
+// GetAPIMessages returns the full API-layer message history (includes tool_use/tool_result).
+func (m Model) GetAPIMessages() []api.Message {
+	return m.apiMessages
+}
+
+// RestoreSession loads a saved SessionData into the model.
+func (m *Model) RestoreSession(sess *SessionData) {
+	if sess == nil {
+		return
+	}
+	m.messages = sess.Messages
+	m.apiMessages = sess.APIMessages
+	if sess.Model != "" && m.client != nil {
+		m.client.SetModel(sess.Model)
+	}
 }
 
 // GetInput returns the current input text
@@ -861,6 +957,21 @@ func (m *Model) AddMessage(role, content string) {
 	})
 }
 
+// startCompact initiates a /compact summarization request.
+// Returns a tea.Cmd to run if there are messages to compact, nil otherwise.
+func (m *Model) startCompact() tea.Cmd {
+	if len(m.messages) == 0 {
+		return nil
+	}
+	m.state = StateLoading
+	m.startTime = time.Now()
+	m.wasCancelled = false
+	m.timer = timer.NewWithInterval(24*time.Hour, time.Second)
+	m.timerActive = true
+	m.syncViewportHeight()
+	return tea.Batch(SendCompactCmd(m.client, m.messages, APITimeout), m.spinner.Tick, m.timer.Init())
+}
+
 // renderStatusBar renders a 1-line footer: model | ape | tokens.
 func (m Model) renderStatusBar() string {
 	sep := StatusBarSepStyle().Render(" | ")
@@ -879,9 +990,12 @@ func (m Model) renderStatusBar() string {
 	}
 
 	total := m.totalUsage.InputTokens + m.totalUsage.OutputTokens
-	var tokenSeg string
 	if total > 0 {
-		tokenSeg = StatusBarTokenStyle().Render(fmt.Sprintf("%s tokens", formatTokenCount(total)))
+		tokenStr := fmt.Sprintf("%s tokens", formatTokenCount(total))
+		if cost := formatCost(estimateCost(model, m.totalUsage)); cost != "" {
+			tokenStr += "  " + cost
+		}
+		tokenSeg := StatusBarTokenStyle().Render(tokenStr)
 		return modelSeg + sep + apeSeg + sep + tokenSeg
 	}
 	return modelSeg + sep + apeSeg
@@ -953,4 +1067,52 @@ func formatToolCall(tc api.ToolCallResult) string {
 		return header
 	}
 	return header + "\n" + strings.TrimRight(tc.Output, "\n")
+}
+
+// scrollToMatch sets the viewport Y offset so the current search match is visible.
+// It estimates line positions by rendering each message in sequence.
+func (m *Model) scrollToMatch() {
+	idx := m.searchBar.CurrentMatchIndex()
+	if idx < 0 {
+		return
+	}
+	sw := m.messageStyleWidth()
+	line := 0
+	for i, msg := range m.messages {
+		if i == idx {
+			break
+		}
+		rendered := m.renderSingleMessage(sw, msg)
+		line += strings.Count(rendered, "\n") + 2 // +1 timestamp line, +1 gap
+	}
+	m.viewport.SetYOffset(line)
+}
+
+// renderSingleMessage returns the styled string for one message (without timestamp).
+func (m Model) renderSingleMessage(sw int, msg Message) string {
+	switch msg.Role {
+	case "user":
+		return RenderUserBlock(sw, msg.Content)
+	case "assistant":
+		md := strings.TrimRight(RenderMarkdown(msg.Content, sw-8), "\n")
+		modelName := ""
+		if m.client != nil {
+			modelName = m.client.GetModel()
+		}
+		if modelName != "" {
+			return RenderAssistantBlock(sw, modelName, md)
+		}
+		return AssistantMessageStyle(sw).Render(md)
+	case "tool":
+		content := msg.Content
+		if msg.Collapsed {
+			lines := strings.Split(content, "\n")
+			content = fmt.Sprintf("%s\n[%d lines hidden — Ctrl+T to expand]", lines[0], len(lines)-1)
+		}
+		return RenderToolBlock(sw, msg.ToolName, content)
+	case "system":
+		return SystemMessageStyle(sw).Render(msg.Content)
+	default:
+		return ErrorMessageStyle(sw).Render(msg.Content)
+	}
 }

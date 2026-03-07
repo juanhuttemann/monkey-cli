@@ -110,9 +110,6 @@ func TestSendPromptCmd_SuccessResponse(t *testing.T) {
 	if !ok {
 		t.Fatalf("SendPromptCmd() returned %T, want PromptResponseMsg", result)
 	}
-	if response.Err != nil {
-		t.Errorf("PromptResponseMsg.Err = %v, want nil", response.Err)
-	}
 	if response.Response != "Hello from API!" {
 		t.Errorf("PromptResponseMsg.Response = %q, want %q", response.Response, "Hello from API!")
 	}

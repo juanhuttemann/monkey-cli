@@ -145,3 +145,34 @@ func TestBashExecutor_MultilineScript(t *testing.T) {
 		t.Errorf("ExecuteTool() = %q, want output containing '5'", result)
 	}
 }
+
+func TestBashExecutor_TruncatesLargeOutput(t *testing.T) {
+	exec := BashExecutor{}
+	// Generate ~60KB of output (exceeds the 50KB cap).
+	result, err := exec.ExecuteTool("bash", map[string]any{"command": "python3 -c \"print('x' * 60000)\""})
+	if err != nil {
+		t.Fatalf("ExecuteTool() returned error: %v", err)
+	}
+	const maxOutputBytes = 50 * 1024
+	if len(result) <= maxOutputBytes {
+		t.Errorf("expected truncation for large output, got %d bytes (under cap)", len(result))
+	}
+	if !strings.Contains(result, "[output truncated") {
+		t.Errorf("expected truncation notice in output, got: %q", result[:min(200, len(result))])
+	}
+	// The raw content before the notice must not exceed the cap.
+	idx := strings.Index(result, "\n[output truncated")
+	if idx < 0 {
+		idx = strings.Index(result, "[output truncated")
+	}
+	if idx > maxOutputBytes {
+		t.Errorf("content before truncation notice is %d bytes, want <= %d", idx, maxOutputBytes)
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

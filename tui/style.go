@@ -380,3 +380,10 @@ func MessageTimestampStyle(width int) lipgloss.Style {
 		Align(lipgloss.Right).
 		Foreground(lipgloss.Color(ColorGrayDeep))
 }
+
+// SearchMatchStyle returns the styling for the search-match indicator shown above matching messages.
+func SearchMatchStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color(ColorAccent)).
+		Bold(true)
+}

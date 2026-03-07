@@ -200,6 +200,15 @@ func TestCommandPicker_NavigateUp_AtTop_Noop(t *testing.T) {
 	}
 }
 
+func TestCommandPicker_ContainsCompact(t *testing.T) {
+	cp := NewCommandPicker(80)
+	cp.Activate()
+	cp.SetQuery("compact")
+	if cp.SelectedCommand() != "/compact" {
+		t.Errorf("expected /compact in commands, SelectedCommand = %q", cp.SelectedCommand())
+	}
+}
+
 func TestCommandPicker_ContainsExitAndClear(t *testing.T) {
 	cp := NewCommandPicker(80)
 	cp.Activate()

@@ -2,7 +2,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -16,6 +15,8 @@ const (
 	EnvSonnetModel = "ANTHROPIC_DEFAULT_SONNET_MODEL"
 	EnvHaikuModel  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
 	EnvMaxTokens   = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"
+
+	defaultBaseURL = "https://api.anthropic.com"
 )
 
 // Config holds the application configuration
@@ -59,23 +60,59 @@ type Loader interface {
 	Load() (Config, error)
 }
 
-// envLoader implements Loader using environment variables
-type envLoader struct{}
+// envLoader implements Loader using environment variables with an optional config file fallback.
+type envLoader struct {
+	configFile string // path to config.toml; empty means use ConfigFilePath()
+}
 
-// NewEnvLoader creates a new configuration loader that reads from environment variables
+// NewEnvLoader creates a loader that reads from environment variables, falling back
+// to ~/.config/monkey/config.toml (or $XDG_CONFIG_HOME/monkey/config.toml).
 func NewEnvLoader() Loader {
 	return &envLoader{}
 }
 
-// Load reads configuration from environment variables
+// NewEnvLoaderWithConfigFile creates a loader that reads from environment variables,
+// falling back to the specified config file path.
+func NewEnvLoaderWithConfigFile(path string) Loader {
+	return &envLoader{configFile: path}
+}
+
+// fileKey maps an environment variable name to its config-file key equivalent.
+var fileKey = map[string]string{
+	EnvAPIKey:      "api_key",
+	EnvBaseURL:     "base_url",
+	EnvOpusModel:   "opus_model",
+	EnvSonnetModel: "sonnet_model",
+	EnvHaikuModel:  "haiku_model",
+	EnvMaxTokens:   "max_tokens",
+}
+
+// getEnvOrFile returns the value of the environment variable named by envKey;
+// if empty, falls back to the corresponding key in the config file map.
+func getEnvOrFile(envKey string, file map[string]string) string {
+	if v := os.Getenv(envKey); v != "" {
+		return v
+	}
+	return file[fileKey[envKey]]
+}
+
+// Load reads configuration from environment variables, falling back to the config file.
 func (l *envLoader) Load() (Config, error) {
-	apiKey := os.Getenv(EnvAPIKey)
-	if apiKey == "" {
-		return Config{}, errors.New("missing required environment variable: " + EnvAPIKey)
+	cfgPath := l.configFile
+	if cfgPath == "" {
+		cfgPath = ConfigFilePath()
+	}
+	file, err := LoadConfigFile(cfgPath)
+	if err != nil {
+		return Config{}, fmt.Errorf("reading config file %s: %w", cfgPath, err)
 	}
 
-	const defaultBaseURL = "https://api.anthropic.com"
-	baseURL := os.Getenv(EnvBaseURL)
+	apiKey := getEnvOrFile(EnvAPIKey, file)
+	if apiKey == "" {
+		return Config{}, fmt.Errorf("missing required configuration: set %s env var or api_key in %s", EnvAPIKey, cfgPath)
+	}
+
+	baseURL := getEnvOrFile(EnvBaseURL, file)
 	if baseURL == "" {
 		baseURL = defaultBaseURL
 	}
@@ -83,9 +120,9 @@ func (l *envLoader) Load() (Config, error) {
 	cfg := Config{
 		APIKey:      apiKey,
 		BaseURL:     baseURL,
-		OpusModel:   os.Getenv(EnvOpusModel),
-		SonnetModel: os.Getenv(EnvSonnetModel),
-		HaikuModel:  os.Getenv(EnvHaikuModel),
+		OpusModel:   getEnvOrFile(EnvOpusModel, file),
+		SonnetModel: getEnvOrFile(EnvSonnetModel, file),
+		HaikuModel:  getEnvOrFile(EnvHaikuModel, file),
 	}
 
 	if cfg.DefaultModel() == "" {
@@ -93,7 +130,7 @@ func (l *envLoader) Load() (Config, error) {
 			EnvOpusModel, EnvSonnetModel, EnvHaikuModel)
 	}
 
-	if s := os.Getenv(EnvMaxTokens); s != "" {
+	if s := getEnvOrFile(EnvMaxTokens, file); s != "" {
 		n, err := strconv.Atoi(s)
 		if err != nil || n <= 0 {
 			return Config{}, fmt.Errorf("%s must be a positive integer, got %q", EnvMaxTokens, s)

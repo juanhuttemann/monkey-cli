@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -129,6 +131,42 @@ func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, pro
 	}
 
 	return cmd, parentCancel
+}
+
+// compactPrompt is the system instruction sent to the API when compacting context.
+const compactPrompt = `Please create a concise but complete summary of this conversation so far.
+Preserve all key context: decisions made, code written, files changed, current state, and any open questions.
+This summary will replace the full conversation history to reduce context length.
+Reply with only the summary — no preamble.`
+
+// SendCompactCmd creates a tea.Cmd that sends a summarization request to the API.
+// history is the current display messages used to build the summarization prompt.
+// On success it returns a CompactResponseMsg; on failure a PromptErrorMsg.
+func SendCompactCmd(client *api.Client, history []Message, timeout time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		if client == nil {
+			return PromptErrorMsg{Err: fmt.Errorf("no API client")}
+		}
+		var sb strings.Builder
+		sb.WriteString(compactPrompt)
+		sb.WriteString("\n\n<conversation>\n")
+		for _, m := range history {
+			sb.WriteString(m.Role)
+			sb.WriteString(": ")
+			sb.WriteString(m.Content)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("</conversation>")
+
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+
+		resp, err := client.SendMessage(ctx, sb.String())
+		if err != nil {
+			return PromptErrorMsg{Err: err}
+		}
+		return CompactResponseMsg{Summary: resp}
+	}
 }
 
 // waitForToolCall returns a tea.Cmd that blocks until it receives a ToolCallMsg from ch,

@@ -277,7 +277,7 @@ func TestUpdate_PromptResponse_AddsAssistantMessage(t *testing.T) {
 	m := submitted.(Model)
 
 	// Response arrives: assistant message added
-	responseMsg := PromptResponseMsg{Response: "assistant response", Err: nil}
+	responseMsg := PromptResponseMsg{Response: "assistant response"}
 	updatedModel, _ := m.Update(responseMsg)
 
 	result := updatedModel.(Model)
@@ -320,7 +320,7 @@ func TestUpdate_PromptResponse_SetsLoadingFalse(t *testing.T) {
 	model.SetLoading(true)
 
 	// Simulate receiving a response
-	responseMsg := PromptResponseMsg{Response: "assistant response", Err: nil}
+	responseMsg := PromptResponseMsg{Response: "assistant response"}
 	updatedModel, _ := model.Update(responseMsg)
 
 	m := updatedModel.(Model)
@@ -684,5 +684,109 @@ func TestNewModel_UsesMonkeySpinner(t *testing.T) {
 		if got.Frames[i] != frame {
 			t.Errorf("spinner.Frames[%d] = %q, want %q", i, got.Frames[i], frame)
 		}
+	}
+}
+
+// --- /compact command ---
+
+func TestUpdate_SlashCompact_NoMessages_Noop(t *testing.T) {
+	model := NewModel(nil)
+	model.SetInput("/compact")
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel, cmd := model.Update(ctrlEnter)
+
+	m := updatedModel.(Model)
+	// No messages to compact — should not start loading
+	if m.IsLoading() {
+		t.Error("IsLoading() = true after /compact with no messages, want false")
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil when there is nothing to compact")
+	}
+}
+
+func TestUpdate_SlashCompact_WithMessages_StartsLoading(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "summary"}]}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	model := NewModel(client)
+	model.AddMessage("user", "hello")
+	model.AddMessage("assistant", "hi there")
+	model.SetInput("/compact")
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel, cmd := model.Update(ctrlEnter)
+
+	m := updatedModel.(Model)
+	if !m.IsLoading() {
+		t.Error("IsLoading() = false after /compact with messages, want true")
+	}
+	if cmd == nil {
+		t.Error("cmd should not be nil when compacting non-empty history")
+	}
+	if m.GetInput() != "" {
+		t.Errorf("GetInput() = %q after /compact, want ''", m.GetInput())
+	}
+}
+
+func TestUpdate_CompactResponseMsg_ReplacesHistory(t *testing.T) {
+	model := NewModel(nil)
+	model.AddMessage("user", "hello")
+	model.AddMessage("assistant", "hi there")
+	model.AddMessage("user", "how are you")
+	model.SetLoading(true)
+
+	compact := CompactResponseMsg{Summary: "User asked hello; assistant said hi; user asked how are you."}
+	updatedModel, _ := model.Update(compact)
+
+	m := updatedModel.(Model)
+	history := m.GetHistory()
+	if len(history) != 1 {
+		t.Fatalf("History length after compact = %d, want 1", len(history))
+	}
+	if history[0].Role != "system" {
+		t.Errorf("history[0].Role = %q, want %q", history[0].Role, "system")
+	}
+	if history[0].Content != compact.Summary {
+		t.Errorf("history[0].Content = %q, want %q", history[0].Content, compact.Summary)
+	}
+	if m.IsLoading() {
+		t.Error("IsLoading() = true after CompactResponseMsg, want false")
+	}
+}
+
+func TestUpdate_CompactResponseMsg_ResetsAPIMessages(t *testing.T) {
+	model := NewModel(nil)
+	model.AddMessage("user", "hello")
+	model.SetLoading(true)
+	// Simulate some API-layer history being present
+	model.apiMessages = []api.Message{
+		{Role: "user", Content: "hello"},
+		{Role: "assistant", Content: "hi"},
+	}
+
+	compact := CompactResponseMsg{Summary: "Brief summary."}
+	updatedModel, _ := model.Update(compact)
+
+	m := updatedModel.(Model)
+	// After compact, apiMessages should hold the summary as context for the next turn.
+	// The first message should be the summary injected as an assistant context message.
+	if len(m.apiMessages) == 0 {
+		t.Fatal("apiMessages should not be empty after compact — summary must be retained as context")
+	}
+	found := false
+	for _, msg := range m.apiMessages {
+		if c, ok := msg.Content.(string); ok && strings.Contains(c, compact.Summary) {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("summary text should appear in apiMessages after compact")
 	}
 }

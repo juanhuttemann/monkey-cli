@@ -119,8 +119,9 @@ func shouldLaunchTUI(prompt string) bool {
 	return strings.TrimSpace(prompt) == ""
 }
 
-// launchTUI starts the interactive TUI
-func launchTUI() {
+// launchTUI starts the interactive TUI.
+// If continueSession is true, the last saved session is restored.
+func launchTUI(continueSession bool) {
 	loader := config.NewEnvLoader()
 	cfg, err := loader.Load()
 	if err != nil {
@@ -140,10 +141,29 @@ func launchTUI() {
 	model.SetIntroTitle(AppTitle)
 	model.SetIntroVersion("v" + Version)
 
+	if continueSession {
+		sess, err := tui.LoadSession(tui.SessionPath())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not load session: %v\n", err)
+		} else {
+			model.RestoreSession(sess)
+		}
+	}
+
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
-	if _, err := p.Run(); err != nil {
+	finalModel, err := p.Run()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
+	}
+
+	// Persist session for --continue on next invocation.
+	if m, ok := finalModel.(tui.Model); ok {
+		modelName := ""
+		if client != nil {
+			modelName = client.GetModel()
+		}
+		_ = tui.SaveSession(tui.SessionPath(), modelName, m.GetAPIMessages(), m.GetHistory())
 	}
 }
 
@@ -161,6 +181,7 @@ func main() {
 	// Define flags
 	promptFlag := flag.String("p", "", "Your prompt to send to the LLM")
 	flag.StringVar(promptFlag, "prompt", "", "Your prompt to send to the LLM")
+	continueFlag := flag.Bool("continue", false, "Resume the last saved session")
 
 	flag.Parse()
 
@@ -175,5 +196,5 @@ func main() {
 		}
 	}
 
-	run(prompt, launchTUI)
+	run(prompt, func() { launchTUI(*continueFlag) })
 }

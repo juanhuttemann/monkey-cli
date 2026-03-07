@@ -43,51 +43,11 @@ func TestMessage_Timestamp(t *testing.T) {
 	}
 }
 
-func TestNewMessage(t *testing.T) {
-	role := "user"
-	content := "Hello, world!"
-
-	msg := NewMessage(role, content)
-
-	if msg.Role != role {
-		t.Errorf("NewMessage().Role = %q, want %q", msg.Role, role)
-	}
-	if msg.Content != content {
-		t.Errorf("NewMessage().Content = %q, want %q", msg.Content, content)
-	}
-	if msg.Timestamp.IsZero() {
-		t.Error("NewMessage().Timestamp should be set, got zero value")
-	}
-}
-
-func TestMsg_SendPromptMsg(t *testing.T) {
-	msg := SendPromptMsg{Prompt: "test prompt"}
-
-	if msg.Prompt != "test prompt" {
-		t.Errorf("SendPromptMsg.Prompt = %q, want %q", msg.Prompt, "test prompt")
-	}
-}
-
 func TestMsg_PromptResponseMsg(t *testing.T) {
-	msg := PromptResponseMsg{Response: "test response", Err: nil}
+	msg := PromptResponseMsg{Response: "test response"}
 
 	if msg.Response != "test response" {
 		t.Errorf("PromptResponseMsg.Response = %q, want %q", msg.Response, "test response")
-	}
-	if msg.Err != nil {
-		t.Errorf("PromptResponseMsg.Err = %v, want nil", msg.Err)
-	}
-}
-
-func TestMsg_PromptResponseMsg_WithError(t *testing.T) {
-	testErr := error(&testError{msg: "test error"})
-	msg := PromptResponseMsg{Response: "", Err: testErr}
-
-	if msg.Err == nil {
-		t.Error("PromptResponseMsg.Err should not be nil")
-	}
-	if !strings.Contains(msg.Err.Error(), "test error") {
-		t.Errorf("PromptResponseMsg.Err.Error() = %q, should contain %q", msg.Err.Error(), "test error")
 	}
 }
 

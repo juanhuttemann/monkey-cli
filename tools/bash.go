@@ -9,7 +9,19 @@ import (
 	"monkey/api"
 )
 
-const defaultBashTimeout = 30 * time.Second
+const (
+	defaultBashTimeout = 30 * time.Second
+	maxBashOutputBytes = 50 * 1024
+)
+
+// truncateOutput caps raw command output at maxBashOutputBytes and appends a
+// notice when the limit is exceeded.
+func truncateOutput(out []byte) string {
+	if len(out) <= maxBashOutputBytes {
+		return string(out)
+	}
+	return string(out[:maxBashOutputBytes]) + fmt.Sprintf("\n[output truncated: %d bytes total, showing first %d]", len(out), maxBashOutputBytes)
+}
 
 // BashTool returns the Tool definition for executing bash commands.
 func BashTool() api.Tool {
@@ -55,11 +67,12 @@ func (b BashExecutor) ExecuteTool(_ string, input map[string]any) (string, error
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)
 	out, err := cmd.CombinedOutput()
+	result := truncateOutput(out)
 	if err != nil {
 		if ctx.Err() != nil {
-			return string(out), fmt.Errorf("bash: command timed out after %s", b.timeout())
+			return result, fmt.Errorf("bash: command timed out after %s", b.timeout())
 		}
-		return string(out), fmt.Errorf("bash: command failed: %w", err)
+		return result, fmt.Errorf("bash: command failed: %w", err)
 	}
-	return string(out), nil
+	return result, nil
 }
