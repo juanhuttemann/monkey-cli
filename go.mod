@@ -1,4 +1,4 @@
-module monkey
+module github.com/juanhuttemann/monkey-cli
 
 go 1.25.7
 

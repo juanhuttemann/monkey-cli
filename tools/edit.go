@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/aymanbagabas/go-udiff"
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // EditTool returns the Tool definition for editing a file by replacing a string.

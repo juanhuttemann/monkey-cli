@@ -25,6 +25,14 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Test with coverage
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

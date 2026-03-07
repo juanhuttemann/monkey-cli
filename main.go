@@ -9,9 +9,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"monkey/api"
-	"monkey/config"
-	"monkey/tui"
+	"github.com/juanhuttemann/monkey-cli/api"
+	"github.com/juanhuttemann/monkey-cli/config"
+	"github.com/juanhuttemann/monkey-cli/tui"
 )
 
 // systemPromptCandidates returns the paths to check for the system prompt, in priority order.

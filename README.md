@@ -1,14 +1,13 @@
-# 🐒 monkey
+# 🐒 monkey CLI
 
 [![CI](https://github.com/juanhuttemann/monkey-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/juanhuttemann/monkey-cli/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/juanhuttemann/monkey-cli)](https://goreportcard.com/report/github.com/juanhuttemann/monkey-cli)
+[![Coverage](https://codecov.io/gh/juanhuttemann/monkey-cli/branch/main/graph/badge.svg)](https://codecov.io/gh/juanhuttemann/monkey-cli)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/juanhuttemann/monkey-cli)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/juanhuttemann/monkey-cli)](https://github.com/juanhuttemann/monkey-cli/releases)
 
 A Go CLI/TUI for chatting with Claude (Anthropic's LLM API). Run it without arguments for a full interactive terminal interface, or pass a prompt for quick one-shot output.
-
-![monkey TUI demo](intro.txt)
 
 ## Features
 

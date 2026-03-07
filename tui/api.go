@@ -8,8 +8,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"monkey/api"
-	"monkey/tools"
+	"github.com/juanhuttemann/monkey-cli/api"
+	"github.com/juanhuttemann/monkey-cli/tools"
 )
 
 // errToolDeclined is returned by ApprovingExecutor when the user declines a tool call.

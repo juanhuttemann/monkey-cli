@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 func TestView_RendersMessages(t *testing.T) {

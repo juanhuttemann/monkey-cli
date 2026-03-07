@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 func TestSendPromptCmd_ReturnsCmd(t *testing.T) {

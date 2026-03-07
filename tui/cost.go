@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // Environment variables for overriding model pricing (USD per million tokens).

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 func TestWaitForRetry_ReturnsRetryingMsg(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 const grepMaxResults = 200

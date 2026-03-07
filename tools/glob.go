@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // GlobTool returns the Tool definition for finding files by glob pattern.

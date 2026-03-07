@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // --- Prompt history (Up/Down arrow) ---

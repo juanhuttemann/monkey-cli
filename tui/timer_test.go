@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 func TestTimer_NotRunningInitially(t *testing.T) {

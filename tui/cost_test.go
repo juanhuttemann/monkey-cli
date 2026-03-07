@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // --- estimateCost ---

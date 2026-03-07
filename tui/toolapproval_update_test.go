@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 func TestUpdate_ToolApprovalRequestMsg_ActivatesDialog(t *testing.T) {

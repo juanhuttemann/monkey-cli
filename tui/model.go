@@ -13,8 +13,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
-	"monkey/api"
-	"monkey/tools"
+	"github.com/juanhuttemann/monkey-cli/api"
+	"github.com/juanhuttemann/monkey-cli/tools"
 )
 
 // toolCollapseLines is the line count above which tool output is auto-collapsed.

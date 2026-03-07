@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 func TestSaveAndLoadSession_RoundTrip(t *testing.T) {

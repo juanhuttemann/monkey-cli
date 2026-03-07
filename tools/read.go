@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // ReadTool returns the Tool definition for reading file contents.

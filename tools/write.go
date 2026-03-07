@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // WriteTool returns the Tool definition for writing file contents.

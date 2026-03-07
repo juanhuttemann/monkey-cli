@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"monkey/api"
+	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // SessionData is the persisted state for --continue.
