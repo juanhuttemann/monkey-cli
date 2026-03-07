@@ -74,9 +74,10 @@ func (l *envLoader) Load() (Config, error) {
 		return Config{}, errors.New("missing required environment variable: " + EnvAPIKey)
 	}
 
+	const defaultBaseURL = "https://api.anthropic.com"
 	baseURL := os.Getenv(EnvBaseURL)
 	if baseURL == "" {
-		return Config{}, errors.New("missing required environment variable: " + EnvBaseURL)
+		baseURL = defaultBaseURL
 	}
 
 	cfg := Config{

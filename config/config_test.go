@@ -51,18 +51,18 @@ func TestLoad_MissingAPIKey(t *testing.T) {
 	}
 }
 
-func TestLoad_MissingBaseURL(t *testing.T) {
+func TestLoad_MissingBaseURL_DefaultsToAnthropicAPI(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
 	os.Unsetenv(EnvBaseURL)
 	t.Setenv(EnvOpusModel, "test-model")
 
 	loader := NewEnvLoader()
-	_, err := loader.Load()
-	if err == nil {
-		t.Fatal("Load() should return error when ANTHROPIC_BASE_URL is missing")
+	cfg, err := loader.Load()
+	if err != nil {
+		t.Fatalf("Load() should succeed when ANTHROPIC_BASE_URL is unset (use default): %v", err)
 	}
-	if !strings.Contains(err.Error(), EnvBaseURL) {
-		t.Errorf("error should mention %s, got: %v", EnvBaseURL, err)
+	if cfg.BaseURL != "https://api.anthropic.com" {
+		t.Errorf("BaseURL = %q, want default %q", cfg.BaseURL, "https://api.anthropic.com")
 	}
 }
 

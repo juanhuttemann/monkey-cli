@@ -94,25 +94,6 @@ func TestSendPrompt_MissingAPIKey(t *testing.T) {
 	}
 }
 
-func TestSendPrompt_MissingBaseURL(t *testing.T) {
-	// Ensure base URL is not set
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
-	defer func() {
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
-	}()
-
-	_, err := sendPrompt("test prompt")
-	if err == nil {
-		t.Fatal("sendPrompt() should return error when ANTHROPIC_BASE_URL is missing")
-	}
-
-	if !strings.Contains(err.Error(), "ANTHROPIC_BASE_URL") {
-		t.Errorf("error should mention ANTHROPIC_BASE_URL, got: %v", err)
-	}
-}
 
 func TestSendPrompt_MissingModel(t *testing.T) {
 	// Ensure all model env vars are not set

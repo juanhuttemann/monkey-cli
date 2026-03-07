@@ -1,11 +1,15 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
+	"time"
 
 	"monkey/api"
 )
+
+const defaultBashTimeout = 30 * time.Second
 
 // BashTool returns the Tool definition for executing bash commands.
 func BashTool() api.Tool {
@@ -26,19 +30,35 @@ func BashTool() api.Tool {
 }
 
 // BashExecutor implements api.ToolExecutor for the bash tool.
-type BashExecutor struct{}
+// Timeout controls the execution deadline; zero means 30s default.
+type BashExecutor struct {
+	Timeout time.Duration
+}
+
+func (b BashExecutor) timeout() time.Duration {
+	if b.Timeout > 0 {
+		return b.Timeout
+	}
+	return defaultBashTimeout
+}
 
 // ExecuteTool runs the bash command from input["command"] and returns combined output.
-// Returns an error on missing/empty command or non-zero exit code (output is still returned).
+// Returns an error on missing/empty command, timeout, or non-zero exit code.
 func (b BashExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
 	command, ok := input["command"].(string)
 	if !ok || command == "" {
 		return "", fmt.Errorf("bash: missing or empty command")
 	}
 
-	cmd := exec.Command("bash", "-c", command)
+	ctx, cancel := context.WithTimeout(context.Background(), b.timeout())
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "bash", "-c", command)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		if ctx.Err() != nil {
+			return string(out), fmt.Errorf("bash: command timed out after %s", b.timeout())
+		}
 		return string(out), fmt.Errorf("bash: command failed: %w", err)
 	}
 	return string(out), nil

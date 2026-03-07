@@ -143,6 +143,22 @@ func TestWriteExecutor_InvalidPathReturnsError(t *testing.T) {
 	exec := WriteExecutor{}
 	_, err := exec.ExecuteTool("write", map[string]any{"path": "/nonexistent/dir/file.txt", "content": "hi"})
 	if err == nil {
-		t.Error("ExecuteTool() should return error when parent directory does not exist")
+		t.Error("ExecuteTool() should return error when parent directory cannot be created")
+	}
+}
+
+func TestWriteExecutor_CreatesParentDirectories(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "subdir", "nested", "file.txt")
+
+	exec := WriteExecutor{}
+	_, err := exec.ExecuteTool("write", map[string]any{"path": path, "content": "hello"})
+	if err != nil {
+		t.Fatalf("ExecuteTool() should create parent directories, got error: %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	if string(data) != "hello" {
+		t.Errorf("file content = %q, want %q", string(data), "hello")
 	}
 }

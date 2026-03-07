@@ -3,8 +3,27 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// TestLoadHistory_UsesXDGPath verifies that LoadHistory uses an XDG-based path, not CWD.
+func TestLoadHistory_UsesXDGPath(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dir)
+
+	h := LoadHistory()
+
+	if !filepath.IsAbs(h.path) {
+		t.Errorf("history path should be absolute, got %q", h.path)
+	}
+	if filepath.Base(h.path) == ".monkey_history" {
+		t.Error("history path should not be .monkey_history")
+	}
+	if !strings.Contains(h.path, "monkey") {
+		t.Errorf("history path should contain 'monkey', got %q", h.path)
+	}
+}
 
 // historyWithEntries builds a History pre-loaded with entries (no file I/O).
 func historyWithEntries(entries ...string) History {

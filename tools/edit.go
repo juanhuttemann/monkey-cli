@@ -46,6 +46,9 @@ func DiffEdit(path, oldStr, newStr string) (string, error) {
 	if !strings.Contains(original, oldStr) {
 		return "", fmt.Errorf("edit: old_string not found in %s", path)
 	}
+	if count := strings.Count(original, oldStr); count > 1 {
+		return "", fmt.Errorf("edit: old_string matches %d locations in %s; use more context to make it unique", count, path)
+	}
 	updated := strings.Replace(original, oldStr, newStr, 1)
 	return udiff.Unified(path, path, original, updated), nil
 }
@@ -74,6 +77,9 @@ func (e EditExecutor) ExecuteTool(_ string, input map[string]any) (string, error
 
 	if !strings.Contains(original, oldStr) {
 		return "", fmt.Errorf("edit: old_string not found in %s", path)
+	}
+	if count := strings.Count(original, oldStr); count > 1 {
+		return "", fmt.Errorf("edit: old_string matches %d locations in %s; use more context to make it unique", count, path)
 	}
 
 	updated := strings.Replace(original, oldStr, newStr, 1)

@@ -104,7 +104,7 @@ func TestEditExecutor_ReturnsDiff(t *testing.T) {
 	}
 }
 
-func TestEditExecutor_ReplacesOnlyFirstOccurrence(t *testing.T) {
+func TestEditExecutor_AmbiguousOldStringReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
 	os.WriteFile(path, []byte("foo foo foo\n"), 0o644)
@@ -115,13 +115,30 @@ func TestEditExecutor_ReplacesOnlyFirstOccurrence(t *testing.T) {
 		"old_string": "foo",
 		"new_string": "bar",
 	})
-	if err != nil {
-		t.Fatalf("ExecuteTool() returned error: %v", err)
+	if err == nil {
+		t.Error("ExecuteTool() should return error when old_string matches multiple locations")
 	}
+	if err != nil && !strings.Contains(err.Error(), "3") {
+		t.Errorf("error should mention match count, got: %v", err)
+	}
+}
+
+func TestEditExecutor_AmbiguousOldString_FileUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "file.txt")
+	original := "foo foo foo\n"
+	os.WriteFile(path, []byte(original), 0o644)
+
+	exec := EditExecutor{}
+	exec.ExecuteTool("edit", map[string]any{
+		"path":       path,
+		"old_string": "foo",
+		"new_string": "bar",
+	})
 
 	data, _ := os.ReadFile(path)
-	if string(data) != "bar foo foo\n" {
-		t.Errorf("file content = %q, want %q (only first occurrence replaced)", string(data), "bar foo foo\n")
+	if string(data) != original {
+		t.Errorf("file should be unchanged on ambiguous match, got %q", string(data))
 	}
 }
 
@@ -216,6 +233,20 @@ func TestDiffEdit_FileNotFoundReturnsError(t *testing.T) {
 	_, err := DiffEdit("/nonexistent/file.txt", "foo", "bar")
 	if err == nil {
 		t.Error("DiffEdit should return error for non-existent file")
+	}
+}
+
+func TestDiffEdit_AmbiguousOldStringReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "file.txt")
+	os.WriteFile(path, []byte("foo foo foo\n"), 0o644)
+
+	_, err := DiffEdit(path, "foo", "bar")
+	if err == nil {
+		t.Error("DiffEdit should return error when old_string matches multiple locations")
+	}
+	if err != nil && !strings.Contains(err.Error(), "3") {
+		t.Errorf("error should mention match count, got: %v", err)
 	}
 }
 

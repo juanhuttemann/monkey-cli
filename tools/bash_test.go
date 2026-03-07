@@ -3,6 +3,7 @@ package tools
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // --- BashTool definition tests ---
@@ -111,6 +112,25 @@ func TestBashExecutor_EmptyCommandReturnsError(t *testing.T) {
 	_, err := exec.ExecuteTool("bash", map[string]any{"command": ""})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'command' is empty")
+	}
+}
+
+func TestBashExecutor_TimesOut(t *testing.T) {
+	exec := BashExecutor{Timeout: 100 * time.Millisecond}
+	_, err := exec.ExecuteTool("bash", map[string]any{"command": "sleep 10"})
+	if err == nil {
+		t.Error("ExecuteTool() should return error when command exceeds timeout")
+	}
+}
+
+func TestBashExecutor_DefaultTimeoutAllowsFastCommands(t *testing.T) {
+	exec := BashExecutor{}
+	result, err := exec.ExecuteTool("bash", map[string]any{"command": "echo fast"})
+	if err != nil {
+		t.Fatalf("ExecuteTool() returned error: %v", err)
+	}
+	if !strings.Contains(result, "fast") {
+		t.Errorf("ExecuteTool() = %q, want output containing 'fast'", result)
 	}
 }
 

@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
-const historyFile = ".monkey_history"
+const historyFile = ".monkey_history" // legacy fallback, not used by LoadHistory
 
 // History manages prompt history persisted to a local file.
 // Navigation mimics bash: Up moves to older entries, Down moves to newer ones.
@@ -38,10 +39,21 @@ func loadHistoryFromPath(path string) History {
 	return h
 }
 
-// LoadHistory loads history from the default file (.monkey_history in the
-// current directory), creating it if it does not exist.
+// LoadHistory loads history from ~/.config/monkey/history (respecting
+// XDG_DATA_HOME), creating it if it does not exist.
 func LoadHistory() History {
-	return loadHistoryFromPath(historyFile)
+	dir := os.Getenv("XDG_DATA_HOME")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return loadHistoryFromPath(historyFile)
+		}
+		dir = filepath.Join(home, ".config", "monkey")
+	} else {
+		dir = filepath.Join(dir, "monkey")
+	}
+	_ = os.MkdirAll(dir, 0o700)
+	return loadHistoryFromPath(filepath.Join(dir, "history"))
 }
 
 // Add appends an entry to the history and persists it to disk.

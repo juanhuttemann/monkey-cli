@@ -3,6 +3,7 @@ package tools
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"monkey/api"
 )
@@ -40,6 +41,9 @@ func (w WriteExecutor) ExecuteTool(_ string, input map[string]any) (string, erro
 	}
 	content, _ := input["content"].(string)
 
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", fmt.Errorf("write: %w", err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return "", fmt.Errorf("write: %w", err)
 	}
