@@ -226,3 +226,78 @@ func TestToolApprovalDialog_View_CursorOnNo_AfterDown(t *testing.T) {
 		t.Errorf("After Down, view should show '> No': %q", view)
 	}
 }
+
+func TestToolApprovalDialog_IsDenied_FalseByDefault(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	if d.IsDenied() {
+		t.Error("IsDenied should be false by default")
+	}
+}
+
+func TestToolApprovalDialog_Confirm_No_SetsDenied(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	ch := make(chan bool, 1)
+	d.Activate("model", "bash", "ls -la", ch)
+	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown}) // move to No
+	d.Confirm()
+	if !d.IsDenied() {
+		t.Error("After Confirm with cursor on No, IsDenied should be true")
+	}
+}
+
+func TestToolApprovalDialog_Confirm_Yes_NotDenied(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	ch := make(chan bool, 1)
+	d.Activate("model", "bash", "", ch)
+	d.Confirm() // cursor on Yes
+	if d.IsDenied() {
+		t.Error("After Confirm with cursor on Yes, IsDenied should be false")
+	}
+}
+
+func TestToolApprovalDialog_Activate_ClearsDenied(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	ch := make(chan bool, 1)
+	d.Activate("model", "bash", "", ch)
+	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
+	d.Confirm() // denied
+	ch2 := make(chan bool, 1)
+	d.Activate("model", "bash", "", ch2)
+	if d.IsDenied() {
+		t.Error("Re-activating dialog should clear denied state")
+	}
+}
+
+func TestToolApprovalDialog_DeniedView_WhenNotDenied_ReturnsEmpty(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	if got := d.DeniedView(); got != "" {
+		t.Errorf("DeniedView when not denied = %q, want ''", got)
+	}
+}
+
+func TestToolApprovalDialog_DeniedView_ContainsToolNameAndCanceled(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	ch := make(chan bool, 1)
+	d.Activate("model", "bash", "", ch)
+	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
+	d.Confirm()
+	view := stripANSI(d.DeniedView())
+	if !strings.Contains(view, "bash") {
+		t.Errorf("DeniedView should contain tool name 'bash': %q", view)
+	}
+	if !strings.Contains(view, "Canceled by user") {
+		t.Errorf("DeniedView should contain 'Canceled by user': %q", view)
+	}
+}
+
+func TestToolApprovalDialog_DeniedView_ContainsPreviewText(t *testing.T) {
+	d := NewToolApprovalDialog(80)
+	ch := make(chan bool, 1)
+	d.Activate("model", "bash", "ls -la /tmp", ch)
+	d, _ = d.Update(tea.KeyMsg{Type: tea.KeyDown})
+	d.Confirm()
+	view := stripANSI(d.DeniedView())
+	if !strings.Contains(view, "ls -la /tmp") {
+		t.Errorf("DeniedView should contain preview text: %q", view)
+	}
+}

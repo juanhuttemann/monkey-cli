@@ -132,7 +132,7 @@ func (m Model) renderMessages() string {
 				rendered = AssistantMessageStyle(sw).Render(md)
 			}
 		case "tool":
-			rendered = RenderToolBlock(sw, msg.Content)
+			rendered = RenderToolBlock(sw, msg.ToolName, msg.Content)
 		case "system":
 			rendered = SystemMessageStyle(sw).Render(msg.Content)
 		default:
@@ -528,6 +528,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messages = append(m.messages, Message{
 				Role:      "tool",
 				Content:   content,
+				ToolName:  msg.ToolCall.Name,
 				Timestamp: time.Now(),
 			})
 		}
@@ -611,6 +612,9 @@ func (m Model) View() string {
 
 	if m.approvalDialog.IsActive() {
 		view.WriteString(m.approvalDialog.View())
+		view.WriteString("\n")
+	} else if m.approvalDialog.IsDenied() {
+		view.WriteString(m.approvalDialog.DeniedView())
 		view.WriteString("\n")
 	}
 

@@ -11,6 +11,7 @@ import (
 type Message struct {
 	Role      string
 	Content   string
+	ToolName  string // set for Role=="tool" messages
 	Timestamp time.Time
 }
 

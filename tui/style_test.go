@@ -299,29 +299,36 @@ func TestRenderUserBlock_HasANSI(t *testing.T) {
 	}
 }
 
-func TestRenderToolBlock_ShowsWrenchInBorder(t *testing.T) {
-	rendered := RenderToolBlock(80, "$ ls")
-	if !strings.Contains(stripANSI(rendered), "🔧") {
-		t.Error("RenderToolBlock should show '🔧' in the top border")
+func TestRenderToolBlock_ShowsToolNameInBorder(t *testing.T) {
+	rendered := RenderToolBlock(80, "bash", "$ ls")
+	if !strings.Contains(stripANSI(rendered), "bash") {
+		t.Error("RenderToolBlock should show tool name in the top border")
+	}
+}
+
+func TestRenderToolBlock_NoWrenchEmoji(t *testing.T) {
+	rendered := RenderToolBlock(80, "bash", "$ ls")
+	if strings.Contains(stripANSI(rendered), "🔧") {
+		t.Error("RenderToolBlock should not show the wrench emoji")
 	}
 }
 
 func TestRenderToolBlock_ShowsContent(t *testing.T) {
-	rendered := RenderToolBlock(80, "$ ls -la")
+	rendered := RenderToolBlock(80, "bash", "$ ls -la")
 	if !strings.Contains(stripANSI(rendered), "$ ls -la") {
 		t.Error("RenderToolBlock should include the message content")
 	}
 }
 
 func TestRenderToolBlock_HasBorder(t *testing.T) {
-	rendered := RenderToolBlock(80, "text")
+	rendered := RenderToolBlock(80, "bash", "text")
 	if len(rendered) <= len("text") {
 		t.Error("RenderToolBlock should add a border around the content")
 	}
 }
 
 func TestRenderToolBlock_HasANSI(t *testing.T) {
-	rendered := RenderToolBlock(80, "text")
+	rendered := RenderToolBlock(80, "bash", "text")
 	if !strings.Contains(rendered, "\x1b[") {
 		t.Error("RenderToolBlock should produce ANSI escape codes for styling")
 	}

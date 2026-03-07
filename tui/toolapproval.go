@@ -13,6 +13,7 @@ type ToolApprovalDialog struct {
 	previewText string
 	cursor      int // 0 = Yes, 1 = No
 	active      bool
+	denied      bool // true after user explicitly selects "No"
 	width       int
 	responseCh  chan<- bool
 }
@@ -32,6 +33,7 @@ func (d *ToolApprovalDialog) Activate(modelName, toolName, previewText string, r
 	d.cursor = 0
 	d.responseCh = responseCh
 	d.active = true
+	d.denied = false
 }
 
 // Deactivate hides the dialog and clears the response channel.
@@ -49,9 +51,16 @@ func (d *ToolApprovalDialog) SetWidth(w int) { d.width = w }
 // IsApproved reports whether the cursor is on "Yes".
 func (d ToolApprovalDialog) IsApproved() bool { return d.cursor == 0 }
 
+// IsDenied reports whether the user explicitly selected "No" to cancel the tool.
+func (d ToolApprovalDialog) IsDenied() bool { return d.denied }
+
 // Confirm sends the user's decision on responseCh and deactivates the dialog.
+// If the cursor is on "No", sets the denied state so DeniedView can render.
 func (d *ToolApprovalDialog) Confirm() {
 	approved := d.cursor == 0
+	if !approved {
+		d.denied = true
+	}
 	if d.responseCh != nil {
 		d.responseCh <- approved
 	}
@@ -87,6 +96,22 @@ func (d ToolApprovalDialog) Update(msg tea.Msg) (ToolApprovalDialog, tea.Cmd) {
 		}
 	}
 	return d, nil
+}
+
+// DeniedView renders a grayed-out version of the dialog after the user cancels a tool.
+// Returns "" when not in the denied state.
+func (d ToolApprovalDialog) DeniedView() string {
+	if !d.denied {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString(ToolApprovalDeniedToolStyle().Render(d.toolName) +
+		" " + ToolApprovalCanceledLabelStyle().Render("Canceled by user"))
+	if d.previewText != "" {
+		sb.WriteString("\n\n")
+		sb.WriteString(ToolApprovalDeniedPreviewStyle().Render("$ " + d.previewText))
+	}
+	return FilePickerStyle(d.width).Render(sb.String())
 }
 
 // View renders the approval dialog. Returns "" when inactive.

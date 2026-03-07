@@ -237,15 +237,15 @@ func RenderUserBlock(width int, content string) string {
 }
 
 // RenderToolBlock renders a tool call message inside a cyan rounded border
-// with a wrench emoji embedded in the top border: ╭─ 🔧 ──────╮
-func RenderToolBlock(width int, content string) string {
+// with the tool name embedded in the top border: ╭─ bash ──────╮
+func RenderToolBlock(width int, toolName, content string) string {
 	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(ToolBorderColor))
 
 	innerW := width - 4
 	paddedContent := lipgloss.NewStyle().Width(innerW).Padding(0, 1).Render(content)
 	contentLines := strings.Split(paddedContent, "\n")
 
-	label := "🔧"
+	label := toolName
 	titleW := 2 + lipgloss.Width(label) + 1
 	dashLen := max(0, innerW-titleW)
 	topLine := bdr.Render("╭─ " + label + " " + strings.Repeat("─", dashLen) + "╮")
@@ -307,6 +307,27 @@ func ToolApprovalToolStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FBBF24")).
 		Bold(true)
+}
+
+// ToolApprovalCanceledLabelStyle returns muted gray italic styling for the "Canceled by user" label.
+func ToolApprovalCanceledLabelStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#888888")).
+		Italic(true)
+}
+
+// ToolApprovalDeniedToolStyle returns muted styling for the tool name in a canceled dialog.
+func ToolApprovalDeniedToolStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#777777")).
+		Bold(true)
+}
+
+// ToolApprovalDeniedPreviewStyle returns faint gray styling for the preview in a canceled dialog.
+func ToolApprovalDeniedPreviewStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#555555")).
+		Faint(true)
 }
 
 // MessageTimestampStyle returns the styling for per-message timestamps: gray, right-aligned.
