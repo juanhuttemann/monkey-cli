@@ -14,12 +14,21 @@ import (
 	"monkey/tui"
 )
 
-// systemPromptCandidates returns the paths to check for a system prompt, in priority order.
+// systemPromptCandidates returns the paths to check for the system prompt, in priority order.
 // Local system.md takes precedence over the global ~/.config/monkey/system.md.
 func systemPromptCandidates() []string {
 	candidates := []string{"system.md"}
 	if home, err := os.UserHomeDir(); err == nil {
 		candidates = append(candidates, home+"/.config/monkey/system.md")
+	}
+	return candidates
+}
+
+// claudeMDCandidates returns paths to CLAUDE.md files to append as project context.
+func claudeMDCandidates() []string {
+	candidates := []string{"CLAUDE.md"}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, home+"/.claude/CLAUDE.md")
 	}
 	return candidates
 }
@@ -44,6 +53,20 @@ func buildClientOpts(cfg config.Config) ([]api.ClientOption, error) {
 		if s != "" {
 			systemPrompt = s
 			break
+		}
+	}
+	// Append any CLAUDE.md files found as additional project context.
+	for _, path := range claudeMDCandidates() {
+		s, err := config.LoadSystemPromptFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if s != "" {
+			if systemPrompt != "" {
+				systemPrompt += "\n\n" + s
+			} else {
+				systemPrompt = s
+			}
 		}
 	}
 	if systemPrompt != "" {

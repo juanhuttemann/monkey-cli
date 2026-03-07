@@ -21,6 +21,10 @@ type Message struct {
 type apiResponse struct {
 	Content    []ContentBlock `json:"content"`
 	StopReason string         `json:"stop_reason"`
+	Usage      struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
 }
 
 // ContentBlock represents a single content block in a message or response.

@@ -250,6 +250,31 @@ func collectBatchFilesLoaded(cmd tea.Cmd) (FilesLoadedMsg, bool) {
 	return FilesLoadedMsg{}, false
 }
 
+func TestMention_LargeFileTruncated(t *testing.T) {
+	// Create a file larger than the size cap
+	dir := t.TempDir()
+	path := filepath.Join(dir, "big.txt")
+	big := strings.Repeat("x", 200*1024) // 200KB
+	if err := os.WriteFile(path, []byte(big), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := expandMentions("check @" + path)
+
+	// Should contain a truncation notice, not the full 200KB
+	if strings.Contains(result, big) {
+		t.Error("expandMentions should truncate large files")
+	}
+	if !strings.Contains(result, "truncated") {
+		preview := result
+		if len(preview) > 200 {
+			preview = preview[:200]
+		}
+		t.Errorf("expandMentions should include a truncation notice, got: %q", preview)
+	}
+}
+
+
 // TestMention_AtSymbol_TriggersFileReload verifies that typing '@' when the
 // picker is inactive dispatches LoadFilesCmd so newly-created files appear.
 func TestMention_AtSymbol_TriggersFileReload(t *testing.T) {

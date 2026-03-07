@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/timer"
@@ -347,6 +348,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.apeMode = !m.apeMode
 					m.input.SetValue("")
 					return m, nil
+				case "/copy":
+					if text := m.lastAssistantContent(); text != "" {
+						clipboard.WriteAll(text)
+					}
+					m.input.SetValue("")
+					return m, nil
 				}
 				return m, nil
 			}
@@ -560,6 +567,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else if msg.ToolName == "bash" {
 			preview, _ = msg.Input["command"].(string)
+		} else if msg.ToolName == "read" {
+			path, _ := msg.Input["path"].(string)
+			preview = path
+		} else if msg.ToolName == "write" {
+			path, _ := msg.Input["path"].(string)
+			content, _ := msg.Input["content"].(string)
+			lines := strings.SplitN(content, "\n", 6)
+			if len(lines) > 5 {
+				lines = append(lines[:5], "...")
+			}
+			preview = path + "\n" + strings.Join(lines, "\n")
+		} else if msg.ToolName == "glob" {
+			path, _ := msg.Input["path"].(string)
+			pattern, _ := msg.Input["pattern"].(string)
+			if path == "" {
+				path = "."
+			}
+			preview = pattern + " in " + path
+		} else if msg.ToolName == "grep" {
+			pattern, _ := msg.Input["pattern"].(string)
+			path, _ := msg.Input["path"].(string)
+			if path == "" {
+				path = "."
+			}
+			preview = pattern + " in " + path
 		}
 		m.approvalDialog.Activate(msg.ModelName, msg.ToolName, preview, msg.ResponseCh)
 		m.syncViewportHeight()
@@ -825,8 +857,18 @@ func (m *Model) AddMessage(role, content string) {
 	})
 }
 
+// lastAssistantContent returns the content of the most recent assistant message, or "".
+func (m Model) lastAssistantContent() string {
+	for i := len(m.messages) - 1; i >= 0; i-- {
+		if m.messages[i].Role == "assistant" {
+			return m.messages[i].Content
+		}
+	}
+	return ""
+}
+
 // formatToolCall formats an api.ToolCallResult for display in the conversation.
-// For bash calls it shows "$ <command>\n<output>"; other tools show "<name>: <output>".
+// For bash: "$ <command>\n<output>". For other tools: shows the key input + output.
 func formatToolCall(tc api.ToolCallResult) string {
 	if cmd, ok := tc.Input["command"].(string); ok {
 		content := "$ " + cmd
@@ -835,5 +877,33 @@ func formatToolCall(tc api.ToolCallResult) string {
 		}
 		return content
 	}
-	return tc.Output
+	// For read/write/edit/glob/grep: prefix with the primary input parameter.
+	var header string
+	switch tc.Name {
+	case "read", "write", "edit":
+		if path, ok := tc.Input["path"].(string); ok && path != "" {
+			header = path
+		}
+	case "glob":
+		if pat, ok := tc.Input["pattern"].(string); ok && pat != "" {
+			header = pat
+			if p, ok := tc.Input["path"].(string); ok && p != "" {
+				header += " in " + p
+			}
+		}
+	case "grep":
+		if pat, ok := tc.Input["pattern"].(string); ok && pat != "" {
+			header = pat
+			if p, ok := tc.Input["path"].(string); ok && p != "" {
+				header += " in " + p
+			}
+		}
+	}
+	if header == "" {
+		return tc.Output
+	}
+	if tc.Output == "" {
+		return header
+	}
+	return header + "\n" + strings.TrimRight(tc.Output, "\n")
 }

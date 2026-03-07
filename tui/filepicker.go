@@ -209,10 +209,17 @@ func expandMentions(text string) string {
 		if err != nil {
 			continue
 		}
+		const maxMentionBytes = 100 * 1024
 		ext := strings.TrimPrefix(filepath.Ext(path), ".")
+		content := strings.TrimRight(string(data), "\n")
+		note := ""
+		if len(data) > maxMentionBytes {
+			content = string(data[:maxMentionBytes])
+			note = fmt.Sprintf("\n[truncated: file is %d bytes, showing first %d]", len(data), maxMentionBytes)
+		}
 		appendix.WriteString(fmt.Sprintf(
-			"\n\n---\nFile: %s\n```%s\n%s\n```",
-			path, ext, strings.TrimRight(string(data), "\n"),
+			"\n\n---\nFile: %s\n```%s\n%s\n```%s",
+			path, ext, content, note,
 		))
 	}
 
