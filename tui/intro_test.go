@@ -29,16 +29,16 @@ func TestView_ShowsVersion_WhenNoMessages(t *testing.T) {
 	}
 }
 
-func TestView_ShowsIntroTitle_WhenNoMessages(t *testing.T) {
+func TestView_ShowsIntroTitle_InRightPanel(t *testing.T) {
 	model := NewModel(nil)
 	model.SetDimensions(80, 24)
-	model.SetIntro("art content")
+	model.SetIntro("line1\nline2\nline3\nline4\nline5")
 	model.SetIntroTitle("MyApp")
 
 	view := model.View()
 
 	if !strings.Contains(stripANSI(view), "MyApp") {
-		t.Error("View() should show intro title in block border")
+		t.Error("View() should show intro title in the right panel")
 	}
 }
 

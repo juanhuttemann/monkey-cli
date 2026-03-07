@@ -202,15 +202,17 @@ func TestRenderIntroBlock_HasBorder(t *testing.T) {
 	}
 }
 
-func TestRenderIntroBlock_TitleAppearsInBorder(t *testing.T) {
-	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
+func TestRenderIntroBlock_TitleAppearsInRightPanel(t *testing.T) {
+	art := "line1\nline2\nline3\nline4\nline5"
+	rendered := RenderIntroBlock(80, "Monkey", "", art)
 	if !strings.Contains(stripANSI(rendered), "Monkey") {
-		t.Error("RenderIntroBlock should include the title in the border")
+		t.Error("RenderIntroBlock should show the title in the right panel")
 	}
 }
 
 func TestRenderIntroBlock_ShowsHelpText(t *testing.T) {
-	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
+	art := "line1\nline2\nline3\nline4\nline5"
+	rendered := RenderIntroBlock(80, "Monkey", "", art)
 	if !strings.Contains(stripANSI(rendered), "Type ? for help") {
 		t.Error("RenderIntroBlock should show 'Type ? for help' in the right panel")
 	}
@@ -377,10 +379,10 @@ func TestInputStyle_UsesAccentBorderColor(t *testing.T) {
 	}
 }
 
-func TestRenderIntroBlock_UsesAccentBorderColor(t *testing.T) {
+func TestRenderIntroBlock_UsesPrimaryDividerColor(t *testing.T) {
 	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
-	if !strings.Contains(rendered, "168;146;40") {
-		t.Errorf("RenderIntroBlock border should use ColorAccent (%s → 168;146;40), got ANSI: %q", ColorAccent, rendered)
+	if !strings.Contains(rendered, "70;25;20") {
+		t.Errorf("RenderIntroBlock divider should use ColorPrimary (%s → 70;25;20), got ANSI: %q", ColorPrimary, rendered)
 	}
 }
 

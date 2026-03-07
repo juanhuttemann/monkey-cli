@@ -110,11 +110,10 @@ func colorizeArt(s string) string {
 	return sb.String()
 }
 
-// RenderIntroBlock renders content inside a bordered block with the title
-// and optional version embedded in the top border: ╭─ Title v0.1.0 ──────╮
-// The block is split: 3/5 left (content) │ 2/5 right ("Type ? for help").
+// RenderIntroBlock renders a two-panel block split 3/5 left (ASCII art) and
+// 2/5 right (title + version at top, "Type ? for help" centered below).
 func RenderIntroBlock(width int, title, version, content string) string {
-	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAccent))
+	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 	verFg := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGrayMid))
 
 	// Split inner area: 3/5 left, 1 divider, 2/5 right.
@@ -151,52 +150,57 @@ func RenderIntroBlock(width int, title, version, content string) string {
 	), "\n")
 	nLines := len(leftLines)
 
-	// Build right lines: "Type ? for help" vertically centered.
+	// Build right lines: title+version at top, "Type ? for help" centered in remaining rows.
+	emptyRight := strings.Repeat(" ", rightW)
+
+	// Row 0: title (and version) centered in the right panel.
+	titleText := title
+	titleVisW := lipgloss.Width(title)
+	if version != "" {
+		titleVisW += 1 + lipgloss.Width(version)
+	}
+	titleLPad := max(0, (rightW-titleVisW)/2)
+	titleRPad := max(0, rightW-titleVisW-titleLPad)
+	titleLine := strings.Repeat(" ", titleLPad) +
+		lipgloss.NewStyle().Bold(true).Render(titleText)
+	if version != "" {
+		titleLine += " " + verFg.Render(version)
+	}
+	titleLine += strings.Repeat(" ", titleRPad)
+
 	helpLine := lipgloss.NewStyle().
 		Width(rightW).
 		Align(lipgloss.Center).
 		Foreground(lipgloss.Color(ColorGrayDark)).
 		Render("Type ? for help")
-	emptyRight := strings.Repeat(" ", rightW)
 	rightLines := make([]string, nLines)
+	titleRow := min(1, nLines-1) // 1 row top padding; clamp for very short content
+	rightLines[titleRow] = titleLine
+	// Center "Type ? for help" among rows below the title.
+	helpRow := titleRow + 1 + (nLines-1-titleRow)/2
+	if helpRow >= nLines {
+		helpRow = titleRow // fallback: no room below title
+	}
 	for i := range rightLines {
-		if i == nLines/2 {
+		switch {
+		case i == titleRow:
+			// title already set above
+		case i == helpRow:
 			rightLines[i] = helpLine
-		} else {
+		default:
 			rightLines[i] = emptyRight
 		}
 	}
 
-	// Top border: ╭─ Title v0.1.0 ──────────────────────────────────────────╮
-	prefix := "╭─ "
-	suffix := " "
-	titleSection := prefix + title
-	if version != "" {
-		titleSection += " " + version
-	}
-	titleSection += suffix
-	// innerW+2 accounts for the two │ side chars; -1 for ╮
-	dashLen := max(0, innerW+2-lipgloss.Width(titleSection)-1)
-
-	topLine := bdr.Render(prefix + title)
-	if version != "" {
-		topLine += bdr.Render(" ") + verFg.Render(version)
-	}
-	topLine += bdr.Render(suffix + strings.Repeat("─", dashLen) + "╮")
-
 	var sb strings.Builder
-	sb.WriteString(topLine)
 	for i, ll := range leftLines {
-		sb.WriteByte('\n')
-		sb.WriteString(bdr.Render("│"))
+		if i > 0 {
+			sb.WriteByte('\n')
+		}
 		sb.WriteString(ll)
 		sb.WriteString(bdr.Render("│"))
 		sb.WriteString(rightLines[i])
-		sb.WriteString(bdr.Render("│"))
 	}
-	// Bottom border: ╰──────────────────────────────────────────────────────╯
-	sb.WriteByte('\n')
-	sb.WriteString(bdr.Render("╰" + strings.Repeat("─", innerW) + "╯"))
 
 	return sb.String()
 }
