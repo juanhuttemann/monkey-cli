@@ -75,7 +75,7 @@ func TestReadTool_HasOffsetAndLimitProperties(t *testing.T) {
 func TestReadExecutor_ReadsFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hello.txt")
-	os.WriteFile(path, []byte("hello world"), 0o644)
+	_ = os.WriteFile(path, []byte("hello world"), 0o644)
 
 	exec := ReadExecutor{}
 	result, err := exec.ExecuteTool("read", map[string]any{"path": path})
@@ -91,7 +91,7 @@ func TestReadExecutor_ReadsFile(t *testing.T) {
 func TestReadExecutor_ReadsMultilineFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "multi.txt")
-	os.WriteFile(path, []byte("line1\nline2\nline3\n"), 0o644)
+	_ = os.WriteFile(path, []byte("line1\nline2\nline3\n"), 0o644)
 
 	exec := ReadExecutor{}
 	result, err := exec.ExecuteTool("read", map[string]any{"path": path})
@@ -131,7 +131,7 @@ func TestReadExecutor_NonExistentFileReturnsError(t *testing.T) {
 func TestReadExecutor_ReadsEmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "empty.txt")
-	os.WriteFile(path, []byte{}, 0o644)
+	_ = os.WriteFile(path, []byte{}, 0o644)
 
 	exec := ReadExecutor{}
 	result, err := exec.ExecuteTool("read", map[string]any{"path": path})
@@ -146,7 +146,7 @@ func TestReadExecutor_ReadsEmptyFile(t *testing.T) {
 func TestReadExecutor_LineNumbersUseRealLineNumbers(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "nums.txt")
-	os.WriteFile(path, []byte("a\nb\nc\n"), 0o644)
+	_ = os.WriteFile(path, []byte("a\nb\nc\n"), 0o644)
 
 	exec := ReadExecutor{}
 	result, _ := exec.ExecuteTool("read", map[string]any{"path": path})
@@ -161,7 +161,7 @@ func TestReadExecutor_LineNumbersUseRealLineNumbers(t *testing.T) {
 func TestReadExecutor_WithOffset(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("a\nb\nc\nd\n"), 0o644)
+	_ = os.WriteFile(path, []byte("a\nb\nc\nd\n"), 0o644)
 
 	exec := ReadExecutor{}
 	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "offset": 3})
@@ -180,7 +180,7 @@ func TestReadExecutor_WithOffset(t *testing.T) {
 func TestReadExecutor_WithLimit(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("a\nb\nc\nd\n"), 0o644)
+	_ = os.WriteFile(path, []byte("a\nb\nc\nd\n"), 0o644)
 
 	exec := ReadExecutor{}
 	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "limit": 2})
@@ -200,7 +200,7 @@ func TestReadExecutor_WithLimit(t *testing.T) {
 func TestReadExecutor_WithOffsetAndLimit(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("a\nb\nc\nd\ne\n"), 0o644)
+	_ = os.WriteFile(path, []byte("a\nb\nc\nd\ne\n"), 0o644)
 
 	exec := ReadExecutor{}
 	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "offset": 2, "limit": 2})
@@ -217,7 +217,7 @@ func TestReadExecutor_WithOffsetAndLimit(t *testing.T) {
 func TestReadExecutor_OffsetBeyondEOF(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("a\nb\n"), 0o644)
+	_ = os.WriteFile(path, []byte("a\nb\n"), 0o644)
 
 	exec := ReadExecutor{}
 	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "offset": 100})

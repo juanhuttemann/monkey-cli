@@ -54,7 +54,7 @@ func TestGrepTool_HasOptionalPathAndGlobProperties(t *testing.T) {
 
 func TestGrepExecutor_FindsMatch(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("hello world\nfoo bar\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("hello world\nfoo bar\n"), 0o644)
 
 	exec := GrepExecutor{}
 	result, err := exec.ExecuteTool("grep", map[string]any{
@@ -71,7 +71,7 @@ func TestGrepExecutor_FindsMatch(t *testing.T) {
 
 func TestGrepExecutor_OutputFormat(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "file.txt"), []byte("line one\nline two\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "file.txt"), []byte("line one\nline two\n"), 0o644)
 
 	exec := GrepExecutor{}
 	result, _ := exec.ExecuteTool("grep", map[string]any{
@@ -89,7 +89,7 @@ func TestGrepExecutor_OutputFormat(t *testing.T) {
 
 func TestGrepExecutor_NoMatchReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "file.txt"), []byte("hello world\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "file.txt"), []byte("hello world\n"), 0o644)
 
 	exec := GrepExecutor{}
 	result, err := exec.ExecuteTool("grep", map[string]any{
@@ -125,8 +125,8 @@ func TestGrepExecutor_MissingPatternReturnsError(t *testing.T) {
 
 func TestGrepExecutor_GlobFilter(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte("func main() {}\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("func not here\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "main.go"), []byte("func main() {}\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("func not here\n"), 0o644)
 
 	exec := GrepExecutor{}
 	result, err := exec.ExecuteTool("grep", map[string]any{
@@ -147,9 +147,9 @@ func TestGrepExecutor_GlobFilter(t *testing.T) {
 
 func TestGrepExecutor_MultipleFiles(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("needle\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("needle\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "c.txt"), []byte("haystack\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("needle\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("needle\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "c.txt"), []byte("haystack\n"), 0o644)
 
 	exec := GrepExecutor{}
 	result, err := exec.ExecuteTool("grep", map[string]any{
@@ -174,7 +174,7 @@ func TestGrepExecutor_CapsAt200Results(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		sb.WriteString("match line\n")
 	}
-	os.WriteFile(filepath.Join(dir, "big.txt"), []byte(sb.String()), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "big.txt"), []byte(sb.String()), 0o644)
 
 	exec := GrepExecutor{}
 	result, err := exec.ExecuteTool("grep", map[string]any{
@@ -192,7 +192,7 @@ func TestGrepExecutor_CapsAt200Results(t *testing.T) {
 
 func TestGrepExecutor_RegexPattern(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "code.go"), []byte("func Foo() {}\nfunc Bar() {}\nvar x = 1\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "code.go"), []byte("func Foo() {}\nfunc Bar() {}\nvar x = 1\n"), 0o644)
 
 	exec := GrepExecutor{}
 	result, err := exec.ExecuteTool("grep", map[string]any{

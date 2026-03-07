@@ -17,26 +17,26 @@ func setupTestEnv(apiKey, baseURL, model string) func() {
 	originalModel := os.Getenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 
 	// Set new values
-	os.Setenv("ANTHROPIC_API_KEY", apiKey)
-	os.Setenv("ANTHROPIC_BASE_URL", baseURL)
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", model)
+	_ = os.Setenv("ANTHROPIC_API_KEY", apiKey)
+	_ = os.Setenv("ANTHROPIC_BASE_URL", baseURL)
+	_ = os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", model)
 
 	// Return cleanup function
 	return func() {
 		if originalAPIKey == "" {
-			os.Unsetenv("ANTHROPIC_API_KEY")
+			_ = os.Unsetenv("ANTHROPIC_API_KEY")
 		} else {
-			os.Setenv("ANTHROPIC_API_KEY", originalAPIKey)
+			_ = os.Setenv("ANTHROPIC_API_KEY", originalAPIKey)
 		}
 		if originalBaseURL == "" {
-			os.Unsetenv("ANTHROPIC_BASE_URL")
+			_ = os.Unsetenv("ANTHROPIC_BASE_URL")
 		} else {
-			os.Setenv("ANTHROPIC_BASE_URL", originalBaseURL)
+			_ = os.Setenv("ANTHROPIC_BASE_URL", originalBaseURL)
 		}
 		if originalModel == "" {
-			os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
+			_ = os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 		} else {
-			os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", originalModel)
+			_ = os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", originalModel)
 		}
 	}
 }
@@ -46,7 +46,7 @@ func createMockServer(responseBody string, statusCode int) (*httptest.Server, fu
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody))
+		_, _ = w.Write([]byte(responseBody))
 	}))
 	return server, server.Close
 }
@@ -58,7 +58,7 @@ func createMockServerWithValidator(validator func(*http.Request) bool, responseB
 		validator(r)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody))
+		_, _ = w.Write([]byte(responseBody))
 	}))
 	return server, server.Close
 }

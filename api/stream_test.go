@@ -230,7 +230,7 @@ func TestDoStreamRequest_SetsStreamTrue(t *testing.T) {
 		body, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sseTextResponse("ok", 1, 1)))
+		_, _ = w.Write([]byte(sseTextResponse("ok", 1, 1)))
 	}))
 	defer server.Close()
 
@@ -243,7 +243,7 @@ func TestDoStreamRequest_SetsStreamTrue(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var req apiRequest
-	json.Unmarshal(body, &req)
+	_ = json.Unmarshal(body, &req)
 	if !req.Stream {
 		t.Error("expected stream:true in request body")
 	}
@@ -255,7 +255,7 @@ func TestDoStreamRequest_SetsCorrectHeaders(t *testing.T) {
 		headers = r.Header
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sseTextResponse("ok", 1, 1)))
+		_, _ = w.Write([]byte(sseTextResponse("ok", 1, 1)))
 	}))
 	defer server.Close()
 
@@ -278,7 +278,7 @@ func TestDoStreamRequest_SetsCorrectHeaders(t *testing.T) {
 func TestDoStreamRequest_Non200Status(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte("rate limited"))
+		_, _ = w.Write([]byte("rate limited"))
 	}))
 	defer server.Close()
 
@@ -320,7 +320,7 @@ func TestSendMessageWithToolsStreaming_NoToolUse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sseTextResponse("streamed answer", 5, 3)))
+		_, _ = w.Write([]byte(sseTextResponse("streamed answer", 5, 3)))
 	}))
 	defer server.Close()
 
@@ -350,7 +350,7 @@ func TestSendMessageWithToolsStreaming_OnTokenCalled(t *testing.T) {
 		b.WriteString("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
 		b.WriteString("event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":2}}\n\n")
 		b.WriteString("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
-		w.Write([]byte(b.String()))
+		_, _ = w.Write([]byte(b.String()))
 	}))
 	defer server.Close()
 
@@ -375,9 +375,9 @@ func TestSendMessageWithToolsStreaming_SingleToolCall(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(sseToolUseResponse("toolu_1", "bash", map[string]any{"command": "echo hi"})))
+			_, _ = w.Write([]byte(sseToolUseResponse("toolu_1", "bash", map[string]any{"command": "echo hi"})))
 		} else {
-			w.Write([]byte(sseTextResponse("done", 5, 2)))
+			_, _ = w.Write([]byte(sseTextResponse("done", 5, 2)))
 		}
 	}))
 	defer server.Close()
@@ -405,9 +405,9 @@ func TestSendMessageWithToolsStreaming_AccumulatesUsage(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(sseToolUseResponse("t1", "bash", map[string]any{"command": "date"})))
+			_, _ = w.Write([]byte(sseToolUseResponse("t1", "bash", map[string]any{"command": "date"})))
 		} else {
-			w.Write([]byte(sseTextResponse("done", 20, 3)))
+			_, _ = w.Write([]byte(sseTextResponse("done", 20, 3)))
 		}
 	}))
 	defer server.Close()
@@ -437,12 +437,12 @@ func TestSendMessageWithToolsStreaming_Retries429BeforeStream(t *testing.T) {
 		n := calls.Add(1)
 		if n == 1 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte("rate limited"))
+			_, _ = w.Write([]byte("rate limited"))
 			return
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sseTextResponse("ok", 1, 1)))
+		_, _ = w.Write([]byte(sseTextResponse("ok", 1, 1)))
 	}))
 	defer server.Close()
 
@@ -471,7 +471,7 @@ func TestSendMessageWithToolsStreaming_NoRetryAfterStreamStart(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		// Respond with a valid stream — parse succeeds, no retry should occur.
-		w.Write([]byte(sseTextResponse("streamed", 1, 1)))
+		_, _ = w.Write([]byte(sseTextResponse("streamed", 1, 1)))
 	}))
 	defer server.Close()
 
@@ -506,9 +506,9 @@ func TestSendMessageWithToolsStreaming_ReturnsAccumulatedMessages(t *testing.T) 
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(sseToolUseResponse("toolu_99", "bash", map[string]any{"command": "date"})))
+			_, _ = w.Write([]byte(sseToolUseResponse("toolu_99", "bash", map[string]any{"command": "date"})))
 		} else {
-			w.Write([]byte(sseTextResponse("today", 5, 2)))
+			_, _ = w.Write([]byte(sseTextResponse("today", 5, 2)))
 		}
 	}))
 	defer server.Close()

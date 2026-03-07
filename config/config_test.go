@@ -328,9 +328,13 @@ func TestLoadSystemPromptFile_FileExists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("# System Prompt\n\nYou are a helpful coding assistant.")
-	f.Close()
+	defer func() { _ = os.Remove(f.Name()) }()
+	if _, err := f.WriteString("# System Prompt\n\nYou are a helpful coding assistant."); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := LoadSystemPromptFile(f.Name())
 	if err != nil {
@@ -357,8 +361,10 @@ func TestLoadSystemPromptFile_EmptyFile_ReturnsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.Close()
+	defer func() { _ = os.Remove(f.Name()) }()
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := LoadSystemPromptFile(f.Name())
 	if err != nil {

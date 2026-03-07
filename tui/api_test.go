@@ -15,7 +15,7 @@ func TestSendPromptCmd_ReturnsCmd(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
 	}))
 	defer server.Close()
 
@@ -34,7 +34,7 @@ func TestSendPromptCmd_SendsWithContext(t *testing.T) {
 		requestReceived = true
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
 	}))
 	defer server.Close()
 
@@ -66,7 +66,7 @@ func TestSendPromptCmd_UsesConversationHistory(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
 	}))
 	defer server.Close()
 
@@ -97,7 +97,7 @@ func TestSendPromptCmd_SuccessResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "Hello from API!"}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "Hello from API!"}]}`))
 	}))
 	defer server.Close()
 
@@ -119,7 +119,7 @@ func TestSendPromptCmd_ErrorResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error": "internal server error"}`))
+		_, _ = w.Write([]byte(`{"error": "internal server error"}`))
 	}))
 	defer server.Close()
 
@@ -142,7 +142,7 @@ func TestSendPromptCmd_TimeoutError(t *testing.T) {
 		// Sleep longer than the timeout
 		time.Sleep(2 * time.Second)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "too late"}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "too late"}]}`))
 	}))
 	defer server.Close()
 
@@ -214,9 +214,9 @@ func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		requestCount++
 		if requestCount == 1 {
-			w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}`))
+			_, _ = w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}`))
 		} else {
-			w.Write([]byte(`{"content":[{"type":"text","text":"done"}]}`))
+			_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"done"}]}`))
 		}
 	}))
 	defer server.Close()
@@ -256,7 +256,7 @@ func TestSendPromptCmd_SendsAllTools(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content":[{"type":"text","text":"ok"}]}`))
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"ok"}]}`))
 	}))
 	defer server.Close()
 
@@ -279,9 +279,9 @@ func TestSendPromptCmd_PromptResponseContainsAPIMessages(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		requestCount++
 		if requestCount == 1 {
-			w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}`))
+			_, _ = w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}`))
 		} else {
-			w.Write([]byte(`{"content":[{"type":"text","text":"files listed"}]}`))
+			_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"files listed"}]}`))
 		}
 	}))
 	defer server.Close()
@@ -313,7 +313,7 @@ func TestSendPromptCmd_APIMessagesPassedAsPriorHistory(t *testing.T) {
 		bodies = append(bodies, body)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content":[{"type":"text","text":"ok"}]}`))
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"ok"}]}`))
 	}))
 	defer server.Close()
 
@@ -347,7 +347,7 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
 	}))
 	defer server.Close()
 

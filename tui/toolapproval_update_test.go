@@ -162,7 +162,7 @@ func TestView_ToolApprovalDialog_Active_ShowsInView(t *testing.T) {
 func TestUpdate_ToolApprovalRequestMsg_EditTool_ShowsDiffInDialog(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
-	os.WriteFile(path, []byte("hello world\n"), 0o644)
+	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	model := NewModel(nil)
 	ch := make(chan bool, 1)

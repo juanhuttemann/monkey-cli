@@ -79,7 +79,7 @@ func TestWriteExecutor_WritesFile(t *testing.T) {
 func TestWriteExecutor_OverwritesExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "existing.txt")
-	os.WriteFile(path, []byte("old content"), 0o644)
+	_ = os.WriteFile(path, []byte("old content"), 0o644)
 
 	exec := WriteExecutor{}
 	_, err := exec.ExecuteTool("write", map[string]any{"path": path, "content": "new content"})

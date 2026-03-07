@@ -49,7 +49,7 @@ func textResponse(text string) string {
 func TestSendMessageWithTools_NoToolUse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(textResponse("plain answer")))
+		_, _ = w.Write([]byte(textResponse("plain answer")))
 	}))
 	defer server.Close()
 
@@ -74,9 +74,9 @@ func TestSendMessageWithTools_SingleToolCall(t *testing.T) {
 		n := requestCount.Add(1)
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(toolUseResponse("toolu_1", "bash", map[string]any{"command": "echo hi"})))
+			_, _ = w.Write([]byte(toolUseResponse("toolu_1", "bash", map[string]any{"command": "echo hi"})))
 		} else {
-			w.Write([]byte(textResponse("done")))
+			_, _ = w.Write([]byte(textResponse("done")))
 		}
 	}))
 	defer server.Close()
@@ -107,7 +107,7 @@ func TestSendMessageWithTools_SendsToolsInFirstRequest(t *testing.T) {
 			firstBody = body
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(textResponse("ok")))
+		_, _ = w.Write([]byte(textResponse("ok")))
 	}))
 	defer server.Close()
 
@@ -122,7 +122,7 @@ func TestSendMessageWithTools_SendsToolsInFirstRequest(t *testing.T) {
 	}
 
 	var req apiRequest
-	json.Unmarshal(firstBody, &req)
+	_ = json.Unmarshal(firstBody, &req)
 	if len(req.Tools) == 0 {
 		t.Fatal("expected tools to be sent in request, got none")
 	}
@@ -143,9 +143,9 @@ func TestSendMessageWithTools_SendsToolResultInSecondRequest(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(toolUseResponse("toolu_42", "bash", map[string]any{"command": "pwd"})))
+			_, _ = w.Write([]byte(toolUseResponse("toolu_42", "bash", map[string]any{"command": "pwd"})))
 		} else {
-			w.Write([]byte(textResponse("ok")))
+			_, _ = w.Write([]byte(textResponse("ok")))
 		}
 	}))
 	defer server.Close()
@@ -161,7 +161,7 @@ func TestSendMessageWithTools_SendsToolResultInSecondRequest(t *testing.T) {
 	}
 
 	var req apiRequest
-	json.Unmarshal(secondBody, &req)
+	_ = json.Unmarshal(secondBody, &req)
 
 	// Last message should be user with tool_result content
 	last := req.Messages[len(req.Messages)-1]
@@ -194,9 +194,9 @@ func TestSendMessageWithTools_AssistantToolUseAddedToHistory(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(toolUseResponse("toolu_7", "bash", map[string]any{"command": "ls"})))
+			_, _ = w.Write([]byte(toolUseResponse("toolu_7", "bash", map[string]any{"command": "ls"})))
 		} else {
-			w.Write([]byte(textResponse("ok")))
+			_, _ = w.Write([]byte(textResponse("ok")))
 		}
 	}))
 	defer server.Close()
@@ -212,7 +212,7 @@ func TestSendMessageWithTools_AssistantToolUseAddedToHistory(t *testing.T) {
 	}
 
 	var req apiRequest
-	json.Unmarshal(secondBody, &req)
+	_ = json.Unmarshal(secondBody, &req)
 
 	// Messages in second request: [user, assistant(tool_use), user(tool_result)]
 	if len(req.Messages) != 3 {
@@ -242,9 +242,9 @@ func TestSendMessageWithTools_AccumulatesUsage(t *testing.T) {
 		n := requestCount.Add(1)
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"date"}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}}`))
+			_, _ = w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"date"}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}}`))
 		} else {
-			w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{"input_tokens":20,"output_tokens":3}}`))
+			_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{"input_tokens":20,"output_tokens":3}}`))
 		}
 	}))
 	defer server.Close()
@@ -273,9 +273,9 @@ func TestSendMessageWithTools_ReturnsAccumulatedMessages(t *testing.T) {
 		n := requestCount.Add(1)
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			w.Write([]byte(toolUseResponse("toolu_99", "bash", map[string]any{"command": "date"})))
+			_, _ = w.Write([]byte(toolUseResponse("toolu_99", "bash", map[string]any{"command": "date"})))
 		} else {
-			w.Write([]byte(textResponse("today")))
+			_, _ = w.Write([]byte(textResponse("today")))
 		}
 	}))
 	defer server.Close()
@@ -315,7 +315,7 @@ func TestSendMessageWithTools_ReturnsAccumulatedMessages(t *testing.T) {
 func TestSendMessageWithTools_NoToolUse_ReturnsMessages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(textResponse("simple answer")))
+		_, _ = w.Write([]byte(textResponse("simple answer")))
 	}))
 	defer server.Close()
 

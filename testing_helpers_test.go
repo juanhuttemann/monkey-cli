@@ -24,9 +24,9 @@ func TestSetupTestEnv_SetsAllVars(t *testing.T) {
 
 func TestSetupTestEnv_CleanupRemovesVars(t *testing.T) {
 	// Ensure vars are not set before test
-	os.Unsetenv("ANTHROPIC_API_KEY")
-	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
+	_ = os.Unsetenv("ANTHROPIC_API_KEY")
+	_ = os.Unsetenv("ANTHROPIC_BASE_URL")
+	_ = os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 
 	cleanup := setupTestEnv("test-api-key", "http://test-url", "test-model")
 	cleanup()
@@ -44,9 +44,9 @@ func TestSetupTestEnv_CleanupRemovesVars(t *testing.T) {
 
 func TestSetupTestEnv_PartialVars(t *testing.T) {
 	// Ensure clean state
-	os.Unsetenv("ANTHROPIC_API_KEY")
-	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
+	_ = os.Unsetenv("ANTHROPIC_API_KEY")
+	_ = os.Unsetenv("ANTHROPIC_BASE_URL")
+	_ = os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 
 	// Set only some vars
 	cleanup := setupTestEnv("", "http://test-url", "")
@@ -72,7 +72,7 @@ func TestCreateMockServer_ReturnsCorrectResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -92,7 +92,7 @@ func TestCreateMockServer_CleanupClosesServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request before cleanup: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Cleanup should close the server
 	cleanup()
@@ -153,7 +153,7 @@ func TestCreateMockServer_CustomStatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Status = %d, want %d", resp.StatusCode, http.StatusNotFound)
@@ -162,9 +162,9 @@ func TestCreateMockServer_CustomStatusCode(t *testing.T) {
 
 func TestSetupTestEnv_PreservesExistingVars(t *testing.T) {
 	// Set up initial values
-	os.Setenv("ANTHROPIC_API_KEY", "original-key")
-	os.Setenv("ANTHROPIC_BASE_URL", "original-url")
-	os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "original-model")
+	_ = os.Setenv("ANTHROPIC_API_KEY", "original-key")
+	_ = os.Setenv("ANTHROPIC_BASE_URL", "original-url")
+	_ = os.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "original-model")
 
 	cleanup := setupTestEnv("new-key", "new-url", "new-model")
 	cleanup()
@@ -181,7 +181,7 @@ func TestSetupTestEnv_PreservesExistingVars(t *testing.T) {
 	}
 
 	// Clean up
-	os.Unsetenv("ANTHROPIC_API_KEY")
-	os.Unsetenv("ANTHROPIC_BASE_URL")
-	os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
+	_ = os.Unsetenv("ANTHROPIC_API_KEY")
+	_ = os.Unsetenv("ANTHROPIC_BASE_URL")
+	_ = os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 }
