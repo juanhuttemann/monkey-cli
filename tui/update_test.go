@@ -11,6 +11,90 @@ import (
 	"monkey/api"
 )
 
+// --- Prompt history (Up/Down arrow) ---
+
+func TestUpdate_KeyUp_NavigatesHistoryBackward(t *testing.T) {
+	model := NewModel(nil)
+	model.promptHistory = historyWithEntries("first", "second", "third")
+
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	updated, _ := model.Update(upKey)
+
+	m := updated.(Model)
+	if m.GetInput() != "third" {
+		t.Errorf("after Up, input = %q, want %q", m.GetInput(), "third")
+	}
+}
+
+func TestUpdate_KeyUp_ContinuesToOlderEntries(t *testing.T) {
+	model := NewModel(nil)
+	model.promptHistory = historyWithEntries("first", "second", "third")
+
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	m1, _ := model.Update(upKey)
+	m2, _ := m1.(Model).Update(upKey)
+
+	if m2.(Model).GetInput() != "second" {
+		t.Errorf("after two Up presses, input = %q, want %q", m2.(Model).GetInput(), "second")
+	}
+}
+
+func TestUpdate_KeyDown_RestoresDraft(t *testing.T) {
+	model := NewModel(nil)
+	model.SetInput("my draft")
+	model.promptHistory = historyWithEntries("old entry")
+
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	downKey := tea.KeyMsg{Type: tea.KeyDown}
+
+	m1, _ := model.Update(upKey)   // navigate to "old entry", draft saved
+	m2, _ := m1.(Model).Update(downKey) // back down → restore draft
+
+	if m2.(Model).GetInput() != "my draft" {
+		t.Errorf("after Up then Down, input = %q, want %q", m2.(Model).GetInput(), "my draft")
+	}
+}
+
+func TestUpdate_CtrlEnter_SavesPromptToHistory(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	model := NewModel(client)
+	model.SetInput("my prompt")
+
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updated, _ := model.Update(ctrlEnter)
+
+	m := updated.(Model)
+	if len(m.promptHistory.entries) == 0 {
+		t.Error("prompt should be saved to history after submit")
+	}
+	if m.promptHistory.entries[len(m.promptHistory.entries)-1] != "my prompt" {
+		t.Errorf("last history entry = %q, want %q",
+			m.promptHistory.entries[len(m.promptHistory.entries)-1], "my prompt")
+	}
+}
+
+func TestUpdate_KeyUp_NoopWhenPickerActive(t *testing.T) {
+	model := NewModel(nil)
+	model.promptHistory = historyWithEntries("old")
+	model.filePicker.Activate()
+	model.SetInput("")
+
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	updated, _ := model.Update(upKey)
+
+	// input should NOT be changed to history entry while picker is open
+	if updated.(Model).GetInput() == "old" {
+		t.Error("Up should not navigate history when file picker is active")
+	}
+}
+
 func TestUpdate_CtrlEnter_SubmitsPrompt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -55,6 +55,7 @@ type Model struct {
 	approvalDialog ToolApprovalDialog
 	models         []string
 	apeMode        bool
+	promptHistory  History
 }
 
 // IsApeMode reports whether tool approval is disabled.
@@ -90,6 +91,7 @@ func NewModel(client *api.Client) Model {
 		modelPicker:    NewModelPicker(80),
 		helpPanel:      NewHelpPanel(80),
 		approvalDialog: NewToolApprovalDialog(80),
+		promptHistory:  LoadHistory(),
 	}
 }
 
@@ -229,9 +231,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPicker, cpCmd = m.commandPicker.Update(msg)
 				cmds = append(cmds, cpCmd)
 			} else {
-				var inputCmd tea.Cmd
-				m.input, inputCmd = m.input.Update(msg)
-				cmds = append(cmds, inputCmd)
+				m.input.SetValue(m.promptHistory.Up(m.input.Value()))
+				m.input.CursorEnd()
 			}
 		case tea.KeyDown:
 			if m.approvalDialog.IsActive() {
@@ -251,9 +252,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPicker, cpCmd = m.commandPicker.Update(msg)
 				cmds = append(cmds, cpCmd)
 			} else {
-				var inputCmd tea.Cmd
-				m.input, inputCmd = m.input.Update(msg)
-				cmds = append(cmds, inputCmd)
+				m.input.SetValue(m.promptHistory.Down())
+				m.input.CursorEnd()
 			}
 		case tea.KeyTab:
 			if m.modelPicker.IsActive() {
@@ -369,6 +369,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.CanSubmit() {
 				rawInput := m.input.Value()
 				expandedInput := expandMentions(rawInput)
+				m.promptHistory.Add(rawInput)
 				// Show the original message in the UI (preserves @mentions)
 				m.messages = append(m.messages, Message{Role: "user", Content: rawInput, Timestamp: time.Now()})
 				m.input.SetValue("")
