@@ -327,10 +327,12 @@ func TestView_UserHeader_VisibleAfterFirstSubmit(t *testing.T) {
 	model.SetInput("Hello!")
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlM})
-	view := stripANSI(updated.(Model).View())
+	m := updated.(Model)
 
-	if !strings.Contains(view, "╭─ You") {
-		t.Error("View() should show '╭─ You' header after submitting first prompt")
+	// In scrollback mode the user message is committed immediately (not in View()).
+	// Verify the message was committed rather than rendered in the active frame.
+	if m.printedCount != 1 {
+		t.Errorf("After first submit, printedCount = %d, want 1", m.printedCount)
 	}
 }
 

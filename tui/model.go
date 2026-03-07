@@ -65,6 +65,7 @@ type Model struct {
 	apeMode        bool
 	promptHistory  History
 	searchBar      SearchBar
+	printedCount   int // number of messages already committed to terminal scrollback
 }
 
 // IsApeMode reports whether tool approval is disabled.
@@ -106,7 +107,7 @@ func NewModel(client *api.Client) Model {
 
 // Init implements tea.Model
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, LoadFilesCmd())
+	return tea.Batch(tea.Sequence(tea.ClearScreen, tea.Println("")), textarea.Blink, LoadFilesCmd())
 }
 
 // messageStyleWidth returns the style parameter used for message bubbles.
@@ -124,7 +125,8 @@ func (m Model) messageStyleWidth() int {
 func (m Model) renderMessages() string {
 	sw := m.messageStyleWidth()
 	var sb strings.Builder
-	for i, msg := range m.messages {
+	for i := m.printedCount; i < len(m.messages); i++ {
+		msg := m.messages[i]
 		rendered := m.renderSingleMessage(sw, msg)
 		// When search is active, prefix matching messages with a highlight marker.
 		if m.searchBar.IsActive() && m.searchBar.IsMatch(i) {
@@ -138,6 +140,25 @@ func (m Model) renderMessages() string {
 		sb.WriteString("\n")
 	}
 	return sb.String()
+}
+
+// commitUpTo prints messages[printedCount:n] to the terminal scrollback via
+// tea.Println and advances printedCount to n. Returns nil if nothing to print.
+func (m *Model) commitUpTo(n int) tea.Cmd {
+	if n <= m.printedCount {
+		return nil
+	}
+	sw := m.messageStyleWidth()
+	var cmds []tea.Cmd
+	for i := m.printedCount; i < n; i++ {
+		msg := m.messages[i]
+		rendered := m.renderSingleMessage(sw, msg)
+		ts := msg.Timestamp.Format("15:04")
+		text := rendered + "\n" + MessageTimestampStyle(sw).Render(ts)
+		cmds = append(cmds, tea.Println(text))
+	}
+	m.printedCount = n
+	return tea.Batch(cmds...)
 }
 
 // Update implements tea.Model
@@ -203,7 +224,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncViewportHeight()
 				return m, m.timer.Stop()
 			}
-			return m, tea.Quit
+			return m, tea.Sequence(tea.ClearScreen, tea.Quit)
 		case tea.KeyPgUp:
 			m.scrollToBottom = false
 			var vpCmd tea.Cmd
@@ -364,11 +385,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPicker.Deactivate()
 				switch selected {
 				case "/exit":
-					return m, tea.Quit
+					return m, tea.Sequence(tea.ClearScreen, tea.Quit)
 				case "/clear":
 					m.messages = nil
 					m.apiMessages = nil
 					m.totalUsage = api.Usage{}
+					m.printedCount = 0
 					m.input.SetValue("")
 					return m, nil
 				case "/model":
@@ -404,11 +426,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if cmd, ok := parseSlashCommand(inputVal); ok {
 				switch cmd {
 				case "/exit":
-					return m, tea.Quit
+					return m, tea.Sequence(tea.ClearScreen, tea.Quit)
 				case "/clear":
 					m.messages = nil
 					m.apiMessages = nil
 					m.totalUsage = api.Usage{}
+					m.printedCount = 0
 					m.input.SetValue("")
 					m.commandPicker.Deactivate()
 					m.filePicker.Deactivate()
@@ -451,6 +474,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.promptHistory.Add(rawInput)
 				// Show the original message in the UI (preserves @mentions)
 				m.messages = append(m.messages, Message{Role: "user", Content: rawInput, Timestamp: time.Now()})
+				if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 				m.input.SetValue("")
 				m.filePicker.Deactivate()
 				m.state = StateLoading
@@ -613,6 +639,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.timerActive = false
 		m.wasCancelled = false
 		m.retryAttempt = 0
+		if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 		m.scrollToBottom = true
 		m.syncViewportHeight()
 		m.viewport.SetContent(m.renderMessages())
@@ -621,6 +650,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case CompactResponseMsg:
 		// Replace entire message history with a single summary context message.
 		m.messages = []Message{{Role: "system", Content: msg.Summary, Timestamp: time.Now()}}
+		m.printedCount = 0
 		// Seed apiMessages so the next turn has the summary as prior context.
 		m.apiMessages = []api.Message{
 			{Role: "user", Content: "Conversation context (summarized):\n" + msg.Summary},
@@ -644,6 +674,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.timerActive = false
 		m.wasCancelled = false
 		m.retryAttempt = 0
+		if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 		m.scrollToBottom = true
 		m.syncViewportHeight()
 		m.viewport.SetContent(m.renderMessages())
@@ -679,6 +712,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Timestamp: time.Now(),
 				Collapsed: collapsed,
 			})
+		}
+		if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 		m.scrollToBottom = true
 		m.viewport.SetContent(m.renderMessages())
@@ -765,19 +801,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model
 func (m Model) View() string {
-	// Sync viewport content (handles the AddMessage + View() direct path in tests).
-	// This does not affect YOffset, preserving the user's scroll position.
-	if len(m.messages) == 0 && m.intro != "" {
-		m.viewport.SetContent(RenderIntroBlock(m.width, m.introTitle, m.introVersion, m.intro))
-	} else {
-		m.viewport.SetContent(m.renderMessages())
-	}
-	if m.scrollToBottom {
-		m.viewport.GotoBottom()
-	}
-
 	var view strings.Builder
-	view.WriteString(m.viewport.View())
+
+	// In inline (no alt-screen) mode render content directly so it only takes
+	// as much vertical space as needed — no blank gap from a fixed-height viewport.
+	if len(m.messages) == 0 && m.intro != "" {
+		view.WriteString(RenderIntroBlock(m.width, m.introTitle, m.introVersion, m.intro))
+	} else {
+		view.WriteString(m.renderMessages())
+	}
 	view.WriteString("\n")
 
 	if m.modelPicker.IsActive() {
@@ -852,6 +884,7 @@ func (m *Model) RestoreSession(sess *SessionData) {
 	}
 	m.messages = sess.Messages
 	m.apiMessages = sess.APIMessages
+	m.printedCount = len(m.messages)
 	if sess.Model != "" && m.client != nil {
 		m.client.SetModel(sess.Model)
 	}

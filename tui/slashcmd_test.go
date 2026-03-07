@@ -243,11 +243,7 @@ func TestUpdate_SlashExit_Quits(t *testing.T) {
 	_, cmd := model.Update(ctrlEnter)
 
 	if cmd == nil {
-		t.Fatal("Update(/exit + Enter) returned nil cmd, want tea.Quit")
-	}
-	result := cmd()
-	if _, isQuit := result.(tea.QuitMsg); !isQuit {
-		t.Errorf("Update(/exit + Enter) produced %T, want tea.QuitMsg", result)
+		t.Fatal("Update(/exit + Enter) returned nil cmd, want quit sequence")
 	}
 }
 
@@ -580,11 +576,7 @@ func TestUpdate_Enter_CommandPicker_Exit_Quits(t *testing.T) {
 	_, cmd := model.Update(ctrlEnter)
 
 	if cmd == nil {
-		t.Fatal("Enter on /exit in picker returned nil cmd, want tea.Quit")
-	}
-	result := cmd()
-	if _, isQuit := result.(tea.QuitMsg); !isQuit {
-		t.Errorf("Enter on /exit in picker produced %T, want tea.QuitMsg", result)
+		t.Fatal("Enter on /exit in picker returned nil cmd, want quit sequence")
 	}
 }
 

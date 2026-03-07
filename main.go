@@ -150,7 +150,7 @@ func launchTUI(continueSession bool) {
 		}
 	}
 
-	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	p := tea.NewProgram(model)
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())

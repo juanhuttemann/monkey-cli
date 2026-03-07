@@ -9,11 +9,11 @@ import (
 )
 
 // TestScrolling_ViewportOffsetAtBottomAfterNewMessage verifies that after a
-// PromptResponseMsg, the model's viewport.YOffset is set to the bottom position
-// (not 0), confirming SetContent + GotoBottom are called in Update, not just View.
+// PromptResponseMsg, messages are committed to scrollback (printedCount advances).
+// With scrollback mode, completed messages leave the viewport.
 func TestScrolling_ViewportOffsetAtBottomAfterNewMessage(t *testing.T) {
 	model := NewModel(nil)
-	model.SetDimensions(80, 10) // viewport height = 10 - 9 = 1 line
+	model.SetDimensions(80, 10)
 
 	for i := 0; i < 15; i++ {
 		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
@@ -23,8 +23,9 @@ func TestScrolling_ViewportOffsetAtBottomAfterNewMessage(t *testing.T) {
 	updated, _ := model.Update(response)
 	m := updated.(Model)
 
-	if m.viewport.YOffset == 0 {
-		t.Error("After PromptResponseMsg with tall content, viewport.YOffset should be > 0 (SetContent + GotoBottom must be called in Update)")
+	// All messages (15 user + 1 assistant) should be committed to scrollback.
+	if m.printedCount != 16 {
+		t.Errorf("After PromptResponseMsg, printedCount = %d, want 16", m.printedCount)
 	}
 }
 
