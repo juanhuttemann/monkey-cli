@@ -80,6 +80,36 @@ func WaitingStyle() lipgloss.Style {
 		Italic(true)
 }
 
+// colorizeArt applies lipgloss foreground colors to the three Unicode block
+// shading characters used in the monkey pixel art:
+//
+//	█  →  ColorMonkeyDark  (outline)
+//	▒  →  ColorMonkeyMid   (body)
+//	░  →  ColorMonkeyLight (face / underbelly)
+//
+// All other runes (spaces, newlines) are passed through unchanged.
+func colorizeArt(s string) string {
+	dark := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyDark))
+	mid := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyMid))
+	light := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyLight))
+
+	var sb strings.Builder
+	sb.Grow(len(s) * 2) // rough over-alloc for ANSI sequences
+	for _, r := range s {
+		switch r {
+		case '█':
+			sb.WriteString(dark.Render(string(r)))
+		case '▒':
+			sb.WriteString(mid.Render(string(r)))
+		case '░':
+			sb.WriteString(light.Render(string(r)))
+		default:
+			sb.WriteRune(r)
+		}
+	}
+	return sb.String()
+}
+
 // RenderIntroBlock renders content inside a bordered block with the title
 // and optional version embedded in the top border: ╭─ Title v0.1.0 ──────╮
 // The block is split: 3/5 left (content) │ 2/5 right ("Type ? for help").
@@ -91,6 +121,10 @@ func RenderIntroBlock(width int, title, version, content string) string {
 	innerW := width - 2 // space between the two outer │ borders
 	leftW := innerW * 3 / 5
 	rightW := innerW - leftW - 1 // -1 for the divider │
+
+	// Colorize the pixel-art block characters before layout so that
+	// lipgloss.Width() (ANSI-aware) still measures correctly during centering.
+	content = colorizeArt(content)
 
 	// Center the art block as a unit within the left panel.
 	// Find the widest art line, compute a uniform left offset, then render.

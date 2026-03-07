@@ -369,33 +369,33 @@ func TestErrorMessageStyle_UsesBurntOrangeBorder(t *testing.T) {
 	}
 }
 
-// InputStyle border uses ColorAccent (Olive Yellow) = #B5B737 → emits 181;183;55
+// InputStyle border uses ColorAccent (Antique Gold) = #A89228 → emits 168;146;40
 func TestInputStyle_UsesAccentBorderColor(t *testing.T) {
 	rendered := InputStyle(80, 3).Render("text")
-	if !strings.Contains(rendered, "181;183;55") {
-		t.Errorf("InputStyle border should use ColorAccent (%s → 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	if !strings.Contains(rendered, "168;146;40") {
+		t.Errorf("InputStyle border should use ColorAccent (%s → 168;146;40), got ANSI: %q", ColorAccent, rendered)
 	}
 }
 
 func TestRenderIntroBlock_UsesAccentBorderColor(t *testing.T) {
 	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
-	if !strings.Contains(rendered, "181;183;55") {
-		t.Errorf("RenderIntroBlock border should use ColorAccent (%s → 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	if !strings.Contains(rendered, "168;146;40") {
+		t.Errorf("RenderIntroBlock border should use ColorAccent (%s → 168;146;40), got ANSI: %q", ColorAccent, rendered)
 	}
 }
 
-// ColorAccent = #B5B737 = rgb(181,183,55)
-func TestFilePickerCursorStyle_UsesOliveYellow(t *testing.T) {
+// ColorAccent = #A89228 = rgb(168,146,40)
+func TestFilePickerCursorStyle_UsesAccentColor(t *testing.T) {
 	rendered := FilePickerCursorStyle().Render("item")
-	if !strings.Contains(rendered, "181;183;55") {
-		t.Errorf("FilePickerCursorStyle should use Olive Yellow (%s = 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	if !strings.Contains(rendered, "168;146;40") {
+		t.Errorf("FilePickerCursorStyle should use ColorAccent (%s = 168;146;40), got ANSI: %q", ColorAccent, rendered)
 	}
 }
 
-func TestWaitingStyle_UsesOliveYellow(t *testing.T) {
+func TestWaitingStyle_UsesAccentColor(t *testing.T) {
 	rendered := WaitingStyle().Render("What should monkey do?")
-	if !strings.Contains(rendered, "181;183;55") {
-		t.Errorf("WaitingStyle should use Olive Yellow (%s = 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	if !strings.Contains(rendered, "168;146;40") {
+		t.Errorf("WaitingStyle should use ColorAccent (%s = 168;146;40), got ANSI: %q", ColorAccent, rendered)
 	}
 }
 

@@ -5,7 +5,7 @@ package tui
 // ColorAccent is the warm highlight used for active/selected states.
 const (
 	ColorPrimary = "#461914" // Deep Brown-Red
-	ColorAccent  = "#B5B737" // Olive Yellow
+	ColorAccent  = "#A89228" // Antique Gold
 )
 
 // Message role border colors.
@@ -43,4 +43,11 @@ const (
 const (
 	ColorApprovalModel = ColorAssistantBorder // green — the assistant is acting
 	ColorApprovalTool  = ColorToolBorder      // cyan — it is a tool call
+)
+
+// Intro art pixel colors — three tiers of block shading for the monkey sprite.
+const (
+	ColorMonkeyDark  = "#2B1200" // very dark brown  — ██ outline
+	ColorMonkeyMid   = "#7B4220" // medium brown     — ▒▒ body
+	ColorMonkeyLight = "#C49A6C" // warm tan         — ░░ face / underbelly
 )

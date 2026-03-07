@@ -138,8 +138,8 @@ func TestView_ApeModeIndicator_EnabledUsesYellowColor(t *testing.T) {
 
 	view := model.View() // raw with ANSI
 
-	// ColorAccent = #B5B737 (Olive Yellow) → emits 181;183;55
-	if !strings.Contains(view, "181;183;55") {
-		t.Errorf("Enabled ape mode should use ColorAccent (181;183;55 in ANSI), got:\n%s", stripANSI(view))
+	// ColorAccent = #A89228 (Antique Gold) → emits 168;146;40
+	if !strings.Contains(view, "168;146;40") {
+		t.Errorf("Enabled ape mode should use ColorAccent (168;146;40 in ANSI), got:\n%s", stripANSI(view))
 	}
 }
