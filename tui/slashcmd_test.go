@@ -298,6 +298,53 @@ func TestUpdate_SlashClear_DoesNotQuit(t *testing.T) {
 
 // --- Model integration: Tab autocomplete ---
 
+// Tab on "/cop" autocompletes to "/copy"; subsequent Enter must execute the
+// command, NOT submit it as a user prompt.
+func TestUpdate_Tab_AutocompleteCopy_ThenEnter_NotSubmittedAsPrompt(t *testing.T) {
+	model := NewModel(nil)
+	model.SetInput("/cop")
+	model.commandPicker.Activate()
+	model.commandPicker.SetQuery("cop")
+
+	tabKey := tea.KeyMsg{Type: tea.KeyTab}
+	updatedModel, _ := model.Update(tabKey)
+	m := updatedModel.(Model)
+	if m.GetInput() != "/copy" {
+		t.Fatalf("Input after Tab = %q, want '/copy'", m.GetInput())
+	}
+
+	initialMsgCount := len(m.GetHistory())
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel2, _ := m.Update(ctrlEnter)
+	m2 := updatedModel2.(Model)
+
+	if len(m2.GetHistory()) > initialMsgCount {
+		t.Error("/copy after Tab+Enter was submitted as prompt — should have been executed as command")
+	}
+	if m2.GetInput() != "" {
+		t.Errorf("input after Tab+Enter /copy = %q, want ''", m2.GetInput())
+	}
+}
+
+// Typing "/copy" directly then pressing Enter must execute the command, not
+// submit it as a user prompt.
+func TestUpdate_DirectInput_Copy_NotSubmittedAsPrompt(t *testing.T) {
+	model := NewModel(nil)
+	model.SetInput("/copy")
+
+	initialMsgCount := len(model.GetHistory())
+	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
+	updatedModel, _ := model.Update(ctrlEnter)
+	m := updatedModel.(Model)
+
+	if len(m.GetHistory()) > initialMsgCount {
+		t.Error("/copy direct input was submitted as prompt — should have been executed as command")
+	}
+	if m.GetInput() != "" {
+		t.Errorf("input after /copy = %q, want ''", m.GetInput())
+	}
+}
+
 func TestUpdate_Tab_SelectsSlashCommand(t *testing.T) {
 	model := NewModel(nil)
 	model.SetInput("/ex")

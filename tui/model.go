@@ -428,6 +428,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.input.SetValue("")
 					m.commandPicker.Deactivate()
 					return m, nil
+				case "/copy":
+					if text := m.lastAssistantContent(); text != "" {
+						if err := clipboard.WriteAll(text); err != nil {
+							m.messages = append(m.messages, Message{Role: "error", Content: "clipboard: " + err.Error(), Timestamp: time.Now()})
+						}
+					}
+					m.input.SetValue("")
+					m.commandPicker.Deactivate()
+					return m, nil
 				case "/compact":
 					m.input.SetValue("")
 					m.commandPicker.Deactivate()
