@@ -1,1 +1,15 @@
+# binary
+monkey
+monkey-cli
+
+# history & session
 .monkey_history
+session.json
+
+# Go
+*.test
+*.out
+coverage.out
+
+# env
+.env
