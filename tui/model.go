@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
 	"monkey/api"
 	"monkey/tools"
@@ -184,6 +185,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = StateReady
 					m.timerActive = false
 					m.wasCancelled = true
+					m.syncViewportHeight()
 					return m, m.timer.Stop()
 				}
 				// Esc no longer quits; use /exit instead.
@@ -201,6 +203,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = StateReady
 				m.timerActive = false
 				m.wasCancelled = true
+				m.syncViewportHeight()
 				return m, m.timer.Stop()
 			}
 			return m, tea.Quit
@@ -304,8 +307,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = StateReady
 					m.timerActive = false
 					m.wasCancelled = true
+					m.syncViewportHeight()
 					return m, m.timer.Stop()
 				}
+				// Approved: dialog gone, viewport grows back.
+				m.syncViewportHeight()
 				if m.approvalCh != nil {
 					cmds = append(cmds, waitForApproval(m.approvalCh))
 				}
@@ -381,6 +387,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.filePicker.Deactivate()
 				m.state = StateLoading
 				m.scrollToBottom = true
+				m.syncViewportHeight()
 				m.viewport.SetContent(m.renderMessages())
 				m.viewport.GotoBottom()
 				// Start elapsed timer
@@ -449,6 +456,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+			m.syncViewportHeight()
 		}
 
 	case FilesLoadedMsg:
@@ -467,12 +475,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.modelPicker.SetWidth(msg.Width)
 		m.helpPanel.SetWidth(msg.Width)
 		m.approvalDialog.SetWidth(msg.Width)
-		vpHeight := msg.Height - 9
-		if vpHeight < 1 {
-			vpHeight = 1
-		}
 		m.viewport.Width = msg.Width
-		m.viewport.Height = vpHeight
+		m.syncViewportHeight()
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
@@ -492,6 +496,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.wasCancelled = false
 		m.retryAttempt = 0
 		m.scrollToBottom = true
+		m.syncViewportHeight()
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
@@ -503,6 +508,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.wasCancelled = false
 		m.retryAttempt = 0
 		m.scrollToBottom = true
+		m.syncViewportHeight()
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
@@ -512,6 +518,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.timerActive = false
 			m.wasCancelled = true
 			m.retryAttempt = 0
+			m.syncViewportHeight()
 		}
 
 	case RetryingMsg:
@@ -555,6 +562,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			preview, _ = msg.Input["command"].(string)
 		}
 		m.approvalDialog.Activate(msg.ModelName, msg.ToolName, preview, msg.ResponseCh)
+		m.syncViewportHeight()
 		if m.approvalCh != nil {
 			cmds = append(cmds, waitForApproval(m.approvalCh))
 		}
@@ -688,11 +696,55 @@ func (m *Model) SetLoading(loading bool) {
 	} else {
 		m.state = StateReady
 	}
+	m.syncViewportHeight()
 }
 
 // GetDimensions returns the current width and height
 func (m Model) GetDimensions() (int, int) {
 	return m.width, m.height
+}
+
+// syncViewportHeight recomputes and sets the viewport height based on current
+// state so the input area stays at a fixed position on screen regardless of
+// whether the status line or a dialog is visible.
+//
+// Reserved non-viewport rows (base, no status, no dialog):
+//   - 1  \n separator between viewport and rest
+//   - 5  input box (3 content + 2 border)
+//   - 1  \n after input
+//   - 1  ape-mode line
+//   - 1  \n from \n\n trailing  (the second \n is below terminal bottom)
+//
+// = 9 rows.  Each optional element adds its own row count on top.
+func (m *Model) syncViewportHeight() {
+	reserved := 9
+
+	// Status line: spinner, "What should monkey do?", or "took N s"
+	if m.state == StateLoading || m.wasCancelled || m.lastElapsed > 0 {
+		reserved++
+	}
+
+	// Pickers (at most one is active at a time)
+	if m.commandPicker.IsActive() {
+		reserved += lipgloss.Height(m.commandPicker.View())
+	} else if m.filePicker.IsActive() {
+		reserved += lipgloss.Height(m.filePicker.View())
+	} else if m.modelPicker.IsActive() {
+		reserved += lipgloss.Height(m.modelPicker.View())
+	}
+
+	// Approval / denied dialog
+	if m.approvalDialog.IsActive() {
+		reserved += lipgloss.Height(m.approvalDialog.View())
+	} else if m.approvalDialog.IsDenied() {
+		reserved += lipgloss.Height(m.approvalDialog.DeniedView())
+	}
+
+	h := m.height - reserved
+	if h < 1 {
+		h = 1
+	}
+	m.viewport.Height = h
 }
 
 // SetDimensions sets the viewport and textarea dimensions (pointer receiver to mutate in place)
@@ -705,13 +757,12 @@ func (m *Model) SetDimensions(width, height int) {
 	m.modelPicker.SetWidth(width)
 	m.helpPanel.SetWidth(width)
 	m.approvalDialog.SetWidth(width)
-	vpHeight := height - 9
-	if vpHeight < 1 {
-		vpHeight = 1
-	}
 	m.viewport.Width = width
-	m.viewport.Height = vpHeight
+	m.syncViewportHeight()
 }
+
+// GetViewportHeight returns the current viewport height (for testing).
+func (m Model) GetViewportHeight() int { return m.viewport.Height }
 
 // CanSubmit returns true when input is non-empty (trimmed) and not loading
 func (m Model) CanSubmit() bool {
