@@ -64,7 +64,7 @@ func (m Model) IsApeMode() bool { return m.apeMode }
 // NewModel creates a new TUI model with initialized components
 func NewModel(client *api.Client) Model {
 	ta := textarea.New()
-	ta.Placeholder = "Type your message... (Ctrl+Enter to send, /exit to quit)"
+	ta.Placeholder = "Type your message... (Enter to send, Ctrl+J for newline, /exit to quit)"
 	ta.SetWidth(80)
 	ta.SetHeight(3)
 	ta.Focus()
@@ -285,6 +285,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input, inputCmd = m.input.Update(msg)
 				cmds = append(cmds, inputCmd)
 			}
+		case tea.KeyCtrlJ:
+			// Ctrl+J inserts a newline into the input (multiline support).
+			var inputCmd tea.Cmd
+			m.input, inputCmd = m.input.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			cmds = append(cmds, inputCmd)
 		case tea.KeyCtrlM:
 			// Approval dialog takes priority when active.
 			if m.approvalDialog.IsActive() {

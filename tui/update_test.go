@@ -576,6 +576,37 @@ func TestUpdate_SpinnerTick_ContinuesWhenLoading(t *testing.T) {
 	}
 }
 
+// --- Ctrl+J inserts newline ---
+
+func TestUpdate_CtrlJ_InsertsNewline(t *testing.T) {
+	model := NewModel(nil)
+	model.SetInput("hello")
+
+	ctrlJ := tea.KeyMsg{Type: tea.KeyCtrlJ}
+	updated, _ := model.Update(ctrlJ)
+
+	m := updated.(Model)
+	if !strings.Contains(m.GetInput(), "\n") {
+		t.Errorf("Ctrl+J should insert a newline, got input: %q", m.GetInput())
+	}
+}
+
+func TestUpdate_CtrlJ_DoesNotSubmit(t *testing.T) {
+	model := NewModel(nil)
+	model.SetInput("hello")
+
+	ctrlJ := tea.KeyMsg{Type: tea.KeyCtrlJ}
+	updated, _ := model.Update(ctrlJ)
+
+	m := updated.(Model)
+	if m.IsLoading() {
+		t.Error("Ctrl+J should not submit the message")
+	}
+	if len(m.GetHistory()) != 0 {
+		t.Error("Ctrl+J should not add to history")
+	}
+}
+
 func TestNewModel_UsesMonkeySpinner(t *testing.T) {
 	model := NewModel(nil)
 
