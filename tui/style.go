@@ -182,10 +182,10 @@ func RenderIntroBlock(width int, title, version, content string) string {
 		helpRow = titleRow // fallback: no room below title
 	}
 	for i := range rightLines {
-		switch {
-		case i == titleRow:
+		switch i {
+		case titleRow:
 			// title already set above
-		case i == helpRow:
+		case helpRow:
 			rightLines[i] = helpLine
 		default:
 			rightLines[i] = emptyRight
