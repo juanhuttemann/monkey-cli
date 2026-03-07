@@ -89,8 +89,8 @@ func TestView_ApeModeIndicator_ShowsDisabledByDefault(t *testing.T) {
 
 	view := stripANSI(model.View())
 
-	if !strings.Contains(view, "ape: off") {
-		t.Errorf("View should show 'ape: off' by default, got:\n%s", view)
+	if !strings.Contains(view, "ape mode: off") {
+		t.Errorf("View should show 'ape mode: off' by default, got:\n%s", view)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestView_ApeModeIndicator_HasBottomPadding(t *testing.T) {
 
 	view := stripANSI(model.View())
 
-	if !strings.Contains(view, "ape: off\n\n") {
+	if !strings.Contains(view, "ape mode: off\n\n") {
 		t.Errorf("Status bar should have a blank line after it, got:\n%q", view)
 	}
 }
@@ -126,8 +126,8 @@ func TestView_ApeModeIndicator_ShowsEnabledWhenActive(t *testing.T) {
 
 	view := stripANSI(model.View())
 
-	if !strings.Contains(view, "ape: on") {
-		t.Errorf("View should show 'ape: on' when active, got:\n%s", view)
+	if !strings.Contains(view, "ape mode: on") {
+		t.Errorf("View should show 'ape mode: on' when active, got:\n%s", view)
 	}
 }
 

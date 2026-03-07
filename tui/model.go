@@ -1040,9 +1040,9 @@ func (m Model) renderStatusBar() string {
 
 	var apeSeg string
 	if m.apeMode {
-		apeSeg = ApeModeActiveStyle().Render("ape: on")
+		apeSeg = ApeModeActiveStyle().Render("ape mode: on")
 	} else {
-		apeSeg = ApeModeInactiveStyle().Render("ape: off")
+		apeSeg = ApeModeInactiveStyle().Render("ape mode: off")
 	}
 
 	total := m.totalUsage.InputTokens + m.totalUsage.OutputTokens
