@@ -80,10 +80,10 @@ monkey
 ### One-shot CLI
 
 ```bash
-monkey -p "What is the capital of France?"
+monkey -p "Why do monkeys make the best programmers?"
 
 # Unquoted multi-word prompts also work
-monkey -p Write a haiku about Go
+monkey -p Write a haiku about bananas
 
 # Resume the last saved session
 monkey --continue
@@ -105,18 +105,6 @@ When the model needs to perform actions, it calls built-in tools. Each call show
 | `edit` | Make targeted edits to a file |
 | `glob` | Find files by pattern |
 | `grep` | Search file contents |
-
-## Architecture
-
-```
-.
-├── main.go          — entry point; routes to TUI or one-shot CLI
-├── version.go       — version constant and ASCII art embed
-├── api/             — HTTP client for the Anthropic Messages API
-├── config/          — environment variable loading
-├── tools/           — built-in tool implementations (bash, read, write, edit, glob, grep)
-└── tui/             — Bubble Tea interactive UI
-```
 
 ## Running tests
 
