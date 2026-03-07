@@ -138,8 +138,8 @@ func TestView_ApeModeIndicator_EnabledUsesYellowColor(t *testing.T) {
 
 	view := model.View() // raw with ANSI
 
-	// banana yellow #FFD700 = rgb(255,215,0) → ANSI: 255;215;0
-	if !strings.Contains(view, "255;215;0") {
-		t.Errorf("Enabled ape mode should use banana yellow color (255;215;0 in ANSI), got:\n%s", stripANSI(view))
+	// ColorAccent = #B5B737 (Olive Yellow) → emits 181;183;55
+	if !strings.Contains(view, "181;183;55") {
+		t.Errorf("Enabled ape mode should use ColorAccent (181;183;55 in ANSI), got:\n%s", stripANSI(view))
 	}
 }

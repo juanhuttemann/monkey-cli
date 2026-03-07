@@ -333,3 +333,113 @@ func TestRenderToolBlock_HasANSI(t *testing.T) {
 		t.Error("RenderToolBlock should produce ANSI escape codes for styling")
 	}
 }
+
+// --- Palette: message block border colors ---
+// Each block's border ANSI code is asserted against the palette value.
+
+// ColorUserBorder = #8B3A21 → emits 139;58;32
+func TestRenderUserBlock_UsesRustBrownBorder(t *testing.T) {
+	rendered := RenderUserBlock(80, "hello")
+	if !strings.Contains(rendered, "139;58;32") {
+		t.Errorf("RenderUserBlock border should use Rust Brown (%s → 139;58;32), got ANSI: %q", ColorUserBorder, rendered)
+	}
+}
+
+// ColorAssistantBorder = #729B2F → emits 113;155;47
+func TestRenderAssistantBlock_UsesLeafGreenBorder(t *testing.T) {
+	rendered := RenderAssistantBlock(80, "model", "response")
+	if !strings.Contains(rendered, "113;155;47") {
+		t.Errorf("RenderAssistantBlock border should use Leaf Green (%s → 113;155;47), got ANSI: %q", ColorAssistantBorder, rendered)
+	}
+}
+
+// ColorToolBorder = #225057 = rgb(34,80,87)
+func TestRenderToolBlock_UsesDarkTealBorder(t *testing.T) {
+	rendered := RenderToolBlock(80, "bash", "$ ls")
+	if !strings.Contains(rendered, "34;80;87") {
+		t.Errorf("RenderToolBlock border should use Dark Slate/Teal (%s = 34;80;87), got ANSI: %q", ColorToolBorder, rendered)
+	}
+}
+
+// ColorErrorBorder = #BA3F28 = rgb(186,63,40)
+func TestErrorMessageStyle_UsesBurntOrangeBorder(t *testing.T) {
+	rendered := ErrorMessageStyle(80).Render("error")
+	if !strings.Contains(rendered, "186;63;40") {
+		t.Errorf("ErrorMessageStyle border should use Burnt Orange (%s = 186;63;40), got ANSI: %q", ColorErrorBorder, rendered)
+	}
+}
+
+// InputStyle border uses ColorAccent (Olive Yellow) = #B5B737 → emits 181;183;55
+func TestInputStyle_UsesAccentBorderColor(t *testing.T) {
+	rendered := InputStyle(80, 3).Render("text")
+	if !strings.Contains(rendered, "181;183;55") {
+		t.Errorf("InputStyle border should use ColorAccent (%s → 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	}
+}
+
+func TestRenderIntroBlock_UsesAccentBorderColor(t *testing.T) {
+	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
+	if !strings.Contains(rendered, "181;183;55") {
+		t.Errorf("RenderIntroBlock border should use ColorAccent (%s → 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	}
+}
+
+// ColorAccent = #B5B737 = rgb(181,183,55)
+func TestFilePickerCursorStyle_UsesOliveYellow(t *testing.T) {
+	rendered := FilePickerCursorStyle().Render("item")
+	if !strings.Contains(rendered, "181;183;55") {
+		t.Errorf("FilePickerCursorStyle should use Olive Yellow (%s = 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	}
+}
+
+func TestWaitingStyle_UsesOliveYellow(t *testing.T) {
+	rendered := WaitingStyle().Render("What should monkey do?")
+	if !strings.Contains(rendered, "181;183;55") {
+		t.Errorf("WaitingStyle should use Olive Yellow (%s = 181;183;55), got ANSI: %q", ColorAccent, rendered)
+	}
+}
+
+// --- Palette-driven color tests ---
+// These tests verify that style functions use the correct palette constants,
+// catching accidental hardcoded hex drift. TrueColor is forced in TestMain,
+// so lipgloss emits 38;2;R;G;B ANSI codes we can assert on.
+
+func TestFilePickerCursorStyle_IsDistinctFromAssistantBorder(t *testing.T) {
+	cursor := FilePickerCursorStyle().Render("item")
+	assistant := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAssistantBorder)).Render("item")
+	if cursor == assistant {
+		t.Error("FilePickerCursorStyle should not use ColorAssistantBorder — green means 'assistant message', not 'selected'")
+	}
+}
+
+func TestWaitingStyle_DoesNotUseOldGold(t *testing.T) {
+	rendered := WaitingStyle().Render("What should monkey do?")
+	// #D4A017 = rgb(212, 160, 23) — the old hardcoded value to eliminate
+	if strings.Contains(rendered, "212;160;23") {
+		t.Errorf("WaitingStyle should not use old #D4A017 gold (212;160;23); use ColorAccent instead")
+	}
+}
+
+// ColorAssistantBorder = #729B2F → emits 113;155;47
+func TestToolApprovalModelStyle_UsesAssistantBorderColor(t *testing.T) {
+	rendered := ToolApprovalModelStyle().Render("claude-sonnet")
+	if !strings.Contains(rendered, "113;155;47") {
+		t.Errorf("ToolApprovalModelStyle should use ColorAssistantBorder (%s → 113;155;47), got ANSI: %q", ColorAssistantBorder, rendered)
+	}
+}
+
+// ColorToolBorder = #225057 → emits 34;80;87
+func TestToolApprovalToolStyle_UsesToolBorderColor(t *testing.T) {
+	rendered := ToolApprovalToolStyle().Render("bash")
+	if !strings.Contains(rendered, "34;80;87") {
+		t.Errorf("ToolApprovalToolStyle should use ColorToolBorder (%s → 34;80;87), got ANSI: %q", ColorToolBorder, rendered)
+	}
+}
+
+// ColorGrayMid = #888888 = rgb(136, 136, 136)
+func TestToolApprovalPreviewStyle_HasExplicitForeground(t *testing.T) {
+	rendered := ToolApprovalPreviewStyle().Render("rm -rf /")
+	if !strings.Contains(rendered, "136;136;136") {
+		t.Errorf("ToolApprovalPreviewStyle should have explicit foreground ColorGrayMid (%s = 136;136;136), got ANSI: %q", ColorGrayMid, rendered)
+	}
+}

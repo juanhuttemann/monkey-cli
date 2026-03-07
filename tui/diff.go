@@ -20,10 +20,10 @@ func RenderSplitDiff(diff string, width int) string {
 		return ""
 	}
 
-	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B"))
-	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#56D364"))
-	hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#79C0FF")).Bold(true)
-	gutterStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDiffDel))
+	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDiffAdd))
+	hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDiffHunk)).Bold(true)
+	gutterStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDiffGutter))
 
 	blankGutter := gutterStyle.Render("     │")
 
@@ -120,13 +120,13 @@ func RenderSplitDiff(diff string, width int) string {
 
 	leftPanel := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#FF6B6B")).
+		BorderForeground(lipgloss.Color(ColorDiffDel)).
 		Width(panelW).
 		Render(strings.Join(leftLines, "\n"))
 
 	rightPanel := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#56D364")).
+		BorderForeground(lipgloss.Color(ColorDiffAdd)).
 		Width(panelW).
 		Render(strings.Join(rightLines, "\n"))
 

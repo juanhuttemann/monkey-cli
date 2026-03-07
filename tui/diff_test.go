@@ -16,12 +16,13 @@ func TestRenderSplitDiff_Empty_ReturnsEmpty(t *testing.T) {
 
 func TestRenderSplitDiff_HasTwoBorders(t *testing.T) {
 	rendered := RenderSplitDiff(simpleSplitDiff, 80)
-	// Red (#FF6B6B) border for left panel and green (#56D364) border for right panel
-	if !strings.Contains(rendered, "255;107;107") {
-		t.Errorf("split diff should have red border (255;107;107) for left panel: %q", stripANSI(rendered))
+	// ColorDiffDel = ColorErrorBorder = #BA3F28 → emits 186;63;40
+	if !strings.Contains(rendered, "186;63;40") {
+		t.Errorf("split diff should have burnt-orange border (186;63;40) for left panel: %q", stripANSI(rendered))
 	}
-	if !strings.Contains(rendered, "86;211;100") {
-		t.Errorf("split diff should have green border (86;211;100) for right panel: %q", stripANSI(rendered))
+	// ColorDiffAdd = ColorAssistantBorder = #729B2F → emits 113;155;47
+	if !strings.Contains(rendered, "113;155;47") {
+		t.Errorf("split diff should have leaf-green border (113;155;47) for right panel: %q", stripANSI(rendered))
 	}
 }
 
@@ -86,13 +87,21 @@ func TestRenderSplitDiff_AddedContent_HasGreenStyle(t *testing.T) {
 
 func TestRenderSplitDiff_HasRedAndGreenColors(t *testing.T) {
 	rendered := RenderSplitDiff(simpleSplitDiff, 80)
-	// #FF6B6B red (deletion) → TrueColor 255;107;107
-	if !strings.Contains(rendered, "255;107;107") {
-		t.Error("rendered diff should contain red TrueColor code (255;107;107) for deletions")
+	// ColorDiffDel = ColorErrorBorder = #BA3F28 → emits 186;63;40
+	if !strings.Contains(rendered, "186;63;40") {
+		t.Error("rendered diff should contain burnt-orange TrueColor code (186;63;40) for deletions")
 	}
-	// #56D364 green (addition) → TrueColor 86;211;100
-	if !strings.Contains(rendered, "86;211;100") {
-		t.Error("rendered diff should contain green TrueColor code (86;211;100) for additions")
+	// ColorDiffAdd = ColorAssistantBorder = #729B2F → emits 113;155;47
+	if !strings.Contains(rendered, "113;155;47") {
+		t.Error("rendered diff should contain leaf-green TrueColor code (113;155;47) for additions")
+	}
+}
+
+func TestRenderSplitDiff_HunkHeader_UsesToolBorderColor(t *testing.T) {
+	rendered := RenderSplitDiff(simpleSplitDiff, 80)
+	// ColorDiffHunk = ColorToolBorder = #225057 → emits 34;80;87
+	if !strings.Contains(rendered, "34;80;87") {
+		t.Errorf("hunk header should use ColorToolBorder (34;80;87), got ANSI: %q", rendered)
 	}
 }
 

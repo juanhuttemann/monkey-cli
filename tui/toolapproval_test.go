@@ -194,12 +194,13 @@ func TestToolApprovalDialog_View_WithPreview_ShowsSplitPanels(t *testing.T) {
 	if !strings.Contains(stripped, "new") {
 		t.Errorf("View with preview should contain added content: %q", stripped)
 	}
-	// Both panel border colors should appear in the raw ANSI output
-	if !strings.Contains(view, "255;107;107") {
-		t.Errorf("View with preview should have red border for left (before) panel")
+	// ColorDiffDel = ColorErrorBorder = #BA3F28 → emits 186;63;40
+	if !strings.Contains(view, "186;63;40") {
+		t.Errorf("View with preview should have burnt-orange border for left (before) panel")
 	}
-	if !strings.Contains(view, "86;211;100") {
-		t.Errorf("View with preview should have green border for right (after) panel")
+	// ColorDiffAdd = ColorAssistantBorder = #729B2F → emits 113;155;47
+	if !strings.Contains(view, "113;155;47") {
+		t.Errorf("View with preview should have leaf-green border for right (after) panel")
 	}
 }
 
