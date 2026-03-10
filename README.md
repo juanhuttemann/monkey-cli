@@ -41,7 +41,7 @@ go build -o monkey .
 go install github.com/juanhuttemann/monkey-cli@latest
 ```
 
-> **Note:** Requires Go 1.21 or later.
+> **Note:** Requires Go 1.25 or later.
 
 ## Setup
 
