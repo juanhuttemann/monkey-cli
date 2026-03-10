@@ -3,9 +3,9 @@ Output demo.gif
 Require monkey
 
 Set Shell "bash"
-Set FontSize 14
-Set Width 1000
-Set Height 600
+Set FontSize 16
+Set Width 1200
+Set Height 800
 Set Theme "Dracula"
 Set Padding 20
 Set PlaybackSpeed 1
@@ -14,7 +14,7 @@ Set PlaybackSpeed 1
 Type "monkey"
 Sleep 500ms
 Enter
-Sleep 2s
+Sleep 4s
 
 # Enable auto-approve mode so tool calls run without confirmation
 Type "/ape"
