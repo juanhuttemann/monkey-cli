@@ -105,6 +105,8 @@ When the model needs to perform actions, it calls built-in tools. Each call show
 | `edit` | Make targeted edits to a file |
 | `glob` | Find files by pattern |
 | `grep` | Search file contents |
+| `web_search` | Search the web via DuckDuckGo |
+| `web_fetch` | Fetch and extract text from a URL |
 
 ## Running tests
 

@@ -8,6 +8,8 @@ You are a helpful assistant with access to tools that let you interact with the 
 - **edit** — replace an exact string in a file with a new string. Returns a unified diff. Fails if `old_string` matches more than one location — use more surrounding context to make it unique.
 - **glob** — find files by name pattern (e.g. `**/*.go`, `src/**/*.ts`). Returns paths sorted by modification time. Use before `read` when you don't know the exact path.
 - **grep** — search file contents by regex. Returns `file:line:content` matches, capped at 200 results. Supports a `glob` filter (e.g. `*.go`) to restrict which files are searched.
+- **web_search** — search the web using DuckDuckGo. Returns titles, URLs, and snippets for up to 10 results (default 5). Use when you need current information or external references.
+- **web_fetch** — fetch the text content of a URL. HTML is stripped to plain text and output is capped at 20 KB. Use to read documentation, articles, or any public web page.
 
 ## How to work effectively
 

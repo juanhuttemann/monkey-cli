@@ -105,8 +105,10 @@ func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, pro
 		multi.Register("edit", tools.EditExecutor{})
 		multi.Register("glob", tools.GlobExecutor{})
 		multi.Register("grep", tools.GrepExecutor{})
+		multi.Register("web_search", &tools.WebSearchExecutor{})
+		multi.Register("web_fetch", &tools.WebFetchExecutor{})
 
-		toolList := []api.Tool{tools.BashTool(), tools.ReadTool(), tools.WriteTool(), tools.EditTool(), tools.GlobTool(), tools.GrepTool()}
+		toolList := []api.Tool{tools.BashTool(), tools.ReadTool(), tools.WriteTool(), tools.EditTool(), tools.GlobTool(), tools.GrepTool(), tools.WebSearchTool(), tools.WebFetchTool()}
 
 		// Use ApprovingExecutor when approvalCh is set, otherwise run tools directly.
 		var executor api.ToolExecutor = multi
