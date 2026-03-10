@@ -47,7 +47,7 @@ func TestUpdate_KeyDown_RestoresDraft(t *testing.T) {
 	upKey := tea.KeyMsg{Type: tea.KeyUp}
 	downKey := tea.KeyMsg{Type: tea.KeyDown}
 
-	m1, _ := model.Update(upKey)   // navigate to "old entry", draft saved
+	m1, _ := model.Update(upKey)        // navigate to "old entry", draft saved
 	m2, _ := m1.(Model).Update(downKey) // back down → restore draft
 
 	if m2.(Model).GetInput() != "my draft" {

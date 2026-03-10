@@ -165,6 +165,46 @@ func TestStreaming_NoPriorMessages_RenderedPriorIsEmpty(t *testing.T) {
 	}
 }
 
+// updateInGoroutine calls Update in a fresh goroutine so that the value
+// receiver for m is placed on a different goroutine stack on every call.
+// This reliably changes the memory address of m.streamBuf between calls,
+// triggering the strings.Builder copy-after-write panic.
+func updateInGoroutine(m tea.Model, msg tea.Msg) tea.Model {
+	ch := make(chan tea.Model, 1)
+	go func() {
+		result, _ := m.Update(msg)
+		ch <- result
+	}()
+	return <-ch
+}
+
+// TestStreaming_MultipleTokens_DoesNotPanic is a regression test for the
+// strings.Builder copy-after-use panic. Model.Update has a value receiver, so
+// m (and m.streamBuf) is copied on every call. strings.Builder panics when
+// copied after first write ("illegal use of non-zero Builder copied by value").
+//
+// The panic is triggered when the method receiver lands at a different stack
+// address on successive calls — which happens in bubbletea's event loop when
+// other messages are dispatched between streaming tokens. Calling Update in a
+// fresh goroutine each time guarantees a different stack address, reliably
+// reproducing the panic.
+func TestStreaming_MultipleTokens_DoesNotPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Update panicked on repeated streaming tokens: %v", r)
+		}
+	}()
+
+	m := NewModel(nil)
+	m.SetDimensions(80, 24)
+	m.streaming = true
+
+	current := tea.Model(m)
+	for range 5 {
+		current = updateInGoroutine(current, PartialResponseMsg{Token: "word "})
+	}
+}
+
 // BenchmarkStreaming_ManyTokensWithPriorMessages measures the cost of
 // processing N streaming tokens when prior messages exist in the viewport.
 func BenchmarkStreaming_ManyTokensWithPriorMessages(b *testing.B) {
@@ -188,7 +228,7 @@ func BenchmarkStreaming_ManyTokensWithPriorMessages(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		m := base // copy
-		m.streamBuf.Reset()
+		m.streamBuf = m.streamBuf[:0]
 		m.renderedPriorValid = false
 		current := tea.Model(m)
 		for range 50 {

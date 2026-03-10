@@ -92,7 +92,7 @@ func TestViewportHeight_DeniedDialogShrinksViewport(t *testing.T) {
 
 	ch := make(chan bool, 1)
 	m1, _ := m.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", Input: map[string]any{"command": "ls"}, ResponseCh: ch})
-	m2, _ := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})   // move to No
+	m2, _ := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})  // move to No
 	m3, _ := m2.(Model).Update(tea.KeyMsg{Type: tea.KeyCtrlM}) // confirm No → denied view
 
 	// After denial: wasCancelled=true adds 1 row (status line), plus the

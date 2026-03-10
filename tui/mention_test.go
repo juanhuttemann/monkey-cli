@@ -274,7 +274,6 @@ func TestMention_LargeFileTruncated(t *testing.T) {
 	}
 }
 
-
 // TestMention_AtSymbol_TriggersFileReload verifies that typing '@' when the
 // picker is inactive dispatches LoadFilesCmd so newly-created files appear.
 func TestMention_AtSymbol_TriggersFileReload(t *testing.T) {

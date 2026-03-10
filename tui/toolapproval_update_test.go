@@ -79,7 +79,7 @@ func TestUpdate_ToolApprovalDialog_No_CancelsRequest(t *testing.T) {
 	model.SetLoading(true)
 	ch := make(chan bool, 1)
 	m1, _ := model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
-	m2, _ := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})   // move to No
+	m2, _ := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})  // move to No
 	m3, _ := m2.(Model).Update(tea.KeyMsg{Type: tea.KeyCtrlM}) // confirm No
 	m := m3.(Model)
 	if m.IsLoading() {
@@ -188,9 +188,9 @@ func TestUpdate_ToolApprovalRequestMsg_BashTool_ShowsCommandInDialog(t *testing.
 	model := NewModel(nil)
 	ch := make(chan bool, 1)
 	msg := ToolApprovalRequestMsg{
-		ModelName: "m",
-		ToolName:  "bash",
-		Input:     map[string]any{"command": "ls -la /tmp"},
+		ModelName:  "m",
+		ToolName:   "bash",
+		Input:      map[string]any{"command": "ls -la /tmp"},
 		ResponseCh: ch,
 	}
 	updatedModel, _ := model.Update(msg)
@@ -246,7 +246,7 @@ func TestView_ToolApprovalDialog_DeniedAfterNo_ShowsCanceled(t *testing.T) {
 	model.SetDimensions(80, 24)
 	ch := make(chan bool, 1)
 	m1, _ := model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", Input: map[string]any{"command": "ls -la"}, ResponseCh: ch})
-	m2, _ := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})   // move to No
+	m2, _ := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyDown})  // move to No
 	m3, _ := m2.(Model).Update(tea.KeyMsg{Type: tea.KeyCtrlM}) // confirm No
 	view := stripANSI(m3.(Model).View())
 	if !strings.Contains(view, "Canceled by user") {

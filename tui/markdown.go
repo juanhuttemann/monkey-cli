@@ -4,19 +4,26 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/glamour"
 	glamourstyles "github.com/charmbracelet/glamour/styles"
 )
 
-// ansiSGR matches ANSI Select Graphic Rendition escape sequences.
-var ansiSGR = regexp.MustCompile(`\x1b\[([0-9;]*)m`)
+var (
+	mdCacheMu sync.Mutex
+	mdCache   = map[int]*glamour.TermRenderer{}
+)
 
-// RenderMarkdown renders markdown-formatted content as ANSI-styled terminal text.
-// Falls back to the original content if rendering fails or width is zero.
-func RenderMarkdown(content string, width int) string {
-	if width <= 0 {
-		return content
+// getMarkdownRenderer returns a cached TermRenderer for the given width,
+// creating one on first use. The renderer is safe to reuse because
+// glamour's Render method writes to a fresh local buffer on each call.
+func getMarkdownRenderer(width int) (*glamour.TermRenderer, error) {
+	mdCacheMu.Lock()
+	defer mdCacheMu.Unlock()
+
+	if r, ok := mdCache[width]; ok {
+		return r, nil
 	}
 
 	style := glamourstyles.DarkStyleConfig
@@ -28,6 +35,36 @@ func RenderMarkdown(content string, width int) string {
 		glamour.WithStyles(style),
 		glamour.WithWordWrap(width),
 	)
+	if err != nil {
+		return nil, err
+	}
+	mdCache[width] = r
+	return r, nil
+}
+
+func markdownCacheLen() int {
+	mdCacheMu.Lock()
+	defer mdCacheMu.Unlock()
+	return len(mdCache)
+}
+
+func clearMarkdownCache() {
+	mdCacheMu.Lock()
+	defer mdCacheMu.Unlock()
+	mdCache = map[int]*glamour.TermRenderer{}
+}
+
+// ansiSGR matches ANSI Select Graphic Rendition escape sequences.
+var ansiSGR = regexp.MustCompile(`\x1b\[([0-9;]*)m`)
+
+// RenderMarkdown renders markdown-formatted content as ANSI-styled terminal text.
+// Falls back to the original content if rendering fails or width is zero.
+func RenderMarkdown(content string, width int) string {
+	if width <= 0 {
+		return content
+	}
+
+	r, err := getMarkdownRenderer(width)
 	if err != nil {
 		return content
 	}

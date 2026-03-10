@@ -187,7 +187,7 @@ func TestHelpPanel_View_WhenActive_ContainsAllSlashCommands(t *testing.T) {
 	hp := NewHelpPanel(80)
 	hp.Activate()
 	v := stripANSI(hp.View())
-	
+
 	// Check that all slash commands are mentioned in the help
 	// These are the commands defined in slashcmd.go
 	expectedCommands := []string{"/exit", "/clear", "/model", "/ape", "/copy", "/compact"}
@@ -202,7 +202,7 @@ func TestHelpPanel_View_WhenActive_MatchesSlashCommandsSource(t *testing.T) {
 	hp := NewHelpPanel(80)
 	hp.Activate()
 	v := stripANSI(hp.View())
-	
+
 	// The help panel should list all commands from the slashCommands variable
 	// This ensures the help stays in sync with the actual available commands
 	for _, cmd := range slashCommands {

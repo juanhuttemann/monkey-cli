@@ -11,8 +11,8 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/juanhuttemann/monkey-cli/api"
 	"github.com/juanhuttemann/monkey-cli/tools"
 )
@@ -70,7 +70,9 @@ type Model struct {
 	// Streaming render cache: renderedPrior holds the pre-rendered output for
 	// all messages except the in-flight last one, computed once per streaming
 	// session. streamBuf accumulates tokens without O(N²) string reallocations.
-	streamBuf          strings.Builder
+	// []byte is used instead of strings.Builder: Builder panics when copied
+	// after first write, and Model is copied on every value-receiver Update call.
+	streamBuf          []byte
 	renderedPrior      string
 	renderedPriorValid bool
 }
@@ -628,15 +630,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.streaming {
 			n := len(m.messages)
 			if n > 0 && m.messages[n-1].Role == "assistant" {
-				// Append to builder (O(1) amortised) instead of O(n) string concat.
-				m.streamBuf.WriteString(msg.Token)
-				m.messages[n-1].Content = m.streamBuf.String()
+				// Append to buf (O(1) amortised) instead of O(n) string concat.
+				m.streamBuf = append(m.streamBuf, msg.Token...)
+				m.messages[n-1].Content = string(m.streamBuf)
 			} else {
 				// First token: start a new assistant message and cache the rendered
 				// output of all prior visible messages so we don't re-render them on
 				// every subsequent token.
-				m.streamBuf.Reset()
-				m.streamBuf.WriteString(msg.Token)
+				m.streamBuf = m.streamBuf[:0]
+				m.streamBuf = append(m.streamBuf, msg.Token...)
 				m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Token, Timestamp: time.Now()})
 				n = len(m.messages)
 				sw := m.messageStyleWidth()
@@ -684,7 +686,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.timerActive = false
 		m.wasCancelled = false
 		m.retryAttempt = 0
-		m.streamBuf.Reset()
+		m.streamBuf = m.streamBuf[:0]
 		m.renderedPriorValid = false
 		if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -732,7 +734,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PromptCancelledMsg:
 		m.streaming = false
 		m.tokenCh = nil
-		m.streamBuf.Reset()
+		m.streamBuf = m.streamBuf[:0]
 		m.renderedPriorValid = false
 		if m.state == StateLoading {
 			m.state = StateReady

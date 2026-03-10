@@ -17,9 +17,9 @@ func stubBashTool() Tool {
 		Name:        "bash",
 		Description: "Execute a bash command.",
 		InputSchema: InputSchema{
-			Type:     "object",
+			Type:       "object",
 			Properties: map[string]PropertyDef{"command": {Type: "string", Description: "command"}},
-			Required: []string{"command"},
+			Required:   []string{"command"},
 		},
 	}
 }

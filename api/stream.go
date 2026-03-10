@@ -45,7 +45,7 @@ type sseContentBlock struct {
 
 type sseDelta struct {
 	// content_block_delta
-	Type        string `json:"type"`                  // "text_delta" or "input_json_delta"
+	Type        string `json:"type"`                   // "text_delta" or "input_json_delta"
 	Text        string `json:"text,omitempty"`         // text_delta
 	PartialJSON string `json:"partial_json,omitempty"` // input_json_delta
 

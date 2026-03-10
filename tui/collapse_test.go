@@ -166,4 +166,3 @@ func TestRenderMessages_ExpandedTool_ShowsFullContent(t *testing.T) {
 		t.Errorf("expanded tool render should show all %d lines, got %d occurrences", toolCollapseLines+5, lineCount)
 	}
 }
-
