@@ -192,6 +192,28 @@ func TestSendPrompt_EmptyContent(t *testing.T) {
 	}
 }
 
+func TestPrintVersion(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printVersion()
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf strings.Builder
+	_, _ = io.Copy(&buf, r)
+	output := buf.String()
+
+	if !strings.Contains(output, Version) {
+		t.Errorf("printVersion() should contain version %q, got: %q", Version, output)
+	}
+	if !strings.Contains(output, AppTitle) {
+		t.Errorf("printVersion() should contain app title %q, got: %q", AppTitle, output)
+	}
+}
+
 func TestPrintUsage(t *testing.T) {
 	// Capture stderr
 	oldStderr := os.Stderr

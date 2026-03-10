@@ -106,6 +106,11 @@ func runPrompt(prompt string) string {
 	return response
 }
 
+// printVersion prints the application name and version to stdout.
+func printVersion() {
+	fmt.Printf("%s v%s\n", AppTitle, Version)
+}
+
 // printUsage displays the help message to stderr
 func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: monkey -p \"<prompt>\"")
@@ -182,8 +187,15 @@ func main() {
 	promptFlag := flag.String("p", "", "Your prompt to send to the LLM")
 	flag.StringVar(promptFlag, "prompt", "", "Your prompt to send to the LLM")
 	continueFlag := flag.Bool("continue", false, "Resume the last saved session")
+	versionFlag := flag.Bool("v", false, "Print version and exit")
+	flag.BoolVar(versionFlag, "version", false, "Print version and exit")
 
 	flag.Parse()
+
+	if *versionFlag {
+		printVersion()
+		return
+	}
 
 	// Build prompt from flag value and any remaining positional arguments
 	// This supports both quoted prompts (-p "hello world") and unquoted (-p hello world)
