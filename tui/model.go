@@ -66,6 +66,13 @@ type Model struct {
 	promptHistory  History
 	searchBar      SearchBar
 	printedCount   int // number of messages already committed to terminal scrollback
+
+	// Streaming render cache: renderedPrior holds the pre-rendered output for
+	// all messages except the in-flight last one, computed once per streaming
+	// session. streamBuf accumulates tokens without O(N²) string reallocations.
+	streamBuf          strings.Builder
+	renderedPrior      string
+	renderedPriorValid bool
 }
 
 // IsApeMode reports whether tool approval is disabled.
@@ -121,23 +128,29 @@ func (m Model) messageStyleWidth() int {
 	return m.width
 }
 
+// renderMessageEntry returns the fully-formatted string for messages[i],
+// including a search-match prefix (when active) and a timestamp footer.
+func (m Model) renderMessageEntry(sw, i int) string {
+	msg := m.messages[i]
+	rendered := m.renderSingleMessage(sw, msg)
+	if m.searchBar.IsActive() && m.searchBar.IsMatch(i) {
+		matchLabel := SearchMatchStyle().Render("▶ match")
+		rendered = matchLabel + "\n" + rendered
+	}
+	var sb strings.Builder
+	sb.WriteString(rendered)
+	sb.WriteString("\n")
+	sb.WriteString(MessageTimestampStyle(sw).Render(msg.Timestamp.Format("15:04")))
+	sb.WriteString("\n")
+	return sb.String()
+}
+
 // renderMessages returns the styled content string for all messages.
 func (m Model) renderMessages() string {
 	sw := m.messageStyleWidth()
 	var sb strings.Builder
 	for i := m.printedCount; i < len(m.messages); i++ {
-		msg := m.messages[i]
-		rendered := m.renderSingleMessage(sw, msg)
-		// When search is active, prefix matching messages with a highlight marker.
-		if m.searchBar.IsActive() && m.searchBar.IsMatch(i) {
-			matchLabel := SearchMatchStyle().Render("▶ match")
-			rendered = matchLabel + "\n" + rendered
-		}
-		sb.WriteString(rendered)
-		sb.WriteString("\n")
-		ts := msg.Timestamp.Format("15:04")
-		sb.WriteString(MessageTimestampStyle(sw).Render(ts))
-		sb.WriteString("\n")
+		sb.WriteString(m.renderMessageEntry(sw, i))
 	}
 	return sb.String()
 }
@@ -599,6 +612,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.approvalDialog.SetWidth(msg.Width)
 		m.viewport.Width = msg.Width
 		m.syncViewportHeight()
+		m.renderedPriorValid = false // width changed; prior-render cache is stale
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
@@ -614,12 +628,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.streaming {
 			n := len(m.messages)
 			if n > 0 && m.messages[n-1].Role == "assistant" {
-				m.messages[n-1].Content += msg.Token
+				// Append to builder (O(1) amortised) instead of O(n) string concat.
+				m.streamBuf.WriteString(msg.Token)
+				m.messages[n-1].Content = m.streamBuf.String()
 			} else {
+				// First token: start a new assistant message and cache the rendered
+				// output of all prior visible messages so we don't re-render them on
+				// every subsequent token.
+				m.streamBuf.Reset()
+				m.streamBuf.WriteString(msg.Token)
 				m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Token, Timestamp: time.Now()})
+				n = len(m.messages)
+				sw := m.messageStyleWidth()
+				var prior strings.Builder
+				for i := m.printedCount; i < n-1; i++ {
+					prior.WriteString(m.renderMessageEntry(sw, i))
+				}
+				m.renderedPrior = prior.String()
+				m.renderedPriorValid = true
 			}
 			m.scrollToBottom = true
-			m.viewport.SetContent(m.renderMessages())
+			// Re-render only the last (in-flight) message; prior messages are cached.
+			// Fall back to full render when search is active (match markers may change).
+			if m.renderedPriorValid && !m.searchBar.IsActive() {
+				sw := m.messageStyleWidth()
+				n = len(m.messages)
+				m.viewport.SetContent(m.renderedPrior + m.renderMessageEntry(sw, n-1))
+			} else {
+				m.viewport.SetContent(m.renderMessages())
+			}
 			m.viewport.GotoBottom()
 		}
 		if m.tokenCh != nil {
@@ -647,6 +684,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.timerActive = false
 		m.wasCancelled = false
 		m.retryAttempt = 0
+		m.streamBuf.Reset()
+		m.renderedPriorValid = false
 		if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -693,6 +732,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PromptCancelledMsg:
 		m.streaming = false
 		m.tokenCh = nil
+		m.streamBuf.Reset()
+		m.renderedPriorValid = false
 		if m.state == StateLoading {
 			m.state = StateReady
 			m.timerActive = false
