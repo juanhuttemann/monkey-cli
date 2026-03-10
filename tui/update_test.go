@@ -572,6 +572,78 @@ func TestUpdate_SpinnerTick_ContinuesWhenLoading(t *testing.T) {
 	}
 }
 
+// --- Multiline Up/Down navigation ---
+
+func TestUpdate_KeyUp_MultilineInput_MovesWithinTextFirst(t *testing.T) {
+	// Cursor is on line 1 (last line) of a 2-line input.
+	// Pressing Up should move cursor to line 0, NOT navigate history.
+	model := NewModel(nil)
+	model.promptHistory = historyWithEntries("old entry")
+	model.SetInput("line1\nline2") // cursor ends up on line 1
+
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	updated, _ := model.Update(upKey)
+
+	m := updated.(Model)
+	// Input must be unchanged — history navigation must NOT have triggered.
+	if m.GetInput() != "line1\nline2" {
+		t.Errorf("Up on line 1 changed input to %q; want %q (cursor should move within text, not navigate history)",
+			m.GetInput(), "line1\nline2")
+	}
+	// Cursor should now be on line 0.
+	if m.input.Line() != 0 {
+		t.Errorf("cursor line after Up = %d, want 0", m.input.Line())
+	}
+}
+
+func TestUpdate_KeyUp_MultilineInput_NavigatesHistoryFromFirstLine(t *testing.T) {
+	// Cursor is already on line 0 of a 2-line input.
+	// Pressing Up should navigate to the previous history entry.
+	model := NewModel(nil)
+	model.promptHistory = historyWithEntries("old entry")
+	model.SetInput("line1\nline2") // cursor on line 1
+
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	// First Up: move cursor to line 0.
+	m1, _ := model.Update(upKey)
+	// Second Up: now on line 0, navigate history.
+	m2, _ := m1.(Model).Update(upKey)
+
+	if m2.(Model).GetInput() != "old entry" {
+		t.Errorf("second Up should navigate history; got %q, want %q",
+			m2.(Model).GetInput(), "old entry")
+	}
+}
+
+func TestUpdate_KeyDown_MultilineInput_MovesWithinTextFirst(t *testing.T) {
+	// Cursor is on line 0 of a 2-line input.
+	// Pressing Down should move cursor to line 1, NOT navigate history.
+	model := NewModel(nil)
+	model.promptHistory = historyWithEntries("old entry")
+	model.SetInput("line1\nline2") // cursor on line 1 after SetInput
+
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	downKey := tea.KeyMsg{Type: tea.KeyDown}
+
+	// Move cursor to line 0.
+	m1, _ := model.Update(upKey)
+	if m1.(Model).input.Line() != 0 {
+		t.Skip("precondition failed: cursor not on line 0 after Up")
+	}
+
+	// Now press Down: should move to line 1, not navigate history.
+	m2, _ := m1.(Model).Update(downKey)
+
+	m := m2.(Model)
+	if m.GetInput() != "line1\nline2" {
+		t.Errorf("Down on line 0 of multiline changed input to %q; want %q",
+			m.GetInput(), "line1\nline2")
+	}
+	if m.input.Line() != 1 {
+		t.Errorf("cursor line after Down = %d, want 1", m.input.Line())
+	}
+}
+
 // --- Ctrl+J inserts newline ---
 
 func TestUpdate_CtrlJ_InsertsNewline(t *testing.T) {

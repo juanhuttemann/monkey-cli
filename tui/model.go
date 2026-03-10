@@ -252,8 +252,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPicker, cpCmd = m.commandPicker.Update(msg)
 				cmds = append(cmds, cpCmd)
 			} else {
-				m.input.SetValue(m.promptHistory.Up(m.input.Value()))
-				m.input.CursorEnd()
+				if m.input.Line() == 0 {
+					m.input.SetValue(m.promptHistory.Up(m.input.Value()))
+					m.input.CursorEnd()
+				} else {
+					m.input.CursorUp()
+				}
 			}
 		case tea.KeyDown:
 			if m.approvalDialog.IsActive() {
@@ -273,8 +277,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPicker, cpCmd = m.commandPicker.Update(msg)
 				cmds = append(cmds, cpCmd)
 			} else {
-				m.input.SetValue(m.promptHistory.Down())
-				m.input.CursorEnd()
+				if m.input.Line() == m.input.LineCount()-1 {
+					m.input.SetValue(m.promptHistory.Down())
+					m.input.CursorEnd()
+				} else {
+					m.input.CursorDown()
+				}
 			}
 		case tea.KeyTab:
 			if m.modelPicker.IsActive() {
