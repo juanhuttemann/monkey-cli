@@ -21,6 +21,12 @@ A Go CLI/TUI for chatting with Claude (Anthropic's LLM API). Run it without argu
 
 ## Installation
 
+### One-liner
+
+```bash
+curl -fsSL https://monkeycli.com/install.sh | sh
+```
+
 ### From source
 
 ```bash
