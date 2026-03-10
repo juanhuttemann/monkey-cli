@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-10
+### Added
+- Add monkey update subcommand to self-update to latest release
+- Add -v/--version flag to print app name and version
+- Default to latest Claude models when none configured
+
 ## [0.2.0] - 2026-03-10
 ### Added
 - Web search and web fetch tools with user-agent rotation
