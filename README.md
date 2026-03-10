@@ -8,6 +8,8 @@
 
 A Go CLI/TUI for chatting with Claude (Anthropic's LLM API). Run it without arguments for a full interactive terminal interface, or pass a prompt for quick one-shot output.
 
+![demo](demo.gif)
+
 ## Features
 
 - **Interactive TUI** — full-screen chat built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), with markdown rendering and conversation history
