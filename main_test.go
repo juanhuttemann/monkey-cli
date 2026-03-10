@@ -80,21 +80,31 @@ func TestSendPrompt_MissingAPIKey(t *testing.T) {
 	}
 }
 
-func TestSendPrompt_MissingModel(t *testing.T) {
-	// Ensure all model env vars are not set
+func TestSendPrompt_DefaultModelUsedWhenEnvVarsUnset(t *testing.T) {
+	var capturedModel string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if m, ok := body["model"].(string); ok {
+			capturedModel = m
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+	}))
+	defer server.Close()
+
 	t.Setenv("ANTHROPIC_API_KEY", "test-key")
-	t.Setenv("ANTHROPIC_BASE_URL", "http://localhost")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
 	_ = os.Unsetenv("ANTHROPIC_DEFAULT_OPUS_MODEL")
 	_ = os.Unsetenv("ANTHROPIC_DEFAULT_SONNET_MODEL")
 	_ = os.Unsetenv("ANTHROPIC_DEFAULT_HAIKU_MODEL")
 
 	_, err := sendPrompt("test prompt")
-	if err == nil {
-		t.Fatal("sendPrompt() should return error when no model env vars are set")
+	if err != nil {
+		t.Fatalf("sendPrompt() should succeed with default model, got error: %v", err)
 	}
-
-	if !strings.Contains(err.Error(), "ANTHROPIC_DEFAULT_OPUS_MODEL") {
-		t.Errorf("error should mention ANTHROPIC_DEFAULT_OPUS_MODEL, got: %v", err)
+	if capturedModel == "" {
+		t.Fatal("expected a model to be sent in the request")
 	}
 }
 

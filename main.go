@@ -183,6 +183,17 @@ func run(prompt string, tuiRunner func()) {
 }
 
 func main() {
+	// Handle subcommands before flag parsing
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		msg, err := runUpdate(githubAPIURL, "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+		fmt.Println(msg)
+		return
+	}
+
 	// Define flags
 	promptFlag := flag.String("p", "", "Your prompt to send to the LLM")
 	flag.StringVar(promptFlag, "prompt", "", "Your prompt to send to the LLM")
