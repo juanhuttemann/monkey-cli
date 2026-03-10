@@ -70,7 +70,7 @@ func (w *WebFetchExecutor) ExecuteTool(_ string, input map[string]any) (string, 
 	if err != nil {
 		return "", fmt.Errorf("web_fetch: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("web_fetch: server returned %s", resp.Status)

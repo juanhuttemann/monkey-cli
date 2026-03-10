@@ -133,7 +133,7 @@ func (w *WebSearchExecutor) searchWithAgent(query string, max int, ua string) (r
 	if err != nil {
 		return nil, false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, false, fmt.Errorf("server returned %s", resp.Status)
