@@ -383,6 +383,52 @@ func TestView_StatusBar_NoTokensWhenZero(t *testing.T) {
 	}
 }
 
+// TestView_CursorTracksLineAfterCursorUp verifies that the ▌ cursor character
+// appears on the correct line after CursorUp moves the cursor within multiline input.
+// Regression test: previously ▌ was always appended at the end of Value(), so after
+// pressing Up (CursorUp) within multiline text the cursor stayed on the last line.
+func TestView_CursorTracksLineAfterCursorUp(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	// SetInput puts the cursor at the end of the last line (row 1 for "line1\nline2").
+	model.SetInput("line1\nline2")
+
+	// Press Up: cursor is on row 1, so CursorUp() is called → cursor moves to row 0.
+	upKey := tea.KeyMsg{Type: tea.KeyUp}
+	updated, _ := model.Update(upKey)
+	m := updated.(Model)
+
+	view := stripANSI(m.View())
+	viewLines := strings.Split(view, "\n")
+
+	// Find the rendered lines that contain "line1" and "line2".
+	var line1Row, line2Row string
+	for _, l := range viewLines {
+		if strings.Contains(l, "line1") {
+			line1Row = l
+		}
+		if strings.Contains(l, "line2") {
+			line2Row = l
+		}
+	}
+
+	if line1Row == "" {
+		t.Fatal("could not find 'line1' in view")
+	}
+	if line2Row == "" {
+		t.Fatal("could not find 'line2' in view")
+	}
+
+	// After CursorUp the cursor must be on the line that contains "line1".
+	if !strings.Contains(line1Row, "▌") {
+		t.Errorf("▌ should appear on the 'line1' row after CursorUp, got row: %q", line1Row)
+	}
+	// The "line2" row must NOT carry the cursor.
+	if strings.Contains(line2Row, "▌") {
+		t.Errorf("▌ should NOT appear on the 'line2' row after CursorUp, got row: %q", line2Row)
+	}
+}
+
 func TestFormatTokenCount(t *testing.T) {
 	tests := []struct {
 		n    int

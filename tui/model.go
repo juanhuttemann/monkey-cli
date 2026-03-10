@@ -860,9 +860,9 @@ func (m Model) View() string {
 		view.WriteString("\n")
 	}
 
-	// Render input area: use raw value + block cursor so tests can find the
-	// text as a contiguous string while still providing a visible cursor.
-	view.WriteString(InputStyle(m.width, 3).Render(m.input.Value() + "▌"))
+	// Render input area with ▌ at the actual cursor position so it tracks
+	// correctly during multiline Up/Down navigation.
+	view.WriteString(InputStyle(m.width, 3).Render(m.inputWithCursor()))
 	view.WriteString("\n")
 	view.WriteString(m.renderStatusBar())
 	view.WriteString("\n\n")
@@ -1164,6 +1164,25 @@ func formatToolCall(tc api.ToolCallResult) string {
 		return header
 	}
 	return header + "\n" + strings.TrimRight(tc.Output, "\n")
+}
+
+// inputWithCursor returns the input value with the ▌ cursor character inserted
+// at the actual textarea cursor position (row/col), so the visual cursor tracks
+// correctly when CursorUp/CursorDown moves within multiline input.
+func (m Model) inputWithCursor() string {
+	row := m.input.Line()
+	info := m.input.LineInfo()
+	col := info.StartColumn + info.ColumnOffset // raw rune index within row
+
+	lines := strings.Split(m.input.Value(), "\n")
+	if row < len(lines) {
+		line := []rune(lines[row])
+		if col > len(line) {
+			col = len(line)
+		}
+		lines[row] = string(line[:col]) + "▌" + string(line[col:])
+	}
+	return strings.Join(lines, "\n")
 }
 
 // scrollToMatch sets the viewport Y offset so the current search match is visible.
