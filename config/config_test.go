@@ -66,20 +66,37 @@ func TestLoad_MissingBaseURL_DefaultsToAnthropicAPI(t *testing.T) {
 	}
 }
 
-func TestLoad_NoModels(t *testing.T) {
+func TestLoad_NoModelsEnvVars_UsesDefaults(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
 	_ = os.Unsetenv(EnvOpusModel)
 	_ = os.Unsetenv(EnvSonnetModel)
 	_ = os.Unsetenv(EnvHaikuModel)
 
-	loader := NewEnvLoader()
-	_, err := loader.Load()
-	if err == nil {
-		t.Fatal("Load() should return error when no model env vars are set")
+	cfg, err := NewEnvLoaderWithConfigFile("/nonexistent").Load()
+	if err != nil {
+		t.Fatalf("Load() should succeed with no model env vars (use defaults): %v", err)
 	}
-	if !strings.Contains(err.Error(), EnvOpusModel) {
-		t.Errorf("error should mention %s, got: %v", EnvOpusModel, err)
+	if cfg.OpusModel != defaultOpusModel {
+		t.Errorf("OpusModel = %q, want default %q", cfg.OpusModel, defaultOpusModel)
+	}
+	if cfg.SonnetModel != defaultSonnetModel {
+		t.Errorf("SonnetModel = %q, want default %q", cfg.SonnetModel, defaultSonnetModel)
+	}
+	if cfg.HaikuModel != defaultHaikuModel {
+		t.Errorf("HaikuModel = %q, want default %q", cfg.HaikuModel, defaultHaikuModel)
+	}
+}
+
+func TestLoad_DefaultModelConstants(t *testing.T) {
+	if defaultOpusModel != "claude-opus-4-6" {
+		t.Errorf("defaultOpusModel = %q, want %q", defaultOpusModel, "claude-opus-4-6")
+	}
+	if defaultSonnetModel != "claude-sonnet-4-6" {
+		t.Errorf("defaultSonnetModel = %q, want %q", defaultSonnetModel, "claude-sonnet-4-6")
+	}
+	if defaultHaikuModel != "claude-haiku-4-5-20251001" {
+		t.Errorf("defaultHaikuModel = %q, want %q", defaultHaikuModel, "claude-haiku-4-5-20251001")
 	}
 }
 
@@ -103,15 +120,23 @@ func TestLoad_OnlySonnetModel(t *testing.T) {
 	t.Setenv(EnvAPIKey, "test-key")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
 	_ = os.Unsetenv(EnvOpusModel)
-	t.Setenv(EnvSonnetModel, "claude-sonnet-4")
+	t.Setenv(EnvSonnetModel, "claude-sonnet-custom")
 	_ = os.Unsetenv(EnvHaikuModel)
 
-	cfg, err := NewEnvLoader().Load()
+	cfg, err := NewEnvLoaderWithConfigFile("/nonexistent").Load()
 	if err != nil {
 		t.Fatalf("Load() returned error: %v", err)
 	}
-	if cfg.DefaultModel() != "claude-sonnet-4" {
-		t.Errorf("DefaultModel() = %q, want %q", cfg.DefaultModel(), "claude-sonnet-4")
+	// Explicitly set sonnet overrides its default
+	if cfg.SonnetModel != "claude-sonnet-custom" {
+		t.Errorf("SonnetModel = %q, want %q", cfg.SonnetModel, "claude-sonnet-custom")
+	}
+	// Unset models use defaults
+	if cfg.OpusModel != defaultOpusModel {
+		t.Errorf("OpusModel = %q, want default %q", cfg.OpusModel, defaultOpusModel)
+	}
+	if cfg.HaikuModel != defaultHaikuModel {
+		t.Errorf("HaikuModel = %q, want default %q", cfg.HaikuModel, defaultHaikuModel)
 	}
 }
 
@@ -120,14 +145,22 @@ func TestLoad_OnlyHaikuModel(t *testing.T) {
 	t.Setenv(EnvBaseURL, "https://api.example.com")
 	_ = os.Unsetenv(EnvOpusModel)
 	_ = os.Unsetenv(EnvSonnetModel)
-	t.Setenv(EnvHaikuModel, "claude-haiku-4")
+	t.Setenv(EnvHaikuModel, "claude-haiku-custom")
 
-	cfg, err := NewEnvLoader().Load()
+	cfg, err := NewEnvLoaderWithConfigFile("/nonexistent").Load()
 	if err != nil {
 		t.Fatalf("Load() returned error: %v", err)
 	}
-	if cfg.DefaultModel() != "claude-haiku-4" {
-		t.Errorf("DefaultModel() = %q, want %q", cfg.DefaultModel(), "claude-haiku-4")
+	// Explicitly set haiku overrides its default
+	if cfg.HaikuModel != "claude-haiku-custom" {
+		t.Errorf("HaikuModel = %q, want %q", cfg.HaikuModel, "claude-haiku-custom")
+	}
+	// Unset models use defaults
+	if cfg.OpusModel != defaultOpusModel {
+		t.Errorf("OpusModel = %q, want default %q", cfg.OpusModel, defaultOpusModel)
+	}
+	if cfg.SonnetModel != defaultSonnetModel {
+		t.Errorf("SonnetModel = %q, want default %q", cfg.SonnetModel, defaultSonnetModel)
 	}
 }
 

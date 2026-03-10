@@ -16,7 +16,10 @@ const (
 	EnvHaikuModel  = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
 	EnvMaxTokens   = "CLAUDE_CODE_MAX_OUTPUT_TOKENS"
 
-	defaultBaseURL = "https://api.anthropic.com"
+	defaultBaseURL     = "https://api.anthropic.com"
+	defaultOpusModel   = "claude-opus-4-6"
+	defaultSonnetModel = "claude-sonnet-4-6"
+	defaultHaikuModel  = "claude-haiku-4-5-20251001"
 )
 
 // Config holds the application configuration
@@ -117,17 +120,25 @@ func (l *envLoader) Load() (Config, error) {
 		baseURL = defaultBaseURL
 	}
 
+	opusModel := getEnvOrFile(EnvOpusModel, file)
+	if opusModel == "" {
+		opusModel = defaultOpusModel
+	}
+	sonnetModel := getEnvOrFile(EnvSonnetModel, file)
+	if sonnetModel == "" {
+		sonnetModel = defaultSonnetModel
+	}
+	haikuModel := getEnvOrFile(EnvHaikuModel, file)
+	if haikuModel == "" {
+		haikuModel = defaultHaikuModel
+	}
+
 	cfg := Config{
 		APIKey:      apiKey,
 		BaseURL:     baseURL,
-		OpusModel:   getEnvOrFile(EnvOpusModel, file),
-		SonnetModel: getEnvOrFile(EnvSonnetModel, file),
-		HaikuModel:  getEnvOrFile(EnvHaikuModel, file),
-	}
-
-	if cfg.DefaultModel() == "" {
-		return Config{}, fmt.Errorf("at least one model must be set (%s, %s, or %s)",
-			EnvOpusModel, EnvSonnetModel, EnvHaikuModel)
+		OpusModel:   opusModel,
+		SonnetModel: sonnetModel,
+		HaikuModel:  haikuModel,
 	}
 
 	if s := getEnvOrFile(EnvMaxTokens, file); s != "" {
