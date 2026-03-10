@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/juanhuttemann/monkey-cli/api"
 	"github.com/juanhuttemann/monkey-cli/tools"
 )
@@ -998,18 +997,18 @@ func (m *Model) syncViewportHeight() {
 
 	// Pickers (at most one is active at a time)
 	if m.commandPicker.IsActive() {
-		reserved += lipgloss.Height(m.commandPicker.View())
+		reserved += m.commandPicker.Height()
 	} else if m.filePicker.IsActive() {
-		reserved += lipgloss.Height(m.filePicker.View())
+		reserved += m.filePicker.Height()
 	} else if m.modelPicker.IsActive() {
-		reserved += lipgloss.Height(m.modelPicker.View())
+		reserved += m.modelPicker.Height()
 	}
 
 	// Approval / denied dialog
 	if m.approvalDialog.IsActive() {
-		reserved += lipgloss.Height(m.approvalDialog.View())
+		reserved += m.approvalDialog.Height()
 	} else if m.approvalDialog.IsDenied() {
-		reserved += lipgloss.Height(m.approvalDialog.DeniedView())
+		reserved += m.approvalDialog.DeniedHeight()
 	}
 
 	h := m.height - reserved

@@ -4,18 +4,21 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ToolApprovalDialog is a Yes/No prompt shown when the model wants to run a tool.
 type ToolApprovalDialog struct {
-	modelName   string
-	toolName    string
-	previewText string
-	cursor      int // 0 = Yes, 1 = No
-	active      bool
-	denied      bool // true after user explicitly selects "No"
-	width       int
-	responseCh  chan<- bool
+	modelName    string
+	toolName     string
+	previewText  string
+	cursor       int // 0 = Yes, 1 = No
+	active       bool
+	denied       bool // true after user explicitly selects "No"
+	width        int
+	responseCh   chan<- bool
+	cachedHeight int // height of View(), cached at Activate time
+	cachedDenied int // height of DeniedView(), cached at Confirm time
 }
 
 // NewToolApprovalDialog returns an inactive approval dialog.
@@ -34,6 +37,8 @@ func (d *ToolApprovalDialog) Activate(modelName, toolName, previewText string, r
 	d.responseCh = responseCh
 	d.active = true
 	d.denied = false
+	// Cache the rendered height once so syncViewportHeight never calls View().
+	d.cachedHeight = lipgloss.Height(d.View())
 }
 
 // Deactivate hides the dialog and clears the response channel.
@@ -60,6 +65,8 @@ func (d *ToolApprovalDialog) Confirm() {
 	approved := d.cursor == 0
 	if !approved {
 		d.denied = true
+		// Cache denied height before deactivating so DeniedHeight() never calls DeniedView().
+		d.cachedDenied = lipgloss.Height(d.DeniedView())
 	}
 	if d.responseCh != nil {
 		d.responseCh <- approved
@@ -96,6 +103,26 @@ func (d ToolApprovalDialog) Update(msg tea.Msg) (ToolApprovalDialog, tea.Cmd) {
 		}
 	}
 	return d, nil
+}
+
+// Height returns the cached row count of View(). Returns 0 when inactive.
+// The value is computed once in Activate() to avoid re-rendering on every
+// syncViewportHeight call.
+func (d ToolApprovalDialog) Height() int {
+	if !d.active {
+		return 0
+	}
+	return d.cachedHeight
+}
+
+// DeniedHeight returns the cached row count of DeniedView(). Returns 0 when
+// not in the denied state. The value is computed once in Confirm() when the
+// user selects "No".
+func (d ToolApprovalDialog) DeniedHeight() int {
+	if !d.denied {
+		return 0
+	}
+	return d.cachedDenied
 }
 
 // DeniedView renders a grayed-out version of the dialog after the user cancels a tool.

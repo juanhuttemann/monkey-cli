@@ -118,6 +118,23 @@ func (fp FilePicker) Update(msg tea.Msg) (FilePicker, tea.Cmd) {
 	return fp, nil
 }
 
+// Height returns the number of terminal rows occupied by the picker without
+// rendering it. Returns 0 when inactive. Used by syncViewportHeight to avoid
+// a full View() render just to count lines.
+func (fp FilePicker) Height() int {
+	if !fp.active {
+		return 0
+	}
+	n := len(fp.filtered)
+	if n == 0 {
+		return 3 // border (2) + "no files found" (1)
+	}
+	if n > filePickerMaxVisible {
+		n = filePickerMaxVisible
+	}
+	return n + 2 // +2 for top/bottom rounded border
+}
+
 // View renders the picker as a bordered dropdown. Returns "" when inactive.
 func (fp FilePicker) View() string {
 	if !fp.active {

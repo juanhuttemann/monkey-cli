@@ -91,6 +91,20 @@ func (cp CommandPicker) Update(msg tea.Msg) (CommandPicker, tea.Cmd) {
 	return cp, nil
 }
 
+// Height returns the number of terminal rows occupied by the picker without
+// rendering it. Returns 0 when inactive. Used by syncViewportHeight to avoid
+// a full View() render just to count lines.
+func (cp CommandPicker) Height() int {
+	if !cp.active {
+		return 0
+	}
+	n := len(cp.filtered)
+	if n == 0 {
+		return 3 // border (2) + "no commands found" (1)
+	}
+	return n + 2 // +2 for top/bottom rounded border
+}
+
 // View renders the command picker dropdown. Returns "" when inactive.
 func (cp CommandPicker) View() string {
 	if !cp.active {
