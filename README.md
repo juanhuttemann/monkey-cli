@@ -115,14 +115,15 @@ monkey
 
 | Key | Action |
 |---|---|
-| `Ctrl+Enter` | Send message |
-| `Esc` / `Ctrl+C` | Quit |
-| `/model` + `Ctrl+Enter` | Switch model |
-| `/clear` | Start a new session |
-| `/compact` | Summarize and compress history |
+| **`/ape`** | **Unleash mode — Claude acts without asking for approval on every tool call** |
+| `Enter` | Send message |
+| `Ctrl+J` | Insert a newline (multiline input) |
+| `/model` + `Enter` | Switch between Opus, Sonnet, and Haiku |
+| `/compact` | Summarize and compress history to stay under context limits |
 | `/copy` | Copy last response to clipboard |
-| `/ape` | Toggle auto-approve mode (skip tool confirmations) |
-| `/exit` | Quit |
+| `/clear` | Start a new session |
+| `Esc` / `Ctrl+C` | Quit |
+| `/exit` | Quit via slash command |
 
 ### One-shot CLI
 
