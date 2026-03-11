@@ -103,6 +103,8 @@ monkey defaults to the latest Claude model automatically. You can pin specific m
 
 The active model defaults to the first one set, in order: Opus → Sonnet → Haiku.
 
+> monkey also works with any Anthropic-compatible provider — Kimi, MiniMax, GLM, and others. Just point it at your provider's endpoint, set your API key, and map the model slots to that provider's model IDs.
+
 You can also configure monkey via `~/.config/monkey/config.toml`.
 
 ## Usage
