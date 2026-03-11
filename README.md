@@ -1,30 +1,76 @@
-# 🐒 monkey CLI
+# 🐒 monkey
 
 [![CI](https://github.com/juanhuttemann/monkey-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/juanhuttemann/monkey-cli/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/juanhuttemann/monkey-cli)](https://goreportcard.com/report/github.com/juanhuttemann/monkey-cli)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/juanhuttemann/monkey-cli)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Go CLI/TUI for chatting with Claude (Anthropic's LLM API). Run it without arguments for a full interactive terminal interface, or pass a prompt for quick one-shot output.
+**Claude in your terminal. No browser, no copy-pasting — just ask and get things done.**
+
+monkey is an agentic AI assistant that lives where you work. It reads your code, edits files, runs commands, and searches the web. You stay in the terminal; monkey does the rest.
 
 ![demo](demo.gif)
 
-## Features
+## Why monkey?
 
-- **Interactive TUI** — full-screen chat built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), with markdown rendering and conversation history
-- **One-shot CLI** — pipe-friendly: `monkey -p "summarise this" < file.txt`
-- **Agentic tool use** — the model can read, write, edit, search, and run bash commands on your behalf, with per-call approval prompts
-- **Session persistence** — resume your last conversation with `--continue`
-- **Model switching** — cycle between Opus, Sonnet, and Haiku at runtime with `/model`
-- **Conversation compaction** — compress long histories with `/compact` to save tokens
-- **Custom system prompts** — drop a `MONKEY.md` in your project root or `~/.config/monkey/MONKEY.md`
+- **No context switching** — ask Claude to fix a bug and it edits the file, right there
+- **Fully agentic** — Claude can read, write, run commands, and browse the web on your behalf; you approve each action
+- **Works the way you do** — interactive TUI for exploration, one-shot CLI for scripting and pipes
+- **Project-aware** — drop a `MONKEY.md` in any repo to give Claude permanent context about your codebase
 
-## Installation
-
-### One-liner
+## Get started
 
 ```bash
 curl -fsSL https://monkeycli.com/install.sh | sh
+```
+
+```bash
+export ANTHROPIC_API_KEY="your-api-key"
+monkey
+```
+
+That's it. monkey picks the latest Claude model automatically.
+
+## What it can do
+
+- **Edits your files** — Claude reads your code, makes targeted changes, and shows you a diff before applying
+- **Runs commands** — execute shell commands with your approval; ideal for build errors, test failures, or quick scripts
+- **Searches the web** — fetch pages and search DuckDuckGo without leaving your session
+- **Remembers conversations** — resume any session with `--continue`; never lose a thread
+- **Switches models on the fly** — jump between Opus, Sonnet, and Haiku mid-conversation with `/model`
+- **Handles long conversations** — `/compact` summarizes and compresses history so you never hit context limits
+
+## Common workflows
+
+```bash
+# Fix a bug — monkey reads the file, proposes a fix, applies it
+monkey -p "nil pointer panic in api/client.go line 83, fix it"
+
+# Summarize a diff for a PR description
+git diff main | monkey -p "write a pull request description for these changes"
+
+# Research and write
+monkey -p "find the top Go HTTP routers and write a comparison to docs/routers.md"
+
+# Quick question while staying in flow
+monkey -p "what does SIGTERM do vs SIGKILL"
+
+# Pick up where you left off
+monkey --continue
+```
+
+## Installation
+
+### One-liner (recommended)
+
+```bash
+curl -fsSL https://monkeycli.com/install.sh | sh
+```
+
+### go install
+
+```bash
+go install github.com/juanhuttemann/monkey-cli@latest
 ```
 
 ### From source
@@ -35,34 +81,29 @@ cd monkey-cli
 go build -o monkey .
 ```
 
-### go install
-
-```bash
-go install github.com/juanhuttemann/monkey-cli@latest
-```
-
-> **Note:** Requires Go 1.25 or later.
+> Requires Go 1.25 or later.
 
 ## Setup
 
-Set your Anthropic API key and at least one model:
+The only required variable is your API key:
 
 ```bash
 export ANTHROPIC_API_KEY="your-api-key"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-5"
 ```
 
-All environment variables:
+monkey defaults to the latest Claude model automatically. You can pin specific models if needed:
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | ✅ | Your Anthropic API key |
+| `ANTHROPIC_API_KEY` | yes | Your Anthropic API key |
 | `ANTHROPIC_BASE_URL` | no | Override the API base URL (default: `https://api.anthropic.com`) |
-| `ANTHROPIC_DEFAULT_OPUS_MODEL` | one required | Opus model ID |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | one required | Sonnet model ID |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | one required | Haiku model ID |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | no | Pin a specific Opus model ID |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | no | Pin a specific Sonnet model ID |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | no | Pin a specific Haiku model ID |
 
-The default active model is the first one set, in order: Opus → Sonnet → Haiku.
+The active model defaults to the first one set, in order: Opus → Sonnet → Haiku.
+
+You can also configure monkey via `~/.config/monkey/config.toml`.
 
 ## Usage
 
@@ -76,9 +117,9 @@ monkey
 |---|---|
 | `Ctrl+Enter` | Send message |
 | `Esc` / `Ctrl+C` | Quit |
-| `/model` + `Ctrl+Enter` | Open model picker |
+| `/model` + `Ctrl+Enter` | Switch model |
 | `/clear` | Start a new session |
-| `/compact` | Summarise and compress history |
+| `/compact` | Summarize and compress history |
 | `/copy` | Copy last response to clipboard |
 | `/ape` | Toggle auto-approve mode (skip tool confirmations) |
 | `/exit` | Quit |
@@ -88,22 +129,27 @@ monkey
 ```bash
 monkey -p "Why do monkeys make the best programmers?"
 
-# Unquoted multi-word prompts also work
+# Pipe input
+monkey -p "summarise this" < file.txt
+
+# Unquoted prompts work too
 monkey -p Write a haiku about bananas
 
-# Resume the last saved session
+# Resume the last session
 monkey --continue
 ```
 
-### System prompt
+### Custom system prompt
 
-Create a `MONKEY.md` in your working directory (or `~/.config/monkey/MONKEY.md` for a global default) and monkey will include it as the system prompt for every conversation.
+Create a `MONKEY.md` in your project root and monkey will load it as the system prompt for every conversation in that directory. Use it to give Claude context about your stack, conventions, or anything else it should always know.
+
+A global default lives at `~/.config/monkey/MONKEY.md`.
 
 ## Agentic tools
 
-When the model needs to perform actions, it calls built-in tools. Each call shows a confirmation dialog unless `/ape` mode is active.
+When Claude needs to take action, it calls one of these built-in tools. Each call shows a confirmation prompt — or use `/ape` to auto-approve everything.
 
-| Tool | Description |
+| Tool | What it does |
 |---|---|
 | `bash` | Run a shell command |
 | `read` | Read a file |
@@ -122,7 +168,7 @@ go test ./...
 
 ## Contributing
 
-Contributions are welcome! Please open an issue first to discuss what you'd like to change. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Open an issue first to discuss what you'd like to change. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
