@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -59,7 +60,7 @@ type streamBlock struct {
 	text        strings.Builder
 	id          string
 	name        string
-	inputBuffer strings.Builder
+	inputBuffer bytes.Buffer
 }
 
 // parseStream reads SSE events from r, calling onToken for each text token,
@@ -153,7 +154,7 @@ func parseStream(r io.Reader, onToken func(string)) (apiResponse, error) {
 		case "tool_use":
 			var input map[string]any
 			if bs.inputBuffer.Len() > 0 {
-				if err := json.Unmarshal([]byte(bs.inputBuffer.String()), &input); err != nil {
+				if err := json.Unmarshal(bs.inputBuffer.Bytes(), &input); err != nil {
 					return apiResponse{}, fmt.Errorf("failed to parse tool input JSON: %w", err)
 				}
 			}
@@ -254,7 +255,7 @@ func (c *Client) SendMessageWithToolsStreaming(ctx context.Context, messages []M
 	}
 	msgs := make([]Message, len(messages))
 	copy(msgs, messages)
-	return runToolLoop(msgs, tools, executor, onCall, func(msgs []Message, tools []Tool) (apiResponse, error) {
+	return runToolLoop(ctx, msgs, tools, executor, onCall, func(msgs []Message, tools []Tool) (apiResponse, error) {
 		return c.doStreamRequest(ctx, apiRequest{
 			Model:     c.model,
 			MaxTokens: c.effectiveMaxTokens(),

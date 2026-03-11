@@ -29,15 +29,15 @@ func TestMarkdownRenderer_CacheDoesNotGrowForSameWidth(t *testing.T) {
 	}
 }
 
-func TestMarkdownRenderer_CacheGrowsForDifferentWidths(t *testing.T) {
+func TestMarkdownRenderer_CacheNeverExceedsOneEntry(t *testing.T) {
 	clearMarkdownCache()
 	t.Cleanup(clearMarkdownCache)
 
 	RenderMarkdown("hello", 80)
 	RenderMarkdown("hello", 100)
 	RenderMarkdown("hello", 120)
-	if got := markdownCacheLen(); got != 3 {
-		t.Fatalf("expected cache size 3 for three different widths, got %d", got)
+	if got := markdownCacheLen(); got > 1 {
+		t.Fatalf("cache should never exceed 1 entry, got %d (memory leak)", got)
 	}
 }
 

@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,7 +80,7 @@ func TestGlobTool_PathIsNotRequired(t *testing.T) {
 
 func TestGlobExecutor_MissingPatternReturnsError(t *testing.T) {
 	exec := GlobExecutor{}
-	_, err := exec.ExecuteTool("glob", map[string]any{})
+	_, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'pattern' is missing")
 	}
@@ -87,7 +88,7 @@ func TestGlobExecutor_MissingPatternReturnsError(t *testing.T) {
 
 func TestGlobExecutor_EmptyPatternReturnsError(t *testing.T) {
 	exec := GlobExecutor{}
-	_, err := exec.ExecuteTool("glob", map[string]any{"pattern": ""})
+	_, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{"pattern": ""})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'pattern' is empty")
 	}
@@ -100,7 +101,7 @@ func TestGlobExecutor_MatchesSingleWildcard(t *testing.T) {
 	writeFile(t, dir, "c.go", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "*.txt",
 		"path":    dir,
 	})
@@ -127,7 +128,7 @@ func TestGlobExecutor_MatchesDoubleStarRecursive(t *testing.T) {
 	writeFile(t, dir, "sub/readme.md", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "**/*.go",
 		"path":    dir,
 	})
@@ -152,7 +153,7 @@ func TestGlobExecutor_DoubleStarAloneMatchesAll(t *testing.T) {
 	writeFile(t, dir, "sub/b.go", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "**",
 		"path":    dir,
 	})
@@ -174,7 +175,7 @@ func TestGlobExecutor_QuestionMarkWildcard(t *testing.T) {
 	writeFile(t, dir, "abc.txt", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "a?.txt",
 		"path":    dir,
 	})
@@ -196,7 +197,7 @@ func TestGlobExecutor_CharacterClass(t *testing.T) {
 	writeFile(t, dir, "d.txt", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "[ab].txt",
 		"path":    dir,
 	})
@@ -215,7 +216,7 @@ func TestGlobExecutor_NoMatchReturnsEmpty(t *testing.T) {
 	writeFile(t, dir, "main.go", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "*.ts",
 		"path":    dir,
 	})
@@ -229,7 +230,7 @@ func TestGlobExecutor_NoMatchReturnsEmpty(t *testing.T) {
 
 func TestGlobExecutor_DefaultsToCurrentDirectory(t *testing.T) {
 	exec := GlobExecutor{}
-	_, err := exec.ExecuteTool("glob", map[string]any{"pattern": "*.go"})
+	_, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{"pattern": "*.go"})
 	if err != nil {
 		t.Errorf("ExecuteTool() without path should not error: %v", err)
 	}
@@ -240,7 +241,7 @@ func TestGlobExecutor_CustomPath(t *testing.T) {
 	writeFile(t, dir, "x.txt", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "*.txt",
 		"path":    dir,
 	})
@@ -268,7 +269,7 @@ func TestGlobExecutor_SortedByModTimeNewestFirst(t *testing.T) {
 	}
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "*.txt",
 		"path":    dir,
 	})
@@ -295,7 +296,7 @@ func TestGlobExecutor_PatternWithSubdirPrefix(t *testing.T) {
 	writeFile(t, dir, "test/main_test.go", "")
 
 	exec := GlobExecutor{}
-	result, err := exec.ExecuteTool("glob", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "glob", map[string]any{
 		"pattern": "src/*.go",
 		"path":    dir,
 	})

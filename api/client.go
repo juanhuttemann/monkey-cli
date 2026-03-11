@@ -300,11 +300,11 @@ func collectToolUseBlocks(content []ContentBlock) []ContentBlock {
 
 // runToolCalls appends the assistant message, executes every tool call, fires
 // onCall callbacks, and appends the tool_result user message. Returns updated msgs.
-func runToolCalls(msgs []Message, respContent []ContentBlock, toolUseBlocks []ContentBlock, executor ToolExecutor, onCall []func(ToolCallResult)) []Message {
+func runToolCalls(ctx context.Context, msgs []Message, respContent []ContentBlock, toolUseBlocks []ContentBlock, executor ToolExecutor, onCall []func(ToolCallResult)) []Message {
 	msgs = append(msgs, Message{Role: "assistant", Content: respContent})
 	toolResults := make([]ContentBlock, 0, len(toolUseBlocks))
 	for _, tu := range toolUseBlocks {
-		output, execErr := executor.ExecuteTool(tu.Name, tu.Input)
+		output, execErr := executor.ExecuteTool(ctx, tu.Name, tu.Input)
 		content := output
 		if execErr != nil && content == "" {
 			content = fmt.Sprintf("error: %v", execErr)
@@ -324,6 +324,7 @@ func runToolCalls(msgs []Message, respContent []ContentBlock, toolUseBlocks []Co
 // runToolLoop drives the agentic tool-calling loop. fetch is called for each turn;
 // tool results are fed back until the model returns a final text-only response.
 func runToolLoop(
+	ctx context.Context,
 	msgs []Message,
 	tools []Tool,
 	executor ToolExecutor,
@@ -350,7 +351,7 @@ func runToolLoop(
 			return text, append(msgs, Message{Role: "assistant", Content: text}), totalUsage, nil
 		}
 
-		msgs = runToolCalls(msgs, resp.Content, toolUseBlocks, executor, onCall)
+		msgs = runToolCalls(ctx, msgs, resp.Content, toolUseBlocks, executor, onCall)
 	}
 }
 
@@ -398,7 +399,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, messages []Message, t
 	}
 	msgs := make([]Message, len(messages))
 	copy(msgs, messages)
-	return runToolLoop(msgs, tools, executor, onCall, func(msgs []Message, tools []Tool) (apiResponse, error) {
+	return runToolLoop(ctx, msgs, tools, executor, onCall, func(msgs []Message, tools []Tool) (apiResponse, error) {
 		return c.doRequest(ctx, apiRequest{
 			Model:     c.model,
 			MaxTokens: c.effectiveMaxTokens(),

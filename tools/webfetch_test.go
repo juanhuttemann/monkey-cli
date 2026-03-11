@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -59,7 +60,7 @@ func TestWebFetchTool_URLIsRequired(t *testing.T) {
 
 func TestWebFetchExecutor_MissingURL(t *testing.T) {
 	exec := &WebFetchExecutor{}
-	_, err := exec.ExecuteTool("web_fetch", map[string]any{})
+	_, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{})
 	if err == nil {
 		t.Error("expected error for missing url")
 	}
@@ -67,7 +68,7 @@ func TestWebFetchExecutor_MissingURL(t *testing.T) {
 
 func TestWebFetchExecutor_EmptyURL(t *testing.T) {
 	exec := &WebFetchExecutor{}
-	_, err := exec.ExecuteTool("web_fetch", map[string]any{"url": ""})
+	_, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": ""})
 	if err == nil {
 		t.Error("expected error for empty url")
 	}
@@ -81,7 +82,7 @@ func TestWebFetchExecutor_FetchesHTMLAsText(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -98,7 +99,7 @@ func TestWebFetchExecutor_SkipsScriptAndStyle(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -118,7 +119,7 @@ func TestWebFetchExecutor_SkipsHeadContent(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestWebFetchExecutor_FetchesPlainText(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -156,7 +157,7 @@ func TestWebFetchExecutor_TruncatesLargeContent(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -173,7 +174,7 @@ func TestWebFetchExecutor_SkipsNoscript(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -195,7 +196,7 @@ func TestWebFetchExecutor_LargeHTMLIsBounded(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -214,7 +215,7 @@ func TestWebFetchExecutor_NonOKStatusReturnsError(t *testing.T) {
 			defer srv.Close()
 
 			exec := &WebFetchExecutor{}
-			_, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+			_, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 			if err == nil {
 				t.Errorf("expected error for HTTP %d, got nil", code)
 			}
@@ -224,7 +225,7 @@ func TestWebFetchExecutor_NonOKStatusReturnsError(t *testing.T) {
 
 func TestWebFetchExecutor_InvalidURL(t *testing.T) {
 	exec := &WebFetchExecutor{}
-	_, err := exec.ExecuteTool("web_fetch", map[string]any{"url": "://bad-url"})
+	_, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": "://bad-url"})
 	if err == nil {
 		t.Error("expected error for invalid url")
 	}
@@ -242,7 +243,7 @@ func TestWebFetchExecutor_LargeHeadDoesNotMaskBodyContent(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebFetchExecutor{}
-	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	result, err := exec.ExecuteTool(context.Background(), "web_fetch", map[string]any{"url": srv.URL})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}

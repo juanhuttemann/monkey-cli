@@ -257,6 +257,19 @@ func TestView_ToolApprovalDialog_DeniedAfterNo_ShowsCanceled(t *testing.T) {
 	}
 }
 
+func TestUpdate_ToolApprovalDoneMsg_DismissesActiveDialog(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	m1, _ := model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
+	if !m1.(Model).approvalDialog.IsActive() {
+		t.Fatal("precondition: dialog should be active after ToolApprovalRequestMsg")
+	}
+	m2, _ := m1.(Model).Update(toolApprovalDoneMsg{})
+	if m2.(Model).approvalDialog.IsActive() {
+		t.Error("toolApprovalDoneMsg should deactivate the approval dialog")
+	}
+}
+
 func TestView_ToolApprovalDialog_ApprovedAfterYes_NoCanceledMessage(t *testing.T) {
 	model := NewModel(nil)
 	model.SetDimensions(80, 24)

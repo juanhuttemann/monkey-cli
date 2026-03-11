@@ -412,6 +412,54 @@ func TestUpdate_Esc_WhenLoading_GoesReady(t *testing.T) {
 	}
 }
 
+func TestUpdate_PromptCancelled_PreservesPendingPromptInAPIMessages(t *testing.T) {
+	model := NewModel(nil)
+	model.apiMessages = []api.Message{{Role: "user", Content: "hi"}, {Role: "assistant", Content: "hello"}}
+	model.pendingPrompt = "asuncion paraguay"
+	model.SetLoading(true)
+
+	updatedModel, _ := model.Update(PromptCancelledMsg{})
+	m := updatedModel.(Model)
+
+	msgs := m.GetAPIMessages()
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 apiMessages after cancel, got %d", len(msgs))
+	}
+	last := msgs[len(msgs)-1]
+	if last.Role != "user" || last.Content != "asuncion paraguay" {
+		t.Errorf("last apiMessage = {%q, %q}, want {user, asuncion paraguay}", last.Role, last.Content)
+	}
+	if m.pendingPrompt != "" {
+		t.Error("pendingPrompt should be cleared after PromptCancelledMsg")
+	}
+}
+
+// TestUpdate_PromptCancelled_EscAlreadySetReady simulates the real ESC flow:
+// ESC immediately flips state to StateReady and then PromptCancelledMsg arrives
+// asynchronously. The cancelled user message must still be preserved in apiMessages.
+func TestUpdate_PromptCancelled_EscAlreadySetReady(t *testing.T) {
+	model := NewModel(nil)
+	model.apiMessages = []api.Message{{Role: "user", Content: "hi"}, {Role: "assistant", Content: "hello"}}
+	model.pendingPrompt = "asuncion paraguay"
+	// ESC handler sets state=Ready before PromptCancelledMsg arrives
+	model.state = StateReady
+
+	updatedModel, _ := model.Update(PromptCancelledMsg{})
+	m := updatedModel.(Model)
+
+	msgs := m.GetAPIMessages()
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 apiMessages after ESC-cancel, got %d", len(msgs))
+	}
+	last := msgs[len(msgs)-1]
+	if last.Role != "user" || last.Content != "asuncion paraguay" {
+		t.Errorf("last apiMessage = {%q, %q}, want {user, asuncion paraguay}", last.Role, last.Content)
+	}
+	if m.pendingPrompt != "" {
+		t.Error("pendingPrompt should be cleared after PromptCancelledMsg")
+	}
+}
+
 func TestUpdate_PromptCancelled_WhenLoading_GoesReady(t *testing.T) {
 	model := NewModel(nil)
 	model.SetLoading(true)

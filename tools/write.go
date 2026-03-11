@@ -1,9 +1,11 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/juanhuttemann/monkey-cli/api"
 )
@@ -34,10 +36,16 @@ func WriteTool() api.Tool {
 type WriteExecutor struct{}
 
 // ExecuteTool writes input["content"] to the file at input["path"].
-func (w WriteExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+// Relative paths that escape the working directory via ".." are rejected.
+func (w WriteExecutor) ExecuteTool(_ context.Context, _ string, input map[string]any) (string, error) {
 	path, ok := input["path"].(string)
 	if !ok || path == "" {
 		return "", fmt.Errorf("write: missing or empty path")
+	}
+	if !filepath.IsAbs(path) {
+		if clean := filepath.Clean(path); clean == ".." || strings.HasPrefix(clean, "../") {
+			return "", fmt.Errorf("write: path %q escapes working directory", path)
+		}
 	}
 	content, _ := input["content"].(string)
 

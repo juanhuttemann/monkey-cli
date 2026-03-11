@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,7 +66,7 @@ func TestWriteExecutor_WritesFile(t *testing.T) {
 	path := filepath.Join(dir, "out.txt")
 
 	exec := WriteExecutor{}
-	_, err := exec.ExecuteTool("write", map[string]any{"path": path, "content": "hello"})
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": path, "content": "hello"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -82,7 +83,7 @@ func TestWriteExecutor_OverwritesExistingFile(t *testing.T) {
 	_ = os.WriteFile(path, []byte("old content"), 0o644)
 
 	exec := WriteExecutor{}
-	_, err := exec.ExecuteTool("write", map[string]any{"path": path, "content": "new content"})
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": path, "content": "new content"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -98,7 +99,7 @@ func TestWriteExecutor_WritesEmptyContent(t *testing.T) {
 	path := filepath.Join(dir, "empty.txt")
 
 	exec := WriteExecutor{}
-	_, err := exec.ExecuteTool("write", map[string]any{"path": path, "content": ""})
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": path, "content": ""})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -114,7 +115,7 @@ func TestWriteExecutor_ReturnsSuccessMessage(t *testing.T) {
 	path := filepath.Join(dir, "out.txt")
 
 	exec := WriteExecutor{}
-	result, err := exec.ExecuteTool("write", map[string]any{"path": path, "content": "hi"})
+	result, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": path, "content": "hi"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestWriteExecutor_ReturnsSuccessMessage(t *testing.T) {
 
 func TestWriteExecutor_MissingPathReturnsError(t *testing.T) {
 	exec := WriteExecutor{}
-	_, err := exec.ExecuteTool("write", map[string]any{"content": "hi"})
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"content": "hi"})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'path' is missing")
 	}
@@ -133,7 +134,7 @@ func TestWriteExecutor_MissingPathReturnsError(t *testing.T) {
 
 func TestWriteExecutor_EmptyPathReturnsError(t *testing.T) {
 	exec := WriteExecutor{}
-	_, err := exec.ExecuteTool("write", map[string]any{"path": "", "content": "hi"})
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": "", "content": "hi"})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'path' is empty")
 	}
@@ -141,7 +142,7 @@ func TestWriteExecutor_EmptyPathReturnsError(t *testing.T) {
 
 func TestWriteExecutor_InvalidPathReturnsError(t *testing.T) {
 	exec := WriteExecutor{}
-	_, err := exec.ExecuteTool("write", map[string]any{"path": "/nonexistent/dir/file.txt", "content": "hi"})
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": "/nonexistent/dir/file.txt", "content": "hi"})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when parent directory cannot be created")
 	}
@@ -152,7 +153,7 @@ func TestWriteExecutor_CreatesParentDirectories(t *testing.T) {
 	path := filepath.Join(dir, "subdir", "nested", "file.txt")
 
 	exec := WriteExecutor{}
-	_, err := exec.ExecuteTool("write", map[string]any{"path": path, "content": "hello"})
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": path, "content": "hello"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() should create parent directories, got error: %v", err)
 	}
@@ -160,5 +161,29 @@ func TestWriteExecutor_CreatesParentDirectories(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if string(data) != "hello" {
 		t.Errorf("file content = %q, want %q", string(data), "hello")
+	}
+}
+
+func TestWriteExecutor_RelativePathTraversalRejected(t *testing.T) {
+	exec := WriteExecutor{}
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": "../evil.txt", "content": "hi"})
+	if err == nil {
+		t.Error("ExecuteTool() should reject relative path traversal with ..")
+	}
+}
+
+func TestWriteExecutor_DeepRelativePathTraversalRejected(t *testing.T) {
+	exec := WriteExecutor{}
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": "../../etc/passwd", "content": "hi"})
+	if err == nil {
+		t.Error("ExecuteTool() should reject deep relative path traversal")
+	}
+}
+
+func TestWriteExecutor_RelativePathWithDotDotInMiddleRejected(t *testing.T) {
+	exec := WriteExecutor{}
+	_, err := exec.ExecuteTool(context.Background(), "write", map[string]any{"path": "subdir/../../evil.txt", "content": "hi"})
+	if err == nil {
+		t.Error("ExecuteTool() should reject path with .. that escapes the working directory")
 	}
 }

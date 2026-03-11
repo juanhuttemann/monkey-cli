@@ -1,6 +1,8 @@
 // Package api defines data structures for API communication
 package api
 
+import "context"
+
 // apiRequest represents the request body sent to the LLM API
 type apiRequest struct {
 	Model     string    `json:"model"`
@@ -82,7 +84,7 @@ type PropertyDef struct {
 
 // ToolExecutor executes a named tool with the given input and returns output.
 type ToolExecutor interface {
-	ExecuteTool(name string, input map[string]any) (string, error)
+	ExecuteTool(ctx context.Context, name string, input map[string]any) (string, error)
 }
 
 // ToolCallResult records a single tool execution that occurred during a request.

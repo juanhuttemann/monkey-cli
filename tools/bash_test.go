@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -57,7 +58,7 @@ func TestBashTool_CommandIsRequired(t *testing.T) {
 
 func TestBashExecutor_RunsCommand(t *testing.T) {
 	exec := BashExecutor{}
-	result, err := exec.ExecuteTool("bash", map[string]any{"command": "echo hello"})
+	result, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": "echo hello"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -68,7 +69,7 @@ func TestBashExecutor_RunsCommand(t *testing.T) {
 
 func TestBashExecutor_CapturesStdout(t *testing.T) {
 	exec := BashExecutor{}
-	result, err := exec.ExecuteTool("bash", map[string]any{"command": "printf 'line1\nline2\n'"})
+	result, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": "printf 'line1\nline2\n'"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestBashExecutor_CapturesStdout(t *testing.T) {
 
 func TestBashExecutor_CapturesStderr(t *testing.T) {
 	exec := BashExecutor{}
-	result, err := exec.ExecuteTool("bash", map[string]any{"command": "echo oops >&2"})
+	result, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": "echo oops >&2"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -90,7 +91,7 @@ func TestBashExecutor_CapturesStderr(t *testing.T) {
 
 func TestBashExecutor_NonZeroExitReturnsOutput(t *testing.T) {
 	exec := BashExecutor{}
-	result, err := exec.ExecuteTool("bash", map[string]any{"command": "echo fail && exit 1"})
+	result, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": "echo fail && exit 1"})
 	if err == nil {
 		t.Error("ExecuteTool() should return an error for non-zero exit code")
 	}
@@ -101,7 +102,7 @@ func TestBashExecutor_NonZeroExitReturnsOutput(t *testing.T) {
 
 func TestBashExecutor_MissingCommandReturnsError(t *testing.T) {
 	exec := BashExecutor{}
-	_, err := exec.ExecuteTool("bash", map[string]any{})
+	_, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'command' is missing")
 	}
@@ -109,7 +110,7 @@ func TestBashExecutor_MissingCommandReturnsError(t *testing.T) {
 
 func TestBashExecutor_EmptyCommandReturnsError(t *testing.T) {
 	exec := BashExecutor{}
-	_, err := exec.ExecuteTool("bash", map[string]any{"command": ""})
+	_, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": ""})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'command' is empty")
 	}
@@ -117,7 +118,7 @@ func TestBashExecutor_EmptyCommandReturnsError(t *testing.T) {
 
 func TestBashExecutor_TimesOut(t *testing.T) {
 	exec := BashExecutor{Timeout: 100 * time.Millisecond}
-	_, err := exec.ExecuteTool("bash", map[string]any{"command": "sleep 10"})
+	_, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": "sleep 10"})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when command exceeds timeout")
 	}
@@ -125,7 +126,7 @@ func TestBashExecutor_TimesOut(t *testing.T) {
 
 func TestBashExecutor_DefaultTimeoutAllowsFastCommands(t *testing.T) {
 	exec := BashExecutor{}
-	result, err := exec.ExecuteTool("bash", map[string]any{"command": "echo fast"})
+	result, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": "echo fast"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -137,7 +138,7 @@ func TestBashExecutor_DefaultTimeoutAllowsFastCommands(t *testing.T) {
 func TestBashExecutor_MultilineScript(t *testing.T) {
 	exec := BashExecutor{}
 	script := "x=5\necho $x"
-	result, err := exec.ExecuteTool("bash", map[string]any{"command": script})
+	result, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": script})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestBashExecutor_MultilineScript(t *testing.T) {
 func TestBashExecutor_TruncatesLargeOutput(t *testing.T) {
 	exec := BashExecutor{}
 	// Generate ~60KB of output (exceeds the 50KB cap).
-	result, err := exec.ExecuteTool("bash", map[string]any{"command": "python3 -c \"print('x' * 60000)\""})
+	result, err := exec.ExecuteTool(context.Background(), "bash", map[string]any{"command": "python3 -c \"print('x' * 60000)\""})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -175,4 +176,15 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func TestBashExecutor_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	exec := BashExecutor{}
+	_, err := exec.ExecuteTool(ctx, "bash", map[string]any{"command": "sleep 10"})
+	if err == nil {
+		t.Error("ExecuteTool should return error when context is cancelled")
+	}
 }

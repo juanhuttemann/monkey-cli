@@ -60,14 +60,15 @@ func normalizeURL(s string) string {
 }
 
 // ExecuteTool fetches the URL from input["url"] and returns its text content.
-func (w *WebFetchExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+func (w *WebFetchExecutor) ExecuteTool(ctx context.Context, _ string, input map[string]any) (string, error) {
 	rawURL, ok := input["url"].(string)
 	if !ok || rawURL == "" {
 		return "", fmt.Errorf("web_fetch: missing or empty url")
 	}
 	rawURL = normalizeURL(rawURL)
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultFetchTimeout)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, defaultFetchTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)

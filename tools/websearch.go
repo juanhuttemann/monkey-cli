@@ -81,7 +81,7 @@ func (w *WebSearchExecutor) baseURL() string {
 }
 
 // ExecuteTool performs a DuckDuckGo search and returns formatted results.
-func (w *WebSearchExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+func (w *WebSearchExecutor) ExecuteTool(ctx context.Context, _ string, input map[string]any) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok || query == "" {
 		return "", fmt.Errorf("web_search: missing or empty query")
@@ -95,7 +95,7 @@ func (w *WebSearchExecutor) ExecuteTool(_ string, input map[string]any) (string,
 		}
 	}
 
-	results, err := w.search(query, max)
+	results, err := w.search(ctx, query, max)
 	if err != nil {
 		return "", fmt.Errorf("web_search: %w", err)
 	}
@@ -103,9 +103,9 @@ func (w *WebSearchExecutor) ExecuteTool(_ string, input map[string]any) (string,
 	return formatSearchResults(results), nil
 }
 
-func (w *WebSearchExecutor) search(query string, max int) ([]SearchResult, error) {
+func (w *WebSearchExecutor) search(ctx context.Context, query string, max int) ([]SearchResult, error) {
 	for _, ua := range ddgUserAgents {
-		results, blocked, err := w.searchWithAgent(query, max, ua)
+		results, blocked, err := w.searchWithAgent(ctx, query, max, ua)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func (w *WebSearchExecutor) search(query string, max int) ([]SearchResult, error
 	return nil, fmt.Errorf("bot protection triggered for all user agents")
 }
 
-func (w *WebSearchExecutor) searchWithAgent(query string, max int, ua string) (results []SearchResult, blocked bool, err error) {
+func (w *WebSearchExecutor) searchWithAgent(ctx context.Context, query string, max int, ua string) (results []SearchResult, blocked bool, err error) {
 	formBody := url.Values{
 		"q":  {query},
 		"kl": {"wt-wt"},
@@ -124,7 +124,8 @@ func (w *WebSearchExecutor) searchWithAgent(query string, max int, ua string) (r
 		"b":  {""},
 	}.Encode()
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultSearchTimeout)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, defaultSearchTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, w.baseURL(), strings.NewReader(formBody))

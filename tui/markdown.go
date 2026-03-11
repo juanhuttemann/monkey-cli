@@ -11,19 +11,21 @@ import (
 )
 
 var (
-	mdCacheMu sync.Mutex
-	mdCache   = map[int]*glamour.TermRenderer{}
+	mdCacheMu    sync.Mutex
+	mdCacheWidth int
+	mdCacheEntry *glamour.TermRenderer
 )
 
 // getMarkdownRenderer returns a cached TermRenderer for the given width,
-// creating one on first use. The renderer is safe to reuse because
-// glamour's Render method writes to a fresh local buffer on each call.
+// creating one on first use or when the width changes. Only the most
+// recent width is retained so the cache cannot grow unboundedly as the
+// terminal is resized.
 func getMarkdownRenderer(width int) (*glamour.TermRenderer, error) {
 	mdCacheMu.Lock()
 	defer mdCacheMu.Unlock()
 
-	if r, ok := mdCache[width]; ok {
-		return r, nil
+	if mdCacheEntry != nil && mdCacheWidth == width {
+		return mdCacheEntry, nil
 	}
 
 	style := glamourstyles.DarkStyleConfig
@@ -38,20 +40,25 @@ func getMarkdownRenderer(width int) (*glamour.TermRenderer, error) {
 	if err != nil {
 		return nil, err
 	}
-	mdCache[width] = r
+	mdCacheWidth = width
+	mdCacheEntry = r
 	return r, nil
 }
 
 func markdownCacheLen() int {
 	mdCacheMu.Lock()
 	defer mdCacheMu.Unlock()
-	return len(mdCache)
+	if mdCacheEntry == nil {
+		return 0
+	}
+	return 1
 }
 
 func clearMarkdownCache() {
 	mdCacheMu.Lock()
 	defer mdCacheMu.Unlock()
-	mdCache = map[int]*glamour.TermRenderer{}
+	mdCacheWidth = 0
+	mdCacheEntry = nil
 }
 
 // ansiSGR matches ANSI Select Graphic Rendition escape sequences.

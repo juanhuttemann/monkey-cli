@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -97,7 +98,7 @@ func TestWebSearchTool_QueryIsRequired(t *testing.T) {
 
 func TestWebSearchExecutor_MissingQuery(t *testing.T) {
 	exec := &WebSearchExecutor{}
-	_, err := exec.ExecuteTool("web_search", map[string]any{})
+	_, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{})
 	if err == nil {
 		t.Error("expected error for missing query")
 	}
@@ -105,7 +106,7 @@ func TestWebSearchExecutor_MissingQuery(t *testing.T) {
 
 func TestWebSearchExecutor_EmptyQuery(t *testing.T) {
 	exec := &WebSearchExecutor{}
-	_, err := exec.ExecuteTool("web_search", map[string]any{"query": ""})
+	_, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": ""})
 	if err == nil {
 		t.Error("expected error for empty query")
 	}
@@ -116,7 +117,7 @@ func TestWebSearchExecutor_ReturnsResults(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	result, err := exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	result, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -136,7 +137,7 @@ func TestWebSearchExecutor_RespectsMaxResults(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	result, err := exec.ExecuteTool("web_search", map[string]any{"query": "test", "max_results": 1})
+	result, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test", "max_results": 1})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestWebSearchExecutor_EmptyPage(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	result, err := exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	result, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestWebSearchExecutor_MaxResultsCappedAt10(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	result, err := exec.ExecuteTool("web_search", map[string]any{"query": "test", "max_results": 99})
+	result, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test", "max_results": 99})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestWebSearchExecutor_UsesPostMethod(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	_, _ = exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	_, _ = exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 	if gotMethod != http.MethodPost {
 		t.Errorf("request method = %q, want %q", gotMethod, http.MethodPost)
 	}
@@ -207,7 +208,7 @@ func TestWebSearchExecutor_QueryEncodedInFormBody(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	_, _ = exec.ExecuteTool("web_search", map[string]any{"query": "hello world & more"})
+	_, _ = exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "hello world & more"})
 	if gotQuery != "hello world & more" {
 		t.Errorf("server received form query %q, want %q", gotQuery, "hello world & more")
 	}
@@ -225,7 +226,7 @@ func TestWebSearchExecutor_SetsRequiredHeaders(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	_, _ = exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	_, _ = exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 	if gotReferer != "https://html.duckduckgo.com/" {
 		t.Errorf("Referer = %q, want %q", gotReferer, "https://html.duckduckgo.com/")
 	}
@@ -251,7 +252,7 @@ func TestWebSearchExecutor_RetriesOnBotChallenge(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	result, err := exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	result, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}
@@ -271,7 +272,7 @@ func TestWebSearchExecutor_AllAgentsBlockedReturnsError(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	_, err := exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	_, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 	if err == nil {
 		t.Error("expected error when all user agents are blocked")
 	}
@@ -287,7 +288,7 @@ func TestWebSearchExecutor_NonOKStatusReturnsError(t *testing.T) {
 			defer srv.Close()
 
 			exec := &WebSearchExecutor{BaseURL: srv.URL}
-			_, err := exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+			_, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 			if err == nil {
 				t.Errorf("expected error for HTTP %d, got nil", code)
 			}
@@ -310,7 +311,7 @@ func TestWebSearchExecutor_SnippetTruncatesAtWordBoundary(t *testing.T) {
 	defer srv.Close()
 
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
-	result, err := exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	result, err := exec.ExecuteTool(context.Background(), "web_search", map[string]any{"query": "test"})
 	if err != nil {
 		t.Fatalf("ExecuteTool() error: %v", err)
 	}

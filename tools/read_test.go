@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,7 +79,7 @@ func TestReadExecutor_ReadsFile(t *testing.T) {
 	_ = os.WriteFile(path, []byte("hello world"), 0o644)
 
 	exec := ReadExecutor{}
-	result, err := exec.ExecuteTool("read", map[string]any{"path": path})
+	result, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -94,7 +95,7 @@ func TestReadExecutor_ReadsMultilineFile(t *testing.T) {
 	_ = os.WriteFile(path, []byte("line1\nline2\nline3\n"), 0o644)
 
 	exec := ReadExecutor{}
-	result, err := exec.ExecuteTool("read", map[string]any{"path": path})
+	result, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -106,7 +107,7 @@ func TestReadExecutor_ReadsMultilineFile(t *testing.T) {
 
 func TestReadExecutor_MissingPathReturnsError(t *testing.T) {
 	exec := ReadExecutor{}
-	_, err := exec.ExecuteTool("read", map[string]any{})
+	_, err := exec.ExecuteTool(context.Background(), "read", map[string]any{})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'path' is missing")
 	}
@@ -114,7 +115,7 @@ func TestReadExecutor_MissingPathReturnsError(t *testing.T) {
 
 func TestReadExecutor_EmptyPathReturnsError(t *testing.T) {
 	exec := ReadExecutor{}
-	_, err := exec.ExecuteTool("read", map[string]any{"path": ""})
+	_, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": ""})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'path' is empty")
 	}
@@ -122,7 +123,7 @@ func TestReadExecutor_EmptyPathReturnsError(t *testing.T) {
 
 func TestReadExecutor_NonExistentFileReturnsError(t *testing.T) {
 	exec := ReadExecutor{}
-	_, err := exec.ExecuteTool("read", map[string]any{"path": "/nonexistent/path/file.txt"})
+	_, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": "/nonexistent/path/file.txt"})
 	if err == nil {
 		t.Error("ExecuteTool() should return error for non-existent file")
 	}
@@ -134,7 +135,7 @@ func TestReadExecutor_ReadsEmptyFile(t *testing.T) {
 	_ = os.WriteFile(path, []byte{}, 0o644)
 
 	exec := ReadExecutor{}
-	result, err := exec.ExecuteTool("read", map[string]any{"path": path})
+	result, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestReadExecutor_LineNumbersUseRealLineNumbers(t *testing.T) {
 	_ = os.WriteFile(path, []byte("a\nb\nc\n"), 0o644)
 
 	exec := ReadExecutor{}
-	result, _ := exec.ExecuteTool("read", map[string]any{"path": path})
+	result, _ := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path})
 	if !strings.Contains(result, "   1\ta") {
 		t.Errorf("expected line 1 to be numbered, got: %q", result)
 	}
@@ -164,7 +165,7 @@ func TestReadExecutor_WithOffset(t *testing.T) {
 	_ = os.WriteFile(path, []byte("a\nb\nc\nd\n"), 0o644)
 
 	exec := ReadExecutor{}
-	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "offset": 3})
+	result, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path, "offset": 3})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -183,7 +184,7 @@ func TestReadExecutor_WithLimit(t *testing.T) {
 	_ = os.WriteFile(path, []byte("a\nb\nc\nd\n"), 0o644)
 
 	exec := ReadExecutor{}
-	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "limit": 2})
+	result, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path, "limit": 2})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -203,7 +204,7 @@ func TestReadExecutor_WithOffsetAndLimit(t *testing.T) {
 	_ = os.WriteFile(path, []byte("a\nb\nc\nd\ne\n"), 0o644)
 
 	exec := ReadExecutor{}
-	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "offset": 2, "limit": 2})
+	result, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path, "offset": 2, "limit": 2})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}
@@ -220,7 +221,7 @@ func TestReadExecutor_OffsetBeyondEOF(t *testing.T) {
 	_ = os.WriteFile(path, []byte("a\nb\n"), 0o644)
 
 	exec := ReadExecutor{}
-	result, err := exec.ExecuteTool("read", map[string]any{"path": path, "offset": 100})
+	result, err := exec.ExecuteTool(context.Background(), "read", map[string]any{"path": path, "offset": 100})
 	if err != nil {
 		t.Fatalf("ExecuteTool() returned error: %v", err)
 	}

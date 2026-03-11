@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -40,7 +41,7 @@ type ReadExecutor struct{}
 // ExecuteTool reads the file at input["path"] and returns its contents with
 // line numbers in cat-n format. Optional offset (1-based) and limit control
 // which lines are returned.
-func (r ReadExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+func (r ReadExecutor) ExecuteTool(_ context.Context, _ string, input map[string]any) (string, error) {
 	path, ok := input["path"].(string)
 	if !ok || path == "" {
 		return "", fmt.Errorf("read: missing or empty path")

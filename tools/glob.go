@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -38,7 +39,7 @@ type GlobExecutor struct{}
 
 // ExecuteTool walks the filesystem from input["path"] (default ".") and returns all
 // files matching input["pattern"], sorted by modification time (newest first).
-func (g GlobExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+func (g GlobExecutor) ExecuteTool(_ context.Context, _ string, input map[string]any) (string, error) {
 	pattern, ok := input["pattern"].(string)
 	if !ok || pattern == "" {
 		return "", fmt.Errorf("glob: missing or empty pattern")

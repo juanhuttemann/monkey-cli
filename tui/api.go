@@ -24,19 +24,29 @@ type ApprovingExecutor struct {
 }
 
 // ExecuteTool requests approval via approvalCh, then delegates to inner on approval.
-func (a ApprovingExecutor) ExecuteTool(name string, input map[string]any) (string, error) {
+// Returns ctx.Err() if the context is cancelled while waiting for the user's decision.
+func (a ApprovingExecutor) ExecuteTool(ctx context.Context, name string, input map[string]any) (string, error) {
 	responseCh := make(chan bool, 1)
-	a.approvalCh <- ToolApprovalRequestMsg{
+	select {
+	case a.approvalCh <- ToolApprovalRequestMsg{
 		ModelName:  a.modelName,
 		ToolName:   name,
 		Input:      input,
 		ResponseCh: responseCh,
+	}:
+	case <-ctx.Done():
+		return "", ctx.Err()
 	}
-	approved := <-responseCh
+	var approved bool
+	select {
+	case approved = <-responseCh:
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
 	if !approved {
 		return "", errToolDeclined
 	}
-	return a.inner.ExecuteTool(name, input)
+	return a.inner.ExecuteTool(ctx, name, input)
 }
 
 // APITimeout is the default timeout for API requests

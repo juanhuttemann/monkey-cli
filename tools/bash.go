@@ -56,13 +56,14 @@ func (b BashExecutor) timeout() time.Duration {
 
 // ExecuteTool runs the bash command from input["command"] and returns combined output.
 // Returns an error on missing/empty command, timeout, or non-zero exit code.
-func (b BashExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+func (b BashExecutor) ExecuteTool(ctx context.Context, _ string, input map[string]any) (string, error) {
 	command, ok := input["command"].(string)
 	if !ok || command == "" {
 		return "", fmt.Errorf("bash: missing or empty command")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), b.timeout())
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, b.timeout())
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)

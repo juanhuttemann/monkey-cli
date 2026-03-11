@@ -30,7 +30,7 @@ type mockExecutor struct {
 	err    error
 }
 
-func (m mockExecutor) ExecuteTool(_ string, _ map[string]any) (string, error) {
+func (m mockExecutor) ExecuteTool(_ context.Context, _ string, _ map[string]any) (string, error) {
 	return m.result, m.err
 }
 

@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,7 +68,7 @@ func TestEditExecutor_ReplacesString(t *testing.T) {
 	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	exec := EditExecutor{}
-	_, err := exec.ExecuteTool("edit", map[string]any{
+	_, err := exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       path,
 		"old_string": "hello",
 		"new_string": "goodbye",
@@ -88,7 +89,7 @@ func TestEditExecutor_ReturnsDiff(t *testing.T) {
 	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	exec := EditExecutor{}
-	result, err := exec.ExecuteTool("edit", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       path,
 		"old_string": "hello",
 		"new_string": "goodbye",
@@ -110,7 +111,7 @@ func TestEditExecutor_AmbiguousOldStringReturnsError(t *testing.T) {
 	_ = os.WriteFile(path, []byte("foo foo foo\n"), 0o644)
 
 	exec := EditExecutor{}
-	_, err := exec.ExecuteTool("edit", map[string]any{
+	_, err := exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       path,
 		"old_string": "foo",
 		"new_string": "bar",
@@ -130,7 +131,7 @@ func TestEditExecutor_AmbiguousOldString_FileUnchanged(t *testing.T) {
 	_ = os.WriteFile(path, []byte(original), 0o644)
 
 	exec := EditExecutor{}
-	_, _ = exec.ExecuteTool("edit", map[string]any{
+	_, _ = exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       path,
 		"old_string": "foo",
 		"new_string": "bar",
@@ -148,7 +149,7 @@ func TestEditExecutor_OldStringNotFoundReturnsError(t *testing.T) {
 	_ = os.WriteFile(path, []byte("hello world\n"), 0o644)
 
 	exec := EditExecutor{}
-	_, err := exec.ExecuteTool("edit", map[string]any{
+	_, err := exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       path,
 		"old_string": "nothere",
 		"new_string": "x",
@@ -160,7 +161,7 @@ func TestEditExecutor_OldStringNotFoundReturnsError(t *testing.T) {
 
 func TestEditExecutor_FileNotFoundReturnsError(t *testing.T) {
 	exec := EditExecutor{}
-	_, err := exec.ExecuteTool("edit", map[string]any{
+	_, err := exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       "/nonexistent/file.txt",
 		"old_string": "foo",
 		"new_string": "bar",
@@ -172,7 +173,7 @@ func TestEditExecutor_FileNotFoundReturnsError(t *testing.T) {
 
 func TestEditExecutor_MissingPathReturnsError(t *testing.T) {
 	exec := EditExecutor{}
-	_, err := exec.ExecuteTool("edit", map[string]any{
+	_, err := exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"old_string": "foo",
 		"new_string": "bar",
 	})
@@ -187,7 +188,7 @@ func TestEditExecutor_MissingOldStringReturnsError(t *testing.T) {
 	_ = os.WriteFile(path, []byte("hello\n"), 0o644)
 
 	exec := EditExecutor{}
-	_, err := exec.ExecuteTool("edit", map[string]any{
+	_, err := exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       path,
 		"new_string": "bar",
 	})
@@ -268,7 +269,7 @@ func TestEditExecutor_DoesNotModifyFileOnError(t *testing.T) {
 	_ = os.WriteFile(path, []byte(original), 0o644)
 
 	exec := EditExecutor{}
-	_, _ = exec.ExecuteTool("edit", map[string]any{
+	_, _ = exec.ExecuteTool(context.Background(), "edit", map[string]any{
 		"path":       path,
 		"old_string": "nothere",
 		"new_string": "x",

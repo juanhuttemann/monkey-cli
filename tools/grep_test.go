@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,7 +58,7 @@ func TestGrepExecutor_FindsMatch(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("hello world\nfoo bar\n"), 0o644)
 
 	exec := GrepExecutor{}
-	result, err := exec.ExecuteTool("grep", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": "hello",
 		"path":    dir,
 	})
@@ -74,7 +75,7 @@ func TestGrepExecutor_OutputFormat(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "file.txt"), []byte("line one\nline two\n"), 0o644)
 
 	exec := GrepExecutor{}
-	result, _ := exec.ExecuteTool("grep", map[string]any{
+	result, _ := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": "line two",
 		"path":    dir,
 	})
@@ -92,7 +93,7 @@ func TestGrepExecutor_NoMatchReturnsEmpty(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "file.txt"), []byte("hello world\n"), 0o644)
 
 	exec := GrepExecutor{}
-	result, err := exec.ExecuteTool("grep", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": "zzznomatch",
 		"path":    dir,
 	})
@@ -106,7 +107,7 @@ func TestGrepExecutor_NoMatchReturnsEmpty(t *testing.T) {
 
 func TestGrepExecutor_InvalidRegexReturnsError(t *testing.T) {
 	exec := GrepExecutor{}
-	_, err := exec.ExecuteTool("grep", map[string]any{
+	_, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": "[invalid",
 		"path":    ".",
 	})
@@ -117,7 +118,7 @@ func TestGrepExecutor_InvalidRegexReturnsError(t *testing.T) {
 
 func TestGrepExecutor_MissingPatternReturnsError(t *testing.T) {
 	exec := GrepExecutor{}
-	_, err := exec.ExecuteTool("grep", map[string]any{"path": "."})
+	_, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{"path": "."})
 	if err == nil {
 		t.Error("ExecuteTool() should return error when 'pattern' is missing")
 	}
@@ -129,7 +130,7 @@ func TestGrepExecutor_GlobFilter(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("func not here\n"), 0o644)
 
 	exec := GrepExecutor{}
-	result, err := exec.ExecuteTool("grep", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": "func",
 		"path":    dir,
 		"glob":    "*.go",
@@ -152,7 +153,7 @@ func TestGrepExecutor_MultipleFiles(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "c.txt"), []byte("haystack\n"), 0o644)
 
 	exec := GrepExecutor{}
-	result, err := exec.ExecuteTool("grep", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": "needle",
 		"path":    dir,
 	})
@@ -177,7 +178,7 @@ func TestGrepExecutor_CapsAt200Results(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "big.txt"), []byte(sb.String()), 0o644)
 
 	exec := GrepExecutor{}
-	result, err := exec.ExecuteTool("grep", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": "match",
 		"path":    dir,
 	})
@@ -195,7 +196,7 @@ func TestGrepExecutor_RegexPattern(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "code.go"), []byte("func Foo() {}\nfunc Bar() {}\nvar x = 1\n"), 0o644)
 
 	exec := GrepExecutor{}
-	result, err := exec.ExecuteTool("grep", map[string]any{
+	result, err := exec.ExecuteTool(context.Background(), "grep", map[string]any{
 		"pattern": `^func`,
 		"path":    dir,
 	})

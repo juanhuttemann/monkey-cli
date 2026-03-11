@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -357,4 +358,39 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("SendPromptCmdWithTimeout() returned nil, want non-nil tea.Cmd")
 	}
+}
+
+func TestApprovingExecutor_ContextCancellationUnblocksWait(t *testing.T) {
+	// Simulate: context is cancelled while the approval dialog is waiting for user input.
+	// ExecuteTool must return promptly instead of blocking forever.
+	approvalCh := make(chan ToolApprovalRequestMsg, 1)
+	inner := &stubInnerExecutor{}
+	exec := ApprovingExecutor{
+		inner:      inner,
+		modelName:  "test-model",
+		approvalCh: approvalCh,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel before ExecuteTool is called
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = exec.ExecuteTool(ctx, "bash", map[string]any{"command": "echo hi"})
+	}()
+
+	select {
+	case <-done:
+		// good: returned promptly
+	case <-time.After(2 * time.Second):
+		t.Error("ExecuteTool blocked despite cancelled context")
+	}
+}
+
+// stubInnerExecutor is a no-op ToolExecutor for testing.
+type stubInnerExecutor struct{}
+
+func (s *stubInnerExecutor) ExecuteTool(_ context.Context, _ string, _ map[string]any) (string, error) {
+	return "ok", nil
 }

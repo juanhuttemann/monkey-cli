@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -58,7 +59,7 @@ type EditExecutor struct{}
 
 // ExecuteTool replaces the first occurrence of old_string with new_string in the file at path.
 // Returns a unified diff of the change on success.
-func (e EditExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+func (e EditExecutor) ExecuteTool(_ context.Context, _ string, input map[string]any) (string, error) {
 	path, ok := input["path"].(string)
 	if !ok || path == "" {
 		return "", fmt.Errorf("edit: missing or empty path")

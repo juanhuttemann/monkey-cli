@@ -62,6 +62,7 @@ type Model struct {
 	approvalDialog ToolApprovalDialog
 	models         []string
 	apeMode        bool
+	pendingPrompt  string // the expanded prompt of the in-flight request; preserved into apiMessages on cancel
 	promptHistory  History
 	searchBar      SearchBar
 	printedCount   int // number of messages already committed to terminal scrollback
@@ -496,6 +497,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.promptHistory.Add(rawInput)
 				// Show the original message in the UI (preserves @mentions)
 				m.messages = append(m.messages, Message{Role: "user", Content: rawInput, Timestamp: time.Now()})
+				m.pendingPrompt = expandedInput
 				if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
 					cmds = append(cmds, cmd)
 				}
@@ -670,6 +672,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PromptResponseMsg:
 		m.streaming = false
 		m.tokenCh = nil
+		m.pendingPrompt = ""
 		// Replace last assistant message with complete response (handles any race with PartialResponseMsg),
 		// or append if streaming didn't produce one yet.
 		n := len(m.messages)
@@ -735,6 +738,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tokenCh = nil
 		m.streamBuf = m.streamBuf[:0]
 		m.renderedPriorValid = false
+		// Preserve cancelled user message regardless of current state: ESC sets
+		// state=Ready immediately, before this message arrives asynchronously.
+		if m.pendingPrompt != "" {
+			m.apiMessages = append(m.apiMessages, api.Message{Role: "user", Content: m.pendingPrompt})
+			m.pendingPrompt = ""
+		}
 		if m.state == StateLoading {
 			m.state = StateReady
 			m.timerActive = false
@@ -830,6 +839,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case toolApprovalDoneMsg:
 		// Approval channel closed; the API result will arrive separately.
+		// If the dialog is still active (context was cancelled without user
+		// interaction), dismiss it now so the stale prompt doesn't linger.
+		if m.approvalDialog.IsActive() {
+			m.approvalDialog.Deny()
+			m.syncViewportHeight()
+		}
 
 	case timer.TickMsg:
 		if m.timerActive {

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -46,7 +47,7 @@ type GrepExecutor struct{}
 // ExecuteTool searches files under input["path"] (default ".") for lines matching
 // input["pattern"] (regex). An optional input["glob"] filters which files are
 // searched. Returns up to 200 matches in file:line:content format.
-func (g GrepExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
+func (g GrepExecutor) ExecuteTool(_ context.Context, _ string, input map[string]any) (string, error) {
 	pattern, ok := input["pattern"].(string)
 	if !ok || pattern == "" {
 		return "", fmt.Errorf("grep: missing or empty pattern")
