@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-11
+### Added
+- Thread context through tool executors and fix cancelled-prompt history
+
 ## [0.3.1] - 2026-03-10
 ### Fixed
 - Web search POST request handling and webfetch bare domain and HTML truncation
@@ -39,3 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Go module path updated to `github.com/juanhuttemann/monkey-cli`
 - CI/CD pipeline with GoReleaser for cross-platform builds
 - Code coverage reporting with Codecov
+
+[Unreleased]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/juanhuttemann/monkey-cli/compare/v0.3.1...v0.4.0
