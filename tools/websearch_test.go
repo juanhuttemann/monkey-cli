@@ -179,10 +179,28 @@ func TestWebSearchExecutor_MaxResultsCappedAt10(t *testing.T) {
 	}
 }
 
-func TestWebSearchExecutor_QueryEncodedCorrectly(t *testing.T) {
+func TestWebSearchExecutor_UsesPostMethod(t *testing.T) {
+	var gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<html><body></body></html>"))
+	}))
+	defer srv.Close()
+
+	exec := &WebSearchExecutor{BaseURL: srv.URL}
+	_, _ = exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	if gotMethod != http.MethodPost {
+		t.Errorf("request method = %q, want %q", gotMethod, http.MethodPost)
+	}
+}
+
+func TestWebSearchExecutor_QueryEncodedInFormBody(t *testing.T) {
 	var gotQuery string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotQuery = r.URL.Query().Get("q")
+		if err := r.ParseForm(); err == nil {
+			gotQuery = r.FormValue("q")
+		}
 		w.Header().Set("Content-Type", "text/html")
 		_, _ = w.Write([]byte("<html><body></body></html>"))
 	}))
@@ -191,7 +209,31 @@ func TestWebSearchExecutor_QueryEncodedCorrectly(t *testing.T) {
 	exec := &WebSearchExecutor{BaseURL: srv.URL}
 	_, _ = exec.ExecuteTool("web_search", map[string]any{"query": "hello world & more"})
 	if gotQuery != "hello world & more" {
-		t.Errorf("server received query %q, want %q", gotQuery, "hello world & more")
+		t.Errorf("server received form query %q, want %q", gotQuery, "hello world & more")
+	}
+}
+
+func TestWebSearchExecutor_SetsRequiredHeaders(t *testing.T) {
+	var gotReferer, gotSecFetchSite, gotContentType string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotReferer = r.Header.Get("Referer")
+		gotSecFetchSite = r.Header.Get("Sec-Fetch-Site")
+		gotContentType = r.Header.Get("Content-Type")
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<html><body></body></html>"))
+	}))
+	defer srv.Close()
+
+	exec := &WebSearchExecutor{BaseURL: srv.URL}
+	_, _ = exec.ExecuteTool("web_search", map[string]any{"query": "test"})
+	if gotReferer != "https://html.duckduckgo.com/" {
+		t.Errorf("Referer = %q, want %q", gotReferer, "https://html.duckduckgo.com/")
+	}
+	if gotSecFetchSite != "same-origin" {
+		t.Errorf("Sec-Fetch-Site = %q, want %q", gotSecFetchSite, "same-origin")
+	}
+	if !strings.HasPrefix(gotContentType, "application/x-www-form-urlencoded") {
+		t.Errorf("Content-Type = %q, want application/x-www-form-urlencoded", gotContentType)
 	}
 }
 

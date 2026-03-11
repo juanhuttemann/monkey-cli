@@ -117,16 +117,26 @@ func (w *WebSearchExecutor) search(query string, max int) ([]SearchResult, error
 }
 
 func (w *WebSearchExecutor) searchWithAgent(query string, max int, ua string) (results []SearchResult, blocked bool, err error) {
-	params := url.Values{"q": {query}}
-	target := w.baseURL() + "?" + params.Encode()
+	formBody := url.Values{
+		"q":  {query},
+		"kl": {"wt-wt"},
+		"df": {""},
+		"b":  {""},
+	}.Encode()
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultSearchTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, w.baseURL(), strings.NewReader(formBody))
 	if err != nil {
 		return nil, false, err
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", "https://html.duckduckgo.com/")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-User", "?1")
 	req.Header.Set("User-Agent", ua)
 
 	resp, err := w.client().Do(req)

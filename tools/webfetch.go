@@ -15,7 +15,8 @@ import (
 
 const (
 	defaultFetchTimeout = 15 * time.Second
-	maxFetchBytes       = 20 * 1024 // 20 KB
+	maxFetchBytes       = 20 * 1024       // 20 KB – output text limit
+	maxHTMLBytes        = 2 * 1024 * 1024 // 2 MB – raw HTML read limit
 	fetchUserAgent      = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
 )
 
@@ -23,13 +24,13 @@ const (
 func WebFetchTool() api.Tool {
 	return api.Tool{
 		Name:        "web_fetch",
-		Description: "Fetch the text content of a URL. HTML is converted to plain text. Output is capped at 20 KB.",
+		Description: "Fetch the text content of a web page. HTML is converted to plain text. Output is capped at 20 KB. Always use this for web URLs — including bare domains like example.com or news.org.",
 		InputSchema: api.InputSchema{
 			Type: "object",
 			Properties: map[string]api.PropertyDef{
 				"url": {
 					Type:        "string",
-					Description: "The URL to fetch.",
+					Description: "The URL or bare domain to fetch (e.g. https://example.com or example.com). https:// is assumed when no scheme is given.",
 				},
 			},
 			Required: []string{"url"},
@@ -50,12 +51,21 @@ func (w *WebFetchExecutor) client() *http.Client {
 	return http.DefaultClient
 }
 
+// normalizeURL prepends https:// to bare hostnames that have no scheme.
+func normalizeURL(s string) string {
+	if strings.Contains(s, "://") {
+		return s
+	}
+	return "https://" + s
+}
+
 // ExecuteTool fetches the URL from input["url"] and returns its text content.
 func (w *WebFetchExecutor) ExecuteTool(_ string, input map[string]any) (string, error) {
 	rawURL, ok := input["url"].(string)
 	if !ok || rawURL == "" {
 		return "", fmt.Errorf("web_fetch: missing or empty url")
 	}
+	rawURL = normalizeURL(rawURL)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultFetchTimeout)
 	defer cancel()
@@ -78,7 +88,7 @@ func (w *WebFetchExecutor) ExecuteTool(_ string, input map[string]any) (string, 
 
 	ct := resp.Header.Get("Content-Type")
 	if strings.Contains(ct, "text/html") {
-		text, err := htmlToText(io.LimitReader(resp.Body, maxFetchBytes+1))
+		text, err := htmlToText(io.LimitReader(resp.Body, maxHTMLBytes))
 		if err != nil {
 			return "", fmt.Errorf("web_fetch: %w", err)
 		}

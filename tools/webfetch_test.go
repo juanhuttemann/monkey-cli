@@ -229,3 +229,56 @@ func TestWebFetchExecutor_InvalidURL(t *testing.T) {
 		t.Error("expected error for invalid url")
 	}
 }
+
+func TestWebFetchExecutor_LargeHeadDoesNotMaskBodyContent(t *testing.T) {
+	// Simulate a page where <head> with large scripts exceeds maxFetchBytes,
+	// but body has visible text that must still be returned.
+	largeScript := "<script>" + strings.Repeat("var x=1;", 3000) + "</script>"
+	page := "<html><head>" + largeScript + largeScript + "</head><body><p>Visible body content</p></body></html>"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(page))
+	}))
+	defer srv.Close()
+
+	exec := &WebFetchExecutor{}
+	result, err := exec.ExecuteTool("web_fetch", map[string]any{"url": srv.URL})
+	if err != nil {
+		t.Fatalf("ExecuteTool() error: %v", err)
+	}
+	if !strings.Contains(result, "Visible body content") {
+		t.Errorf("body content lost due to large head; got: %q", result)
+	}
+}
+
+// --- normalizeURL tests ---
+
+func TestNormalizeURL_PrependsSchemeToBareHost(t *testing.T) {
+	cases := []struct {
+		input, want string
+	}{
+		{"example.com", "https://example.com"},
+		{"www.example.com/path", "https://www.example.com/path"},
+		{"news.org", "https://news.org"},
+	}
+	for _, c := range cases {
+		got := normalizeURL(c.input)
+		if got != c.want {
+			t.Errorf("normalizeURL(%q) = %q, want %q", c.input, got, c.want)
+		}
+	}
+}
+
+func TestNormalizeURL_LeavesSchemeUnchanged(t *testing.T) {
+	cases := []string{
+		"https://example.com",
+		"http://example.com",
+		"https://abc.com.py/page?q=1",
+	}
+	for _, c := range cases {
+		got := normalizeURL(c)
+		if got != c {
+			t.Errorf("normalizeURL(%q) = %q, want unchanged", c, got)
+		}
+	}
+}
