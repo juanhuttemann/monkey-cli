@@ -45,9 +45,10 @@ const (
 	ColorApprovalTool  = ColorToolBorder      // cyan — it is a tool call
 )
 
-// Intro art pixel colors — three tiers of block shading for the monkey sprite.
+// Intro art pixel colors — four tiers of block shading for the monkey sprite.
 const (
 	ColorMonkeyDark  = "#2B1200" // very dark brown  — ██ outline
 	ColorMonkeyMid   = "#7B4220" // medium brown     — ▒▒ body
+	ColorMonkeySkin  = "#7c3400" // warm brown       — ▓▓ skin
 	ColorMonkeyLight = "#C49A6C" // warm tan         — ░░ face / underbelly
 )

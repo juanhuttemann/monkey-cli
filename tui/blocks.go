@@ -10,7 +10,7 @@ import (
 // shading characters used in the monkey pixel art:
 //
 //	█▄▀  →  ColorMonkeyDark  (outline)
-//	▓  →  ColorMonkeyMid   (body)
+//	▓  →  ColorMonkeySkin  (skin)
 //	▒  →  ColorMonkeyMid   (body)
 //	░  →  ColorMonkeyLight (face / underbelly)
 //
@@ -18,6 +18,7 @@ import (
 func colorizeArt(s string) string {
 	dark := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyDark))
 	mid := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyMid))
+	skin := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeySkin))
 	light := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyLight))
 	var sb strings.Builder
 	sb.Grow(len(s) * 2) // rough over-alloc for ANSI sequences
@@ -25,7 +26,9 @@ func colorizeArt(s string) string {
 		switch r {
 		case '█', '▄', '▀':
 			sb.WriteString(dark.Render(string(r)))
-		case '▓', '▒':
+		case '▓':
+			sb.WriteString(skin.Render(string(r)))
+		case '▒':
 			sb.WriteString(mid.Render(string(r)))
 		case '░':
 			sb.WriteString(light.Render(string(r)))

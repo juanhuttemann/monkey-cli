@@ -1,7 +1,5 @@
 Output demo.gif
 
-Require monkey
-
 Set Shell "bash"
 Set FontSize 16
 Set Width 1200
@@ -10,10 +8,12 @@ Set Theme "Dracula"
 Set Padding 20
 Set PlaybackSpeed 1
 
-# Launch the TUI
-Type "monkey"
-Sleep 500ms
+# Build and launch the TUI
+Hide
+Type "go build -o /tmp/monkey-demo . && /tmp/monkey-demo"
 Enter
+Sleep 10s
+Show
 Sleep 4s
 
 # Enable auto-approve mode so tool calls run without confirmation
@@ -22,10 +22,10 @@ Sleep 1s
 Ctrl+Enter
 Sleep 1s
 
-Type "fix all bugs. you have 5 minutes."
+Type "fix all bugs. you have 5 minutes or no bananas for you."
 Sleep 500ms
 Ctrl+Enter
-Sleep 15s
+Sleep 25s
 
 # Quit
 Escape
