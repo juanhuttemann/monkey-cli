@@ -15,7 +15,7 @@ func TestSendPrompt_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "The capital of France is Paris."}]}`))
+		_, _ = w.Write(fixture(t, "response_paris.json"))
 	}))
 	defer server.Close()
 
@@ -42,7 +42,7 @@ func TestSendPrompt_SendsCorrectPrompt(t *testing.T) {
 		_ = json.Unmarshal(body, &requestBody)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -89,7 +89,7 @@ func TestSendPrompt_DefaultModelUsedWhenEnvVarsUnset(t *testing.T) {
 			capturedModel = m
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -134,7 +134,7 @@ func TestSendPrompt_Non200Status(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error": "internal server error"}`))
+		_, _ = w.Write(fixture(t, "error_internal.json"))
 	}))
 	defer server.Close()
 
@@ -160,7 +160,7 @@ func TestSendPrompt_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [}`)) // Invalid JSON
+		_, _ = w.Write(fixture(t, "response_invalid.json"))
 	}))
 	defer server.Close()
 
@@ -183,7 +183,7 @@ func TestSendPrompt_EmptyContent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": []}`))
+		_, _ = w.Write(fixture(t, "response_empty_content.json"))
 	}))
 	defer server.Close()
 

@@ -30,7 +30,7 @@ func TestSendMessage_NoRetryByDefault(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`{"error": "rate limited"}`))
+		_, _ = w.Write(fixture(t, "error_rate_limited.json"))
 	}))
 	defer server.Close()
 
@@ -50,11 +50,11 @@ func TestSendMessage_RetriesOn429(t *testing.T) {
 		n := calls.Add(1)
 		if n < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			_, _ = w.Write([]byte(`{"error": "rate limited"}`))
+			_, _ = w.Write(fixture(t, "error_rate_limited.json"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -77,11 +77,11 @@ func TestSendMessage_RetriesOn500(t *testing.T) {
 		n := calls.Add(1)
 		if n == 1 {
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(`{"error": "server error"}`))
+			_, _ = w.Write(fixture(t, "error_server.json"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "recovered"}]}`))
+		_, _ = w.Write(fixture(t, "response_recovered.json"))
 	}))
 	defer server.Close()
 
@@ -103,7 +103,7 @@ func TestSendMessage_MaxRetriesExceeded(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`{"error": "rate limited"}`))
+		_, _ = w.Write(fixture(t, "error_rate_limited.json"))
 	}))
 	defer server.Close()
 
@@ -125,7 +125,7 @@ func TestSendMessage_NoRetryOn4xx(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error": "bad request"}`))
+		_, _ = w.Write(fixture(t, "error_bad_request.json"))
 	}))
 	defer server.Close()
 
@@ -164,7 +164,7 @@ func TestSendMessage_ContextCancelledDuringRetry(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error": "server error"}`))
+		_, _ = w.Write(fixture(t, "error_server.json"))
 	}))
 	defer server.Close()
 
@@ -189,11 +189,11 @@ func TestRetryNotifier_CalledBeforeEachRetry(t *testing.T) {
 		n := calls.Add(1)
 		if n < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			_, _ = w.Write([]byte(`{"error": "rate limited"}`))
+			_, _ = w.Write(fixture(t, "error_rate_limited.json"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -272,7 +272,7 @@ func TestSendMessage_RetriesOnDeadlineExceeded(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -307,7 +307,7 @@ func TestSendMessage_RetriesOnConnectionReset(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -348,7 +348,7 @@ func TestSendMessage_RetriesAfterTimeoutThenConnectionReset(t *testing.T) {
 			// First attempt: slow response → per-attempt timeout fires
 			time.Sleep(100 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+			_, _ = w.Write(fixture(t, "response_ok.json"))
 		case 2:
 			// Second attempt: connection reset
 			hj, ok := w.(http.Hijacker)
@@ -361,7 +361,7 @@ func TestSendMessage_RetriesAfterTimeoutThenConnectionReset(t *testing.T) {
 		default:
 			// Third attempt: success
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+			_, _ = w.Write(fixture(t, "response_ok.json"))
 		}
 	}))
 	defer server.Close()

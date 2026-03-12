@@ -3,9 +3,20 @@ package main
 import (
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// fixture reads a file from testdata/ and returns its bytes.
+func fixture(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("fixture %q: %v", name, err)
+	}
+	return data
+}
 
 func TestSetupTestEnv_SetsAllVars(t *testing.T) {
 	cleanup := setupTestEnv("test-api-key", "http://test-url", "test-model")

@@ -51,7 +51,7 @@ func TestSendMessage_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "Hello from API!"}]}`))
+		_, _ = w.Write(fixture(t, "response_hello.json"))
 	}))
 	defer server.Close()
 
@@ -71,7 +71,7 @@ func TestSendMessage_SetsCorrectHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedRequest = r
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -106,7 +106,7 @@ func TestSendMessage_SetsCorrectPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestPath = r.URL.Path
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -126,7 +126,7 @@ func TestSendMessage_SetsCorrectMethod(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		method = r.Method
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -158,7 +158,7 @@ func TestSendMessage_HTTPError(t *testing.T) {
 func TestSendMessage_Non200Status(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error": "internal server error"}`))
+		_, _ = w.Write(fixture(t, "error_internal.json"))
 	}))
 	defer server.Close()
 
@@ -181,7 +181,7 @@ func TestSendMessage_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [}`)) // Invalid JSON
+		_, _ = w.Write(fixture(t, "response_invalid.json"))
 	}))
 	defer server.Close()
 
@@ -201,7 +201,7 @@ func TestSendMessage_EmptyContent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": []}`))
+		_, _ = w.Write(fixture(t, "response_empty_content.json"))
 	}))
 	defer server.Close()
 
@@ -225,7 +225,7 @@ func TestSendMessage_WithContext(t *testing.T) {
 		// Slow response
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -249,7 +249,7 @@ func TestSendMessage_SendsCorrectRequestBody(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &requestBody)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -298,7 +298,7 @@ func TestSendMessage_BaseURLWithTrailingSlash(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestPath = r.URL.Path
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -319,7 +319,7 @@ func TestWithMaxTokens_OverridesDefaultInRequest(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &requestBody)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -355,7 +355,7 @@ func TestClient_SetModel_ChangesModel(t *testing.T) {
 		_ = json.Unmarshal(b, &body)
 		lastModel = body.Model
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -387,7 +387,7 @@ func TestSendMessageWithHistory_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "Response with history!"}]}`))
+		_, _ = w.Write(fixture(t, "response_with_history.json"))
 	}))
 	defer server.Close()
 
@@ -414,7 +414,7 @@ func TestSendMessageWithHistory_SendsAllMessages(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &requestBody)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -449,7 +449,7 @@ func TestSendMessageWithHistory_EmptyMessages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -471,7 +471,7 @@ func TestSendMessageWithHistory_SetsCorrectHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedRequest = r
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -502,7 +502,7 @@ func TestSendMessageWithHistory_SetsCorrectHeaders(t *testing.T) {
 func TestSendMessageWithHistory_Non200Status(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error": "internal server error"}`))
+		_, _ = w.Write(fixture(t, "error_internal.json"))
 	}))
 	defer server.Close()
 
@@ -524,7 +524,7 @@ func TestSendMessageWithHistory_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [}`)) // Invalid JSON
+		_, _ = w.Write(fixture(t, "response_invalid.json"))
 	}))
 	defer server.Close()
 
@@ -546,7 +546,7 @@ func TestSendMessageWithHistory_EmptyContent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": []}`))
+		_, _ = w.Write(fixture(t, "response_empty_content.json"))
 	}))
 	defer server.Close()
 
@@ -570,7 +570,7 @@ func TestWithSystemPrompt_IncludedInRequest(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &requestBody)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -589,7 +589,7 @@ func TestWithSystemPrompt_Empty_OmittedFromRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rawBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -609,7 +609,7 @@ func TestSendMessageWithHistory_WithContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -33,4 +34,17 @@ func newTestClientWithModel(model string) *api.Client {
 // containsSubstring reports whether s contains substr (after stripping ANSI codes).
 func containsSubstring(s, substr string) bool {
 	return strings.Contains(stripANSI(s), substr)
+}
+
+// fixture reads a file from testdata/, falling back to ../testdata/ for shared fixtures.
+func fixture(t *testing.T, name string) []byte {
+	t.Helper()
+	for _, dir := range []string{"testdata", "../testdata"} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err == nil {
+			return data
+		}
+	}
+	t.Fatalf("fixture %q: not found in testdata/ or ../testdata/", name)
+	return nil
 }

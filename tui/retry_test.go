@@ -45,11 +45,11 @@ func TestSendPromptCmdWithTimeout_SendsRetryNotifications(t *testing.T) {
 		n := calls.Add(1)
 		if n == 1 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			_, _ = w.Write([]byte(`{"error": "rate limited"}`))
+			_, _ = w.Write(fixture(t, "error_rate_limited.json"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -86,7 +86,7 @@ func TestSendPromptCmdWithTimeout_SendsRetryNotifications(t *testing.T) {
 func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -110,7 +110,7 @@ func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnSuccess(t *testing.T) {
 func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error": "bad request"}`))
+		_, _ = w.Write(fixture(t, "error_bad_request.json"))
 	}))
 	defer server.Close()
 

@@ -1,0 +1,1 @@
+{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"ls"}}],"stop_reason":"tool_use"}

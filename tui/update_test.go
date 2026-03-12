@@ -59,7 +59,7 @@ func TestUpdate_CtrlEnter_SavesPromptToHistory(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -99,7 +99,7 @@ func TestUpdate_CtrlEnter_SubmitsPrompt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
+		_, _ = w.Write(fixture(t, "response_text.json"))
 	}))
 	defer server.Close()
 
@@ -212,7 +212,7 @@ func TestUpdate_CtrlEnter_AddsUserMessageImmediately(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
+		_, _ = w.Write(fixture(t, "response_text.json"))
 	}))
 	defer server.Close()
 
@@ -242,7 +242,7 @@ func TestUpdate_CtrlEnter_ClearsInputImmediately(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "response"}]}`))
+		_, _ = w.Write(fixture(t, "response_text.json"))
 	}))
 	defer server.Close()
 
@@ -264,7 +264,7 @@ func TestUpdate_PromptResponse_AddsAssistantMessage(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "assistant response"}]}`))
+		_, _ = w.Write(fixture(t, "response_assistant.json"))
 	}))
 	defer server.Close()
 
@@ -298,7 +298,7 @@ func TestUpdate_PromptResponse_ClearsInput(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "ok"}]}`))
+		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
@@ -826,7 +826,7 @@ func TestUpdate_SlashCompact_WithMessages_StartsLoading(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"content": [{"type": "text", "text": "summary"}]}`))
+		_, _ = w.Write(fixture(t, "response_summary.json"))
 	}))
 	defer server.Close()
 

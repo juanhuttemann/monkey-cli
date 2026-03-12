@@ -6,10 +6,25 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 )
+
+// fixture reads a file from testdata/, falling back to ../testdata/ for shared fixtures.
+func fixture(t *testing.T, name string) []byte {
+	t.Helper()
+	for _, dir := range []string{"testdata", "../testdata"} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err == nil {
+			return data
+		}
+	}
+	t.Fatalf("fixture %q: not found in testdata/ or ../testdata/", name)
+	return nil
+}
 
 // stubBashTool returns a minimal Tool for use in SendMessageWithTools tests.
 func stubBashTool() Tool {
@@ -242,9 +257,9 @@ func TestSendMessageWithTools_AccumulatesUsage(t *testing.T) {
 		n := requestCount.Add(1)
 		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			_, _ = w.Write([]byte(`{"content":[{"type":"tool_use","id":"t1","name":"bash","input":{"command":"date"}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}}`))
+			_, _ = w.Write(fixture(t, "tool_use_date_with_usage.json"))
 		} else {
-			_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{"input_tokens":20,"output_tokens":3}}`))
+			_, _ = w.Write(fixture(t, "response_done_with_usage.json"))
 		}
 	}))
 	defer server.Close()
