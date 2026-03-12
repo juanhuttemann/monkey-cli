@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-03-12
+### Improved
+- Update monkey art colors and refresh demo recording
+
 ## [0.4.1] - 2026-03-12
 ### Improved
 - Redesign intro panel layout and monkey pixel art
@@ -50,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GoReleaser for cross-platform builds
 - Code coverage reporting with Codecov
 
-[Unreleased]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/juanhuttemann/monkey-cli/compare/v0.3.1...v0.4.0
