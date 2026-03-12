@@ -5,18 +5,18 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/juanhuttemann/monkey-cli)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Claude in your terminal. No browser, no copy-pasting — just ask and get things done.**
+**Your monkey in the terminal. No browser, no copy-pasting — just ask and get things done.**
 
-monkey is an agentic AI assistant that lives where you work. It reads your code, edits files, runs commands, and searches the web. You stay in the terminal; monkey does the rest.
+Monkey is an agentic AI assistant that lives where you work. It reads your code, edits files, runs commands, and searches the web. You stay in the terminal; monkey does the rest.
 
 ![demo](demo.gif)
 
 ## Why monkey?
 
-- **No context switching** — ask Claude to fix a bug and it edits the file, right there
-- **Fully agentic** — Claude can read, write, run commands, and browse the web on your behalf; you approve each action
+- **No context switching** — ask Monkey to fix a bug and it edits the file, right there
+- **Fully agentic** — Monkey can read, write, run commands, and browse the web on your behalf; you approve each action
 - **Works the way you do** — interactive TUI for exploration, one-shot CLI for scripting and pipes
-- **Project-aware** — drop a `MONKEY.md` in any repo to give Claude permanent context about your codebase
+- **Project-aware** — drop a `MONKEY.md` in any repo to give Monkey permanent context about your codebase
 
 ## Get started
 
@@ -29,11 +29,11 @@ export ANTHROPIC_API_KEY="your-api-key"
 monkey
 ```
 
-That's it. monkey picks the latest Claude model automatically.
+That's it. Monkey picks the latest Claude model automatically.
 
 ## What it can do
 
-- **Edits your files** — Claude reads your code, makes targeted changes, and shows you a diff before applying
+- **Edits your files** — Monkey reads your code, makes targeted changes, and shows you a diff before applying
 - **Runs commands** — execute shell commands with your approval; ideal for build errors, test failures, or quick scripts
 - **Searches the web** — fetch pages and search DuckDuckGo without leaving your session
 - **Remembers conversations** — resume any session with `--continue`; never lose a thread
@@ -91,7 +91,7 @@ The only required variable is your API key:
 export ANTHROPIC_API_KEY="your-api-key"
 ```
 
-monkey defaults to the latest Claude model automatically. You can pin specific models if needed:
+Monkey defaults to the latest Claude model automatically. You can pin specific models if needed:
 
 | Variable | Required | Description |
 |---|---|---|
@@ -117,7 +117,7 @@ monkey
 
 | Key | Action |
 |---|---|
-| **`/ape`** | **Unleash mode — Claude acts without asking for approval on every tool call** |
+| **`/ape`** | **Unleash mode — Monkey acts without asking for approval on every tool call** |
 | `Enter` | Send message |
 | `Ctrl+J` | Insert a newline (multiline input) |
 | `/model` + `Enter` | Switch between Opus, Sonnet, and Haiku |
@@ -150,7 +150,7 @@ A global default lives at `~/.config/monkey/MONKEY.md`.
 
 ## Agentic tools
 
-When Claude needs to take action, it calls one of these built-in tools. Each call shows a confirmation prompt — or use `/ape` to auto-approve everything.
+When Monkey needs to take action, it calls one of these built-in tools. Each call shows a confirmation prompt — or use `/ape` to auto-approve everything.
 
 | Tool | What it does |
 |---|---|
