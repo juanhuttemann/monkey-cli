@@ -429,21 +429,34 @@ func TestView_CursorTracksLineAfterCursorUp(t *testing.T) {
 	}
 }
 
-func TestFormatTokenCount(t *testing.T) {
-	tests := []struct {
-		n    int
-		want string
-	}{
-		{0, "0"},
-		{999, "999"},
-		{1000, "1,000"},
-		{8341, "8,341"},
-		{1234567, "1,234,567"},
+func TestView_ModelPickerActive_ShowsModels(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	model.SetModels([]string{"claude-sonnet", "claude-opus"})
+	model.modelPicker.Activate()
+	view := stripANSI(model.View())
+	if !strings.Contains(view, "claude-sonnet") {
+		t.Errorf("View with active model picker should show model names: %q", view)
 	}
-	for _, tc := range tests {
-		got := formatTokenCount(tc.n)
-		if got != tc.want {
-			t.Errorf("formatTokenCount(%d) = %q, want %q", tc.n, got, tc.want)
-		}
+}
+
+func TestView_CommandPickerActive_ShowsCommands(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	model.commandPicker.Activate()
+	model.commandPicker.SetQuery("")
+	view := stripANSI(model.View())
+	if !strings.Contains(view, "exit") {
+		t.Errorf("View with active command picker should show slash commands: %q", view)
+	}
+}
+
+func TestView_HelpPanelActive_RendersContent(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 40)
+	model.helpPanel.Activate()
+	view := model.View()
+	if view == "" {
+		t.Error("View with active help panel should return non-empty content")
 	}
 }

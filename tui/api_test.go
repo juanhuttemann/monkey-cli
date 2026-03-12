@@ -360,6 +360,47 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 	}
 }
 
+func TestSendPromptCmdWithTimeout_StreamingPath_DeliversTokens(t *testing.T) {
+	// Build a minimal SSE response for the streaming path.
+	sseBody := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"streamed\"}}\n\n" +
+		"event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(sseBody))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	tokenCh := make(chan PartialResponseMsg, 10)
+
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, nil, nil, tokenCh)
+
+	var tokens []string
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for tok := range tokenCh {
+			tokens = append(tokens, tok.Token)
+		}
+	}()
+
+	result := cmd()
+	<-done
+
+	if _, ok := result.(PromptResponseMsg); !ok {
+		t.Fatalf("streaming path result = %T, want PromptResponseMsg", result)
+	}
+	if len(tokens) == 0 {
+		t.Error("expected streaming tokens, got none")
+	}
+}
+
 func TestApprovingExecutor_ContextCancellationUnblocksWait(t *testing.T) {
 	// Simulate: context is cancelled while the approval dialog is waiting for user input.
 	// ExecuteTool must return promptly instead of blocking forever.
@@ -393,4 +434,238 @@ type stubInnerExecutor struct{}
 
 func (s *stubInnerExecutor) ExecuteTool(_ context.Context, _ string, _ map[string]any) (string, error) {
 	return "ok", nil
+}
+
+func TestWaitForToolCall_ReceivesMsg(t *testing.T) {
+	ch := make(chan ToolCallMsg, 1)
+	tc := ToolCallMsg{ToolCall: api.ToolCallResult{Name: "bash"}}
+	ch <- tc
+
+	cmd := waitForToolCall(ch)
+	msg := cmd()
+
+	got, ok := msg.(ToolCallMsg)
+	if !ok {
+		t.Fatalf("waitForToolCall() = %T, want ToolCallMsg", msg)
+	}
+	if got.ToolCall.Name != "bash" {
+		t.Errorf("ToolCallMsg.Name = %q, want %q", got.ToolCall.Name, "bash")
+	}
+}
+
+func TestWaitForToolCall_ClosedChannel(t *testing.T) {
+	ch := make(chan ToolCallMsg)
+	close(ch)
+
+	cmd := waitForToolCall(ch)
+	msg := cmd()
+
+	if _, ok := msg.(toolCallDoneMsg); !ok {
+		t.Fatalf("waitForToolCall on closed ch = %T, want toolCallDoneMsg", msg)
+	}
+}
+
+func TestWaitForToken_ReceivesMsg(t *testing.T) {
+	ch := make(chan PartialResponseMsg, 1)
+	ch <- PartialResponseMsg{Token: "hello"}
+
+	cmd := waitForToken(ch)
+	msg := cmd()
+
+	got, ok := msg.(PartialResponseMsg)
+	if !ok {
+		t.Fatalf("waitForToken() = %T, want PartialResponseMsg", msg)
+	}
+	if got.Token != "hello" {
+		t.Errorf("PartialResponseMsg.Token = %q, want %q", got.Token, "hello")
+	}
+}
+
+func TestWaitForToken_ClosedChannel(t *testing.T) {
+	ch := make(chan PartialResponseMsg)
+	close(ch)
+
+	cmd := waitForToken(ch)
+	msg := cmd()
+
+	if _, ok := msg.(tokenDoneMsg); !ok {
+		t.Fatalf("waitForToken on closed ch = %T, want tokenDoneMsg", msg)
+	}
+}
+
+func TestWaitForApproval_ReceivesMsg(t *testing.T) {
+	ch := make(chan ToolApprovalRequestMsg, 1)
+	resp := make(chan bool, 1)
+	ch <- ToolApprovalRequestMsg{ToolName: "bash", ResponseCh: resp}
+
+	cmd := waitForApproval(ch)
+	msg := cmd()
+
+	got, ok := msg.(ToolApprovalRequestMsg)
+	if !ok {
+		t.Fatalf("waitForApproval() = %T, want ToolApprovalRequestMsg", msg)
+	}
+	if got.ToolName != "bash" {
+		t.Errorf("ToolApprovalRequestMsg.ToolName = %q, want %q", got.ToolName, "bash")
+	}
+}
+
+func TestWaitForApproval_ClosedChannel(t *testing.T) {
+	ch := make(chan ToolApprovalRequestMsg)
+	close(ch)
+
+	cmd := waitForApproval(ch)
+	msg := cmd()
+
+	if _, ok := msg.(toolApprovalDoneMsg); !ok {
+		t.Fatalf("waitForApproval on closed ch = %T, want toolApprovalDoneMsg", msg)
+	}
+}
+
+func TestSendCompactCmd_NilClient(t *testing.T) {
+	cmd := SendCompactCmd(nil, nil, 5*time.Second)
+	msg := cmd()
+
+	errMsg, ok := msg.(PromptErrorMsg)
+	if !ok {
+		t.Fatalf("SendCompactCmd(nil) = %T, want PromptErrorMsg", msg)
+	}
+	if errMsg.Err == nil {
+		t.Error("PromptErrorMsg.Err = nil, want error")
+	}
+}
+
+func TestSendCompactCmd_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture(t, "response_summary.json"))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	history := []Message{
+		{Role: "user", Content: "hello"},
+		{Role: "assistant", Content: "hi"},
+	}
+
+	cmd := SendCompactCmd(client, history, 5*time.Second)
+	msg := cmd()
+
+	resp, ok := msg.(CompactResponseMsg)
+	if !ok {
+		t.Fatalf("SendCompactCmd() = %T, want CompactResponseMsg", msg)
+	}
+	if resp.Summary == "" {
+		t.Error("CompactResponseMsg.Summary is empty")
+	}
+}
+
+func TestSendCompactCmd_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(fixture(t, "../testdata/error_internal.json"))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
+	cmd := SendCompactCmd(client, nil, 5*time.Second)
+	msg := cmd()
+
+	errMsg, ok := msg.(PromptErrorMsg)
+	if !ok {
+		t.Fatalf("SendCompactCmd error = %T, want PromptErrorMsg", msg)
+	}
+	if errMsg.Err == nil {
+		t.Error("PromptErrorMsg.Err = nil, want error")
+	}
+}
+
+func TestApprovingExecutor_Approved_CallsInner(t *testing.T) {
+	approvalCh := make(chan ToolApprovalRequestMsg, 1)
+	inner := &stubInnerExecutor{}
+	exec := ApprovingExecutor{
+		inner:      inner,
+		modelName:  "test-model",
+		approvalCh: approvalCh,
+	}
+
+	ctx := context.Background()
+	done := make(chan string, 1)
+	go func() {
+		result, _ := exec.ExecuteTool(ctx, "bash", map[string]any{"command": "echo hi"})
+		done <- result
+	}()
+
+	// Receive the approval request and approve it.
+	req := <-approvalCh
+	req.ResponseCh <- true
+
+	select {
+	case result := <-done:
+		if result != "ok" {
+			t.Errorf("ExecuteTool approved = %q, want %q", result, "ok")
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecuteTool blocked after approval")
+	}
+}
+
+func TestApprovingExecutor_Declined_ReturnsError(t *testing.T) {
+	approvalCh := make(chan ToolApprovalRequestMsg, 1)
+	inner := &stubInnerExecutor{}
+	exec := ApprovingExecutor{
+		inner:      inner,
+		modelName:  "test-model",
+		approvalCh: approvalCh,
+	}
+
+	ctx := context.Background()
+	done := make(chan error, 1)
+	go func() {
+		_, err := exec.ExecuteTool(ctx, "bash", map[string]any{"command": "rm -rf /"})
+		done <- err
+	}()
+
+	req := <-approvalCh
+	req.ResponseCh <- false
+
+	select {
+	case err := <-done:
+		if err != errToolDeclined {
+			t.Errorf("ExecuteTool declined error = %v, want errToolDeclined", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecuteTool blocked after decline")
+	}
+}
+
+func TestApprovingExecutor_ContextCancelledWhileWaitingForResponse(t *testing.T) {
+	approvalCh := make(chan ToolApprovalRequestMsg, 1)
+	inner := &stubInnerExecutor{}
+	exec := ApprovingExecutor{
+		inner:      inner,
+		modelName:  "test-model",
+		approvalCh: approvalCh,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := exec.ExecuteTool(ctx, "bash", map[string]any{"command": "echo hi"})
+		done <- err
+	}()
+
+	// Wait for the approval request, then cancel the context before responding.
+	<-approvalCh
+	cancel()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("ExecuteTool should return error when context cancelled while waiting for response")
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("ExecuteTool blocked despite cancelled context")
+	}
 }

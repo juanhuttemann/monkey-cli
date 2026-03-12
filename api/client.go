@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -29,25 +28,6 @@ type StatusError struct {
 
 func (e *StatusError) Error() string {
 	return fmt.Sprintf("API returned status %d: %s", e.StatusCode, e.Body)
-}
-
-// retryNotifierKey is the context key for the per-request retry callback.
-type retryNotifierKey struct{}
-
-// perAttemptTimeoutKey is the context key for the per-attempt timeout duration.
-type perAttemptTimeoutKey struct{}
-
-// WithPerAttemptTimeout returns a context that will apply the given timeout to each
-// individual request attempt. This allows retrying after a timeout, as each retry
-// gets a fresh timeout rather than sharing an already-expired one.
-func WithPerAttemptTimeout(ctx context.Context, d time.Duration) context.Context {
-	return context.WithValue(ctx, perAttemptTimeoutKey{}, d)
-}
-
-// WithRetryNotifier returns a context that carries a callback invoked before each retry attempt.
-// attempt is 1-based; err is the error that triggered the retry.
-func WithRetryNotifier(ctx context.Context, fn func(attempt int, err error)) context.Context {
-	return context.WithValue(ctx, retryNotifierKey{}, fn)
 }
 
 // Client handles communication with the LLM API
@@ -191,15 +171,6 @@ func (c *Client) doSingleAttempt(ctx context.Context, jsonBody []byte) (apiRespo
 	return apiResp, nil
 }
 
-// applyPerAttemptTimeout wraps ctx in a fresh timeout if perAttemptTimeoutKey is set.
-// The returned CancelFunc must always be called (safe to call on a no-op cancel).
-func applyPerAttemptTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	if d, ok := ctx.Value(perAttemptTimeoutKey{}).(time.Duration); ok && d > 0 {
-		return context.WithTimeout(ctx, d)
-	}
-	return ctx, func() {}
-}
-
 // doAttempt wraps doSingleAttempt with a per-attempt timeout if one is configured
 // in the context via WithPerAttemptTimeout. This lets each retry get a fresh timeout
 // even after the previous attempt's deadline expired.
@@ -247,112 +218,6 @@ func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (apiResponse
 		}
 	}
 	return apiResponse{}, lastErr
-}
-
-// isRetryableError reports whether err warrants a retry attempt.
-// ctx should be the parent (non-per-attempt) context; if it is cancelled the
-// function returns false regardless of the error.
-func isRetryableError(ctx context.Context, err error) bool {
-	// Explicit user cancellation — do not retry.
-	if errors.Is(ctx.Err(), context.Canceled) {
-		return false
-	}
-	var statusErr *StatusError
-	if errors.As(err, &statusErr) {
-		return statusErr.StatusCode == http.StatusTooManyRequests || statusErr.StatusCode >= 500
-	}
-	// Per-attempt timeout expired (parent ctx is still alive) — retry with fresh timeout.
-	if errors.Is(err, context.DeadlineExceeded) {
-		return true
-	}
-	if errors.Is(err, context.Canceled) {
-		return false
-	}
-	// Network-level transport errors (connection reset, EOF, etc.) are retryable.
-	var urlErr *url.Error
-	return errors.As(err, &urlErr)
-}
-
-// extractText returns the concatenated text from all text blocks in a response.
-func extractText(resp apiResponse) (string, error) {
-	var parts []string
-	for _, block := range resp.Content {
-		if block.Type == "text" {
-			parts = append(parts, block.Text)
-		}
-	}
-	if len(parts) == 0 {
-		return "", errors.New("no text content in response")
-	}
-	return strings.Join(parts, "\n"), nil
-}
-
-// collectToolUseBlocks returns all tool_use content blocks from resp.Content.
-func collectToolUseBlocks(content []ContentBlock) []ContentBlock {
-	var blocks []ContentBlock
-	for _, b := range content {
-		if b.Type == "tool_use" {
-			blocks = append(blocks, b)
-		}
-	}
-	return blocks
-}
-
-// runToolCalls appends the assistant message, executes every tool call, fires
-// onCall callbacks, and appends the tool_result user message. Returns updated msgs.
-func runToolCalls(ctx context.Context, msgs []Message, respContent []ContentBlock, toolUseBlocks []ContentBlock, executor ToolExecutor, onCall []func(ToolCallResult)) []Message {
-	msgs = append(msgs, Message{Role: "assistant", Content: respContent})
-	toolResults := make([]ContentBlock, 0, len(toolUseBlocks))
-	for _, tu := range toolUseBlocks {
-		output, execErr := executor.ExecuteTool(ctx, tu.Name, tu.Input)
-		content := output
-		if execErr != nil && content == "" {
-			content = fmt.Sprintf("error: %v", execErr)
-		}
-		toolResults = append(toolResults, ContentBlock{
-			Type:      "tool_result",
-			ToolUseID: tu.ID,
-			Content:   content,
-		})
-		for _, fn := range onCall {
-			fn(ToolCallResult{Name: tu.Name, Input: tu.Input, Output: output, Err: execErr})
-		}
-	}
-	return append(msgs, Message{Role: "user", Content: toolResults})
-}
-
-// runToolLoop drives the agentic tool-calling loop. fetch is called for each turn;
-// tool results are fed back until the model returns a final text-only response.
-func runToolLoop(
-	ctx context.Context,
-	msgs []Message,
-	tools []Tool,
-	executor ToolExecutor,
-	onCall []func(ToolCallResult),
-	fetch func(msgs []Message, tools []Tool) (apiResponse, error),
-) (string, []Message, Usage, error) {
-	var totalUsage Usage
-	for {
-		resp, err := fetch(msgs, tools)
-		if err != nil {
-			return "", nil, Usage{}, err
-		}
-		totalUsage = totalUsage.Add(Usage{
-			InputTokens:  resp.Usage.InputTokens,
-			OutputTokens: resp.Usage.OutputTokens,
-		})
-
-		toolUseBlocks := collectToolUseBlocks(resp.Content)
-		if len(toolUseBlocks) == 0 {
-			text, err := extractText(resp)
-			if err != nil {
-				return "", nil, Usage{}, err
-			}
-			return text, append(msgs, Message{Role: "assistant", Content: text}), totalUsage, nil
-		}
-
-		msgs = runToolCalls(ctx, msgs, resp.Content, toolUseBlocks, executor, onCall)
-	}
 }
 
 // SendMessage sends a single user message and returns the response text.

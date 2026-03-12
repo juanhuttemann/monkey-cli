@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/juanhuttemann/monkey-cli/config"
 )
 
 func TestSendPrompt_Success(t *testing.T) {
@@ -288,6 +291,157 @@ func TestShouldLaunchTUI_WhitespaceOnly_ReturnsTrue(t *testing.T) {
 	result := shouldLaunchTUI(prompt)
 	if !result {
 		t.Error("shouldLaunchTUI('   ') = false, want true (whitespace should launch TUI)")
+	}
+}
+
+func TestIntroContent_NonEmpty(t *testing.T) {
+	content := introContent()
+	if content == "" {
+		t.Error("introContent() should return non-empty ASCII art string")
+	}
+}
+
+func TestBuildClientOpts_WithMaxTokens(t *testing.T) {
+	server, cleanup := createMockServer(successResponse("ok"), 200)
+	defer cleanup()
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
+	t.Setenv("ANTHROPIC_MAX_TOKENS", "1024")
+
+	loader := config.NewEnvLoader()
+	cfg, err := loader.Load()
+	if err != nil {
+		t.Fatalf("loader.Load() error: %v", err)
+	}
+	opts, err := buildClientOpts(cfg)
+	if err != nil {
+		t.Fatalf("buildClientOpts() error: %v", err)
+	}
+	if len(opts) == 0 {
+		t.Error("buildClientOpts should return non-empty options")
+	}
+}
+
+func TestBuildClientOpts_SystemPromptAndClaudeMD(t *testing.T) {
+	// Test the concat path: both MONKEY.md and CLAUDE.md are found.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "MONKEY.md"), []byte("monkey system prompt"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("claude context"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", "https://api.example.com")
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
+
+	loader := config.NewEnvLoader()
+	cfg, err := loader.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	opts, err := buildClientOpts(cfg)
+	if err != nil {
+		t.Fatalf("buildClientOpts() error: %v", err)
+	}
+	if len(opts) == 0 {
+		t.Error("buildClientOpts should return non-empty options")
+	}
+}
+
+func TestBuildClientOpts_SystemPromptReadError(t *testing.T) {
+	// Create a directory at MONKEY.md path so LoadSystemPromptFile returns a non-IsNotExist error.
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "MONKEY.md"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", "https://api.example.com")
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
+
+	loader := config.NewEnvLoader()
+	cfg, err := loader.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	_, err = buildClientOpts(cfg)
+	if err == nil {
+		t.Fatal("buildClientOpts should return error when MONKEY.md is unreadable")
+	}
+}
+
+func TestSendPrompt_BuildOptsError(t *testing.T) {
+	// Create a directory at MONKEY.md path so buildClientOpts returns an error.
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "MONKEY.md"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", "https://api.example.com")
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	_, err := sendPrompt("test")
+	if err == nil {
+		t.Fatal("sendPrompt should return error when buildClientOpts fails")
+	}
+}
+
+func TestBuildClientOpts_LoadsSystemPrompt(t *testing.T) {
+	dir := t.TempDir()
+	promptFile := dir + "/MONKEY.md"
+	if err := os.WriteFile(promptFile, []byte("You are a helpful monkey."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	server, cleanup := createMockServer(successResponse("ok"), 200)
+	defer cleanup()
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
+
+	loader := config.NewEnvLoader()
+	cfg, err := loader.Load()
+	if err != nil {
+		t.Fatalf("loader.Load() error: %v", err)
+	}
+
+	// Temporarily chdir to dir so MONKEY.md is found
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	opts, err := buildClientOpts(cfg)
+	if err != nil {
+		t.Fatalf("buildClientOpts() error: %v", err)
+	}
+	if len(opts) == 0 {
+		t.Error("buildClientOpts should return non-empty options")
 	}
 }
 

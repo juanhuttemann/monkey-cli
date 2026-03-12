@@ -229,3 +229,28 @@ func TestRenderMessages_SearchActive_MatchHighlighted(t *testing.T) {
 		t.Error("rendered output should contain the matched content")
 	}
 }
+
+func TestSearchBar_NextMatch_NoMatches_DoesNothing(t *testing.T) {
+	sb := NewSearchBar()
+	// No query set → no matches
+	sb.NextMatch() // should not panic
+	if sb.CurrentMatchIndex() != -1 {
+		t.Errorf("NextMatch with no matches should leave cursor at -1, got %d", sb.CurrentMatchIndex())
+	}
+}
+
+func TestSearchBar_PrevMatch_NoMatches_DoesNothing(t *testing.T) {
+	sb := NewSearchBar()
+	sb.PrevMatch() // should not panic
+	if sb.CurrentMatchIndex() != -1 {
+		t.Errorf("PrevMatch with no matches should leave cursor at -1, got %d", sb.CurrentMatchIndex())
+	}
+}
+
+func TestScrollToMatch_NoMatches_DoesNotPanic(t *testing.T) {
+	model := NewModel(nil)
+	model.SetDimensions(80, 24)
+	model.searchBar.Activate()
+	// No query → no matches → CurrentMatchIndex() == -1 → early return
+	model.scrollToMatch()
+}

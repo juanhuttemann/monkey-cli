@@ -137,6 +137,30 @@ func TestFormatCost_Dollar(t *testing.T) {
 	}
 }
 
+func TestEnvFloat_InvalidValue(t *testing.T) {
+	t.Setenv("MONKEY_TEST_FLOAT", "not-a-number")
+	v, ok := envFloat("MONKEY_TEST_FLOAT")
+	if ok {
+		t.Errorf("envFloat with invalid value should return false, got %v", v)
+	}
+}
+
+func TestEnvFloat_NegativeValue(t *testing.T) {
+	t.Setenv("MONKEY_TEST_FLOAT", "-1.5")
+	v, ok := envFloat("MONKEY_TEST_FLOAT")
+	if ok {
+		t.Errorf("envFloat with negative value should return false, got %v", v)
+	}
+}
+
+func TestEnvFloat_ValidValue(t *testing.T) {
+	t.Setenv("MONKEY_TEST_FLOAT", "3.14")
+	v, ok := envFloat("MONKEY_TEST_FLOAT")
+	if !ok || v != 3.14 {
+		t.Errorf("envFloat('3.14') = (%v, %v), want (3.14, true)", v, ok)
+	}
+}
+
 // unsetPricingEnv clears the pricing env vars for the duration of the test.
 func unsetPricingEnv(t *testing.T) {
 	t.Helper()
@@ -148,4 +172,25 @@ func unsetPricingEnv(t *testing.T) {
 		_ = os.Setenv(EnvPriceInput, old1)
 		_ = os.Setenv(EnvPriceOutput, old2)
 	})
+}
+
+// --- formatTokenCount ---
+
+func TestFormatTokenCount(t *testing.T) {
+	tests := []struct {
+		n    int
+		want string
+	}{
+		{0, "0"},
+		{999, "999"},
+		{1000, "1,000"},
+		{8341, "8,341"},
+		{1234567, "1,234,567"},
+	}
+	for _, tc := range tests {
+		got := formatTokenCount(tc.n)
+		if got != tc.want {
+			t.Errorf("formatTokenCount(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
 }

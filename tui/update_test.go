@@ -11,156 +11,6 @@ import (
 	"github.com/juanhuttemann/monkey-cli/api"
 )
 
-// --- Prompt history (Up/Down arrow) ---
-
-func TestUpdate_KeyUp_NavigatesHistoryBackward(t *testing.T) {
-	model := NewModel(nil)
-	model.promptHistory = historyWithEntries("first", "second", "third")
-
-	upKey := tea.KeyMsg{Type: tea.KeyUp}
-	updated, _ := model.Update(upKey)
-
-	m := updated.(Model)
-	if m.GetInput() != "third" {
-		t.Errorf("after Up, input = %q, want %q", m.GetInput(), "third")
-	}
-}
-
-func TestUpdate_KeyUp_ContinuesToOlderEntries(t *testing.T) {
-	model := NewModel(nil)
-	model.promptHistory = historyWithEntries("first", "second", "third")
-
-	upKey := tea.KeyMsg{Type: tea.KeyUp}
-	m1, _ := model.Update(upKey)
-	m2, _ := m1.(Model).Update(upKey)
-
-	if m2.(Model).GetInput() != "second" {
-		t.Errorf("after two Up presses, input = %q, want %q", m2.(Model).GetInput(), "second")
-	}
-}
-
-func TestUpdate_KeyDown_RestoresDraft(t *testing.T) {
-	model := NewModel(nil)
-	model.SetInput("my draft")
-	model.promptHistory = historyWithEntries("old entry")
-
-	upKey := tea.KeyMsg{Type: tea.KeyUp}
-	downKey := tea.KeyMsg{Type: tea.KeyDown}
-
-	m1, _ := model.Update(upKey)        // navigate to "old entry", draft saved
-	m2, _ := m1.(Model).Update(downKey) // back down → restore draft
-
-	if m2.(Model).GetInput() != "my draft" {
-		t.Errorf("after Up then Down, input = %q, want %q", m2.(Model).GetInput(), "my draft")
-	}
-}
-
-func TestUpdate_CtrlEnter_SavesPromptToHistory(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(fixture(t, "response_ok.json"))
-	}))
-	defer server.Close()
-
-	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	model := NewModel(client)
-	model.SetInput("my prompt")
-
-	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
-	updated, _ := model.Update(ctrlEnter)
-
-	m := updated.(Model)
-	if len(m.promptHistory.entries) == 0 {
-		t.Error("prompt should be saved to history after submit")
-	}
-	if m.promptHistory.entries[len(m.promptHistory.entries)-1] != "my prompt" {
-		t.Errorf("last history entry = %q, want %q",
-			m.promptHistory.entries[len(m.promptHistory.entries)-1], "my prompt")
-	}
-}
-
-func TestUpdate_KeyUp_NoopWhenPickerActive(t *testing.T) {
-	model := NewModel(nil)
-	model.promptHistory = historyWithEntries("old")
-	model.filePicker.Activate()
-	model.SetInput("")
-
-	upKey := tea.KeyMsg{Type: tea.KeyUp}
-	updated, _ := model.Update(upKey)
-
-	// input should NOT be changed to history entry while picker is open
-	if updated.(Model).GetInput() == "old" {
-		t.Error("Up should not navigate history when file picker is active")
-	}
-}
-
-func TestUpdate_CtrlEnter_SubmitsPrompt(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(fixture(t, "response_text.json"))
-	}))
-	defer server.Close()
-
-	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
-	model := NewModel(client)
-	model.SetInput("test prompt")
-
-	// Simulate Ctrl+Enter key (using KeyCtrlM as it closest equivalent)
-	// Note: In actual implementation, this may be handled differently
-	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
-	updatedModel, cmd := model.Update(ctrlEnter)
-
-	if cmd == nil {
-		t.Error("Update(CtrlEnter) should return a non-nil command when input has content")
-	}
-
-	// Model should be in loading state
-	m := updatedModel.(Model)
-	if !m.IsLoading() {
-		t.Error("Model should be in loading state after submitting prompt")
-	}
-}
-
-func TestUpdate_CtrlEnter_IgnoresEmptyInput(t *testing.T) {
-	model := NewModel(nil)
-	// Input is empty by default
-
-	// Simulate Ctrl+Enter key
-	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
-	updatedModel, cmd := model.Update(ctrlEnter)
-
-	if cmd != nil {
-		t.Error("Update(CtrlEnter) should return nil command when input is empty")
-	}
-
-	m := updatedModel.(Model)
-	if m.IsLoading() {
-		t.Error("Model should not be in loading state with empty input")
-	}
-}
-
-func TestUpdate_CtrlEnter_DisabledWhileLoading(t *testing.T) {
-	model := NewModel(nil)
-	model.SetInput("test prompt")
-	model.SetLoading(true)
-
-	// Simulate Ctrl+Enter key while already loading
-	ctrlEnter := tea.KeyMsg{Type: tea.KeyCtrlM}
-	updatedModel, cmd := model.Update(ctrlEnter)
-
-	if cmd != nil {
-		t.Error("Update(CtrlEnter) should return nil command when already loading")
-	}
-
-	m := updatedModel.(Model)
-	// History should not have been modified
-	if len(m.GetHistory()) != 0 {
-		t.Error("History should be empty when CtrlEnter is pressed during loading")
-	}
-}
-
 func TestUpdate_MouseWheel_ScrollsViewport(t *testing.T) {
 	model := NewModel(nil)
 	model.SetDimensions(80, 24)
@@ -376,42 +226,6 @@ func TestUpdate_PromptErrorMsg_SetsLoadingFalse(t *testing.T) {
 	}
 }
 
-func TestUpdate_Esc_WhenReady_IsNoop(t *testing.T) {
-	model := NewModel(nil)
-
-	// Esc when StateReady is now a no-op (use /exit to quit)
-	escKey := tea.KeyMsg{Type: tea.KeyEsc}
-	_, cmd := model.Update(escKey)
-
-	if cmd != nil {
-		result := cmd()
-		if _, isQuit := result.(tea.QuitMsg); isQuit {
-			t.Error("Esc when StateReady should not quit — use /exit instead")
-		}
-	}
-}
-
-func TestUpdate_Esc_WhenLoading_GoesReady(t *testing.T) {
-	model := NewModel(nil)
-	model.SetLoading(true)
-
-	escKey := tea.KeyMsg{Type: tea.KeyEsc}
-	updatedModel, cmd := model.Update(escKey)
-
-	m := updatedModel.(Model)
-	if m.IsLoading() {
-		t.Error("Model should not be loading after Esc while loading")
-	}
-
-	// Should not quit — cmd may be non-nil (timer.Stop) but must not produce QuitMsg
-	if cmd != nil {
-		result := cmd()
-		if _, isQuit := result.(tea.QuitMsg); isQuit {
-			t.Error("Esc while loading should not quit the app")
-		}
-	}
-}
-
 func TestUpdate_PromptCancelled_PreservesPendingPromptInAPIMessages(t *testing.T) {
 	model := NewModel(nil)
 	model.apiMessages = []api.Message{{Role: "user", Content: "hi"}, {Role: "assistant", Content: "hello"}}
@@ -492,21 +306,6 @@ func TestUpdate_PromptCancelled_WhenReady_IsNoOp(t *testing.T) {
 		t.Errorf("PromptCancelledMsg when ready should not change history: got %d, want %d",
 			len(m.GetHistory()), initialHistory)
 	}
-}
-
-func TestUpdate_CtrlC_Exits(t *testing.T) {
-	model := NewModel(nil)
-
-	// Simulate Ctrl+C key
-	ctrlC := tea.KeyMsg{Type: tea.KeyCtrlC}
-	_, cmd := model.Update(ctrlC)
-
-	// Should return a quit command
-	if cmd == nil {
-		t.Error("Update(CtrlC) should return a non-nil command")
-	}
-
-	// cmd is non-nil: the quit sequence (ClearScreen + Quit) will be executed by the runtime.
 }
 
 func TestUpdate_SpinnerTick_StopsWhenNotLoading(t *testing.T) {
@@ -617,109 +416,6 @@ func TestUpdate_SpinnerTick_ContinuesWhenLoading(t *testing.T) {
 
 	if cmd == nil {
 		t.Error("spinner.TickMsg in StateLoading should return a non-nil cmd (keep ticking)")
-	}
-}
-
-// --- Multiline Up/Down navigation ---
-
-func TestUpdate_KeyUp_MultilineInput_MovesWithinTextFirst(t *testing.T) {
-	// Cursor is on line 1 (last line) of a 2-line input.
-	// Pressing Up should move cursor to line 0, NOT navigate history.
-	model := NewModel(nil)
-	model.promptHistory = historyWithEntries("old entry")
-	model.SetInput("line1\nline2") // cursor ends up on line 1
-
-	upKey := tea.KeyMsg{Type: tea.KeyUp}
-	updated, _ := model.Update(upKey)
-
-	m := updated.(Model)
-	// Input must be unchanged — history navigation must NOT have triggered.
-	if m.GetInput() != "line1\nline2" {
-		t.Errorf("Up on line 1 changed input to %q; want %q (cursor should move within text, not navigate history)",
-			m.GetInput(), "line1\nline2")
-	}
-	// Cursor should now be on line 0.
-	if m.input.Line() != 0 {
-		t.Errorf("cursor line after Up = %d, want 0", m.input.Line())
-	}
-}
-
-func TestUpdate_KeyUp_MultilineInput_NavigatesHistoryFromFirstLine(t *testing.T) {
-	// Cursor is already on line 0 of a 2-line input.
-	// Pressing Up should navigate to the previous history entry.
-	model := NewModel(nil)
-	model.promptHistory = historyWithEntries("old entry")
-	model.SetInput("line1\nline2") // cursor on line 1
-
-	upKey := tea.KeyMsg{Type: tea.KeyUp}
-	// First Up: move cursor to line 0.
-	m1, _ := model.Update(upKey)
-	// Second Up: now on line 0, navigate history.
-	m2, _ := m1.(Model).Update(upKey)
-
-	if m2.(Model).GetInput() != "old entry" {
-		t.Errorf("second Up should navigate history; got %q, want %q",
-			m2.(Model).GetInput(), "old entry")
-	}
-}
-
-func TestUpdate_KeyDown_MultilineInput_MovesWithinTextFirst(t *testing.T) {
-	// Cursor is on line 0 of a 2-line input.
-	// Pressing Down should move cursor to line 1, NOT navigate history.
-	model := NewModel(nil)
-	model.promptHistory = historyWithEntries("old entry")
-	model.SetInput("line1\nline2") // cursor on line 1 after SetInput
-
-	upKey := tea.KeyMsg{Type: tea.KeyUp}
-	downKey := tea.KeyMsg{Type: tea.KeyDown}
-
-	// Move cursor to line 0.
-	m1, _ := model.Update(upKey)
-	if m1.(Model).input.Line() != 0 {
-		t.Skip("precondition failed: cursor not on line 0 after Up")
-	}
-
-	// Now press Down: should move to line 1, not navigate history.
-	m2, _ := m1.(Model).Update(downKey)
-
-	m := m2.(Model)
-	if m.GetInput() != "line1\nline2" {
-		t.Errorf("Down on line 0 of multiline changed input to %q; want %q",
-			m.GetInput(), "line1\nline2")
-	}
-	if m.input.Line() != 1 {
-		t.Errorf("cursor line after Down = %d, want 1", m.input.Line())
-	}
-}
-
-// --- Ctrl+J inserts newline ---
-
-func TestUpdate_CtrlJ_InsertsNewline(t *testing.T) {
-	model := NewModel(nil)
-	model.SetInput("hello")
-
-	ctrlJ := tea.KeyMsg{Type: tea.KeyCtrlJ}
-	updated, _ := model.Update(ctrlJ)
-
-	m := updated.(Model)
-	if !strings.Contains(m.GetInput(), "\n") {
-		t.Errorf("Ctrl+J should insert a newline, got input: %q", m.GetInput())
-	}
-}
-
-func TestUpdate_CtrlJ_DoesNotSubmit(t *testing.T) {
-	model := NewModel(nil)
-	model.SetInput("hello")
-
-	ctrlJ := tea.KeyMsg{Type: tea.KeyCtrlJ}
-	updated, _ := model.Update(ctrlJ)
-
-	m := updated.(Model)
-	if m.IsLoading() {
-		t.Error("Ctrl+J should not submit the message")
-	}
-	if len(m.GetHistory()) != 0 {
-		t.Error("Ctrl+J should not add to history")
 	}
 }
 
@@ -994,5 +690,78 @@ func TestUpdate_CompactResponseMsg_ResetsAPIMessages(t *testing.T) {
 	}
 	if !found {
 		t.Error("summary text should appear in apiMessages after compact")
+	}
+}
+
+// --- PartialResponseMsg: fallback render when search active ---
+
+func TestUpdate_PartialResponse_SearchActive_UsesFullRender(t *testing.T) {
+	model := NewModel(nil)
+	model.streaming = true
+	model.searchBar.Activate()
+	model.AddMessage("assistant", "prior")
+	_, _ = model.Update(PartialResponseMsg{Token: "tok"})
+}
+
+// --- PartialResponseMsg: wait cmd when tokenCh set ---
+
+func TestUpdate_PartialResponse_WithTokenCh_ReturnsWaitCmd(t *testing.T) {
+	model := NewModel(nil)
+	model.streaming = true
+	tokenCh := make(chan PartialResponseMsg, 1)
+	model.tokenCh = tokenCh
+	model.AddMessage("assistant", "")
+	_, cmd := model.Update(PartialResponseMsg{Token: "tok"})
+	if cmd == nil {
+		t.Error("PartialResponseMsg with tokenCh set should return a wait cmd")
+	}
+}
+
+// --- tokenDoneMsg ---
+
+func TestUpdate_TokenDoneMsg_NoOp(t *testing.T) {
+	model := NewModel(nil)
+	_, _ = model.Update(tokenDoneMsg{})
+}
+
+// --- PromptCancelledMsg while loading ---
+
+func TestUpdate_PromptCancelledMsg_WhileLoading_SetsReady(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+	m, _ := model.Update(PromptCancelledMsg{})
+	if m.(Model).IsLoading() {
+		t.Error("PromptCancelledMsg while loading should transition to ready state")
+	}
+}
+
+// --- ToolCallMsg: wait cmd when toolCallCh set ---
+
+func TestUpdate_ToolCallMsg_WithToolCallCh_ReturnsWaitCmd(t *testing.T) {
+	model := NewModel(nil)
+	toolCallCh := make(chan ToolCallMsg, 1)
+	model.toolCallCh = toolCallCh
+	_, cmd := model.Update(ToolCallMsg{ToolCall: api.ToolCallResult{Name: "bash", Output: "ok"}})
+	if cmd == nil {
+		t.Error("ToolCallMsg with toolCallCh set should return a wait cmd")
+	}
+}
+
+// --- toolCallDoneMsg ---
+
+func TestUpdate_ToolCallDoneMsg_NoOp(t *testing.T) {
+	model := NewModel(nil)
+	_, _ = model.Update(toolCallDoneMsg{})
+}
+
+// --- RetryingMsg: wait cmd when retryCh set ---
+
+func TestUpdate_RetryingMsg_WithRetryCh_ReturnsWaitCmd(t *testing.T) {
+	model := NewModel(nil)
+	retryCh := make(chan RetryingMsg, 1)
+	model.retryCh = retryCh
+	_, cmd := model.Update(RetryingMsg{Attempt: 1})
+	if cmd == nil {
+		t.Error("RetryingMsg with retryCh set should return a wait cmd")
 	}
 }

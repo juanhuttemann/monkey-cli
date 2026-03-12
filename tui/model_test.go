@@ -239,3 +239,38 @@ func TestUpdate_MultipleKeys_BuildsInput(t *testing.T) {
 		t.Errorf("After typing 'hi', GetInput() = %q, want %q", model.GetInput(), "hi")
 	}
 }
+
+func TestModel_Init_ReturnsCmd(t *testing.T) {
+	model := NewModel(nil)
+	cmd := model.Init()
+	if cmd == nil {
+		t.Error("Init() should return a non-nil Cmd")
+	}
+}
+
+func TestModel_LastAssistantContent_NoMessages(t *testing.T) {
+	model := NewModel(nil)
+	if got := model.lastAssistantContent(); got != "" {
+		t.Errorf("lastAssistantContent() = %q, want empty", got)
+	}
+}
+
+func TestModel_LastAssistantContent_NoAssistant(t *testing.T) {
+	model := NewModel(nil)
+	model.AddMessage("user", "hello")
+	model.AddMessage("user", "world")
+	if got := model.lastAssistantContent(); got != "" {
+		t.Errorf("lastAssistantContent() with no assistant messages = %q, want empty", got)
+	}
+}
+
+func TestModel_LastAssistantContent_ReturnsLast(t *testing.T) {
+	model := NewModel(nil)
+	model.AddMessage("user", "hi")
+	model.AddMessage("assistant", "first")
+	model.AddMessage("user", "again")
+	model.AddMessage("assistant", "second")
+	if got := model.lastAssistantContent(); got != "second" {
+		t.Errorf("lastAssistantContent() = %q, want %q", got, "second")
+	}
+}

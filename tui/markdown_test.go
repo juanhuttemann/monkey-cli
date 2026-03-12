@@ -98,6 +98,67 @@ func TestRenderMarkdown_NoBackgroundColors(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdown_NegativeWidth_FallsBack(t *testing.T) {
+	result := RenderMarkdown("some text", -1)
+	if result != "some text" {
+		t.Errorf("RenderMarkdown with negative width should fall back, got: %q", result)
+	}
+}
+
+func TestStripANSIBackground_48Alone(t *testing.T) {
+	// 48 without a sub-type param: should be dropped
+	seq := "\x1b[48m"
+	result := stripANSIBackground(seq)
+	if result != "" {
+		t.Errorf("stripANSIBackground(%q) = %q, want empty", seq, result)
+	}
+}
+
+func TestStripANSIBackground_48With2RGB(t *testing.T) {
+	// 48;2;255;0;0 = red background — must be stripped
+	seq := "\x1b[48;2;255;0;0m"
+	result := stripANSIBackground(seq)
+	if result != "" {
+		t.Errorf("stripANSIBackground(%q) = %q, want empty (RGB background stripped)", seq, result)
+	}
+}
+
+func TestStripANSIBackground_48WithDefaultSub(t *testing.T) {
+	// 48 followed by an unrecognised sub-type: should still be dropped
+	seq := "\x1b[48;9mtext"
+	result := stripANSIBackground(seq)
+	if strings.Contains(result, "48") {
+		t.Errorf("stripANSIBackground should drop 48;9 background, got: %q", result)
+	}
+}
+
+func TestStripANSIBackground_PreservesForeground(t *testing.T) {
+	// 38;2;255;107;107 = foreground red — must be preserved
+	seq := "\x1b[38;2;255;107;107mtext\x1b[0m"
+	result := stripANSIBackground(seq)
+	if !strings.Contains(result, "38;2;255;107;107") {
+		t.Errorf("stripANSIBackground should preserve foreground 38;2;R;G;B, got: %q", result)
+	}
+}
+
+func TestStripANSIBackground_EmptySequence(t *testing.T) {
+	// \x1b[m = empty SGR — should be preserved as-is
+	seq := "\x1b[m"
+	result := stripANSIBackground(seq)
+	if result != seq {
+		t.Errorf("stripANSIBackground(%q) = %q, want same", seq, result)
+	}
+}
+
+func TestStripANSIBackground_BrightBackground(t *testing.T) {
+	// Codes 100-107 are bright background colors — must be stripped
+	seq := "\x1b[103m"
+	result := stripANSIBackground(seq)
+	if result != "" {
+		t.Errorf("stripANSIBackground bright background %q = %q, want empty", seq, result)
+	}
+}
+
 func TestView_AssistantMessage_UsesMarkdown(t *testing.T) {
 	model := NewModel(nil)
 	model.SetDimensions(80, 24)

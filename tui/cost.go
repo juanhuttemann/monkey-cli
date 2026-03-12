@@ -80,6 +80,23 @@ func estimateCost(modelName string, usage api.Usage) float64 {
 		float64(usage.OutputTokens)/1_000_000*outputPrice
 }
 
+// formatTokenCount formats an integer token count with commas (e.g. 8341 → "8,341").
+func formatTokenCount(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	// Insert commas every 3 digits from the right.
+	var out []byte
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, byte(c))
+	}
+	return string(out)
+}
+
 // formatCost formats a USD cost as a human-readable string (e.g. "$0.023").
 // Returns "" when cost is zero.
 func formatCost(cost float64) string {

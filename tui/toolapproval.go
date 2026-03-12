@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/juanhuttemann/monkey-cli/tools"
 )
 
 // ToolApprovalDialog is a Yes/No prompt shown when the model wants to run a tool.
@@ -123,6 +124,49 @@ func (d ToolApprovalDialog) DeniedHeight() int {
 		return 0
 	}
 	return d.cachedDenied
+}
+
+// buildApprovalPreview returns a human-readable preview string for the given
+// tool call, used in the approval dialog. Returns "" when no preview is available.
+func buildApprovalPreview(toolName string, input map[string]any) string {
+	switch toolName {
+	case "edit":
+		path, _ := input["path"].(string)
+		oldStr, _ := input["old_string"].(string)
+		newStr, _ := input["new_string"].(string)
+		if diff, err := tools.DiffEdit(path, oldStr, newStr); err == nil {
+			return diff
+		}
+	case "bash":
+		preview, _ := input["command"].(string)
+		return preview
+	case "read":
+		preview, _ := input["path"].(string)
+		return preview
+	case "write":
+		path, _ := input["path"].(string)
+		content, _ := input["content"].(string)
+		lines := strings.SplitN(content, "\n", 6)
+		if len(lines) > 5 {
+			lines = append(lines[:5], "...")
+		}
+		return path + "\n" + strings.Join(lines, "\n")
+	case "glob":
+		path, _ := input["path"].(string)
+		pattern, _ := input["pattern"].(string)
+		if path == "" {
+			path = "."
+		}
+		return pattern + " in " + path
+	case "grep":
+		pattern, _ := input["pattern"].(string)
+		path, _ := input["path"].(string)
+		if path == "" {
+			path = "."
+		}
+		return pattern + " in " + path
+	}
+	return ""
 }
 
 // DeniedView renders a grayed-out version of the dialog after the user cancels a tool.

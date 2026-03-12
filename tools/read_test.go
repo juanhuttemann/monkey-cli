@@ -229,3 +229,21 @@ func TestReadExecutor_OffsetBeyondEOF(t *testing.T) {
 		t.Errorf("offset beyond EOF should return empty, got %q", result)
 	}
 }
+
+func TestToInt_Int(t *testing.T) {
+	if got := toInt(42); got != 42 {
+		t.Errorf("toInt(42) = %d, want 42", got)
+	}
+}
+
+func TestToInt_Float64(t *testing.T) {
+	if got := toInt(float64(7)); got != 7 {
+		t.Errorf("toInt(7.0) = %d, want 7", got)
+	}
+}
+
+func TestToInt_OtherType(t *testing.T) {
+	if got := toInt("not a number"); got != 0 {
+		t.Errorf("toInt(string) = %d, want 0", got)
+	}
+}

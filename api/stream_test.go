@@ -529,3 +529,61 @@ func TestSendMessageWithToolsStreaming_ReturnsAccumulatedMessages(t *testing.T) 
 		t.Errorf("final message content = %v, want today", msgs[3].Content)
 	}
 }
+
+func TestDoStreamRequest_RetryOnRateLimitThenSucceeds(t *testing.T) {
+	// First attempt returns 429 (retryable); second returns 200 with SSE body.
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		if n == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":"rate limited"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(sseTextResponse("retried ok", 1, 1)))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "key", WithModel("m"), WithMaxRetries(2), WithRetryDelay(0))
+
+	var retryNotified bool
+	ctx := WithRetryNotifier(context.Background(), func(attempt int, err error) {
+		retryNotified = true
+	})
+
+	_, _, _, err := client.SendMessageWithToolsStreaming(ctx,
+		[]Message{{Role: "user", Content: "hi"}},
+		nil, mockExecutor{}, nil,
+	)
+	if err != nil {
+		t.Fatalf("expected success after retry, got error: %v", err)
+	}
+	if !retryNotified {
+		t.Error("retry notifier should have been called")
+	}
+}
+
+func TestDoStreamRequest_NonRetryableError_Breaks(t *testing.T) {
+	// 400 is not retryable; should return immediately without retrying.
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"bad request"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "key", WithModel("m"), WithMaxRetries(3), WithRetryDelay(0))
+	_, _, _, err := client.SendMessageWithToolsStreaming(context.Background(),
+		[]Message{{Role: "user", Content: "hi"}},
+		nil, mockExecutor{}, nil,
+	)
+	if err == nil {
+		t.Fatal("expected error for 400 response")
+	}
+	if calls.Load() != 1 {
+		t.Errorf("expected 1 call (no retries), got %d", calls.Load())
+	}
+}

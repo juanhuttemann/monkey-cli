@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// --- messageStyleWidth ---
+
 func TestMessageStyleWidth_StandardTerminal_Unchanged(t *testing.T) {
 	m := NewModel(nil)
 	m.SetDimensions(80, 24)
@@ -35,8 +37,6 @@ func TestMessageStyleWidth_WideTerminal_Capped(t *testing.T) {
 
 // TestRenderMessages_WideTerminal_BubbleWidthCapped verifies that on a very wide
 // terminal message bubbles don't expand to full terminal width.
-// Tests renderMessages() directly (input box is intentionally full-width and excluded).
-// Uses rune count for display width since box-drawing chars are multi-byte UTF-8.
 func TestRenderMessages_WideTerminal_BubbleWidthCapped(t *testing.T) {
 	m := NewModel(nil)
 	m.SetDimensions(200, 24)
@@ -45,7 +45,6 @@ func TestRenderMessages_WideTerminal_BubbleWidthCapped(t *testing.T) {
 
 	content := stripANSI(m.renderMessages())
 
-	// With the cap, bubble outer width ≤ ~79 display chars (runes).
 	for _, line := range strings.Split(content, "\n") {
 		trimmed := strings.TrimRight(line, " ")
 		if len([]rune(trimmed)) > 130 {
@@ -64,7 +63,6 @@ func TestRenderMessages_NarrowTerminal_WidthPreserved(t *testing.T) {
 
 	content := stripANSI(m.renderMessages())
 
-	// On a 50-char terminal, border lines should span close to full width (≥44 display chars).
 	for _, line := range strings.Split(content, "\n") {
 		if strings.Contains(line, "╭") {
 			displayWidth := len([]rune(strings.TrimRight(line, " ")))
@@ -76,9 +74,19 @@ func TestRenderMessages_NarrowTerminal_WidthPreserved(t *testing.T) {
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+// --- inputWithCursor ---
+
+func TestRender_InputWithCursor_ContainsCursorMarker(t *testing.T) {
+	m := NewModel(nil)
+	m.SetInput("hello")
+	if !strings.Contains(m.inputWithCursor(), "▌") {
+		t.Error("inputWithCursor() should contain cursor marker ▌")
 	}
-	return b
+}
+
+func TestRender_InputWithCursor_EmptyInput(t *testing.T) {
+	m := NewModel(nil)
+	if !strings.Contains(m.inputWithCursor(), "▌") {
+		t.Error("inputWithCursor() on empty input should contain cursor marker ▌")
+	}
 }

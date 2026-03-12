@@ -281,3 +281,182 @@ func TestView_ToolApprovalDialog_ApprovedAfterYes_NoCanceledMessage(t *testing.T
 		t.Errorf("View after Yes should not contain 'Canceled by user': %q", view)
 	}
 }
+
+// --- ToolApprovalDialog: No with cancelFn set ---
+
+func TestUpdate_ToolApprovalDialog_No_CallsCancelFn(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+	var called bool
+	model.cancelFn = func() { called = true }
+	ch := make(chan bool, 1)
+	m1, _ := model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
+	m2, _ := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyDown}) // move to No
+	_, _ = m2.(Model).Update(tea.KeyMsg{Type: tea.KeyCtrlM})  // confirm No
+	if !called {
+		t.Error("confirming No in approval dialog should invoke cancelFn")
+	}
+}
+
+// --- ToolApprovalDialog: Yes with approvalCh ---
+
+func TestUpdate_ToolApprovalDialog_Yes_WithApprovalCh_ReturnsWaitCmd(t *testing.T) {
+	model := NewModel(nil)
+	approvalCh := make(chan ToolApprovalRequestMsg, 1)
+	model.approvalCh = approvalCh
+	ch := make(chan bool, 1)
+	m1, _ := model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
+	_, cmd := m1.(Model).Update(tea.KeyMsg{Type: tea.KeyCtrlM}) // confirm Yes (default)
+	if cmd == nil {
+		t.Error("confirming Yes with approvalCh set should return a wait cmd")
+	}
+}
+
+// --- ToolApprovalRequestMsg: ape mode auto-approves ---
+
+func TestUpdate_ToolApprovalRequestMsg_ApeMode_AutoApproves(t *testing.T) {
+	model := NewModel(nil)
+	model.apeMode = true
+	ch := make(chan bool, 1)
+	_, _ = model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
+	select {
+	case approved := <-ch:
+		if !approved {
+			t.Error("ape mode should auto-approve tool requests")
+		}
+	default:
+		t.Error("ape mode should have sent approval on responseCh immediately")
+	}
+}
+
+// --- ToolApprovalRequestMsg with approvalCh: returns wait cmd ---
+
+func TestUpdate_ToolApprovalRequestMsg_WithApprovalCh_ReturnsWaitCmd(t *testing.T) {
+	model := NewModel(nil)
+	approvalCh := make(chan ToolApprovalRequestMsg, 1)
+	model.approvalCh = approvalCh
+	ch := make(chan bool, 1)
+	_, cmd := model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
+	if cmd == nil {
+		t.Error("ToolApprovalRequestMsg with approvalCh set should return a wait cmd")
+	}
+}
+
+// --- Tool approval previews: read, write, glob, grep ---
+
+func TestUpdate_ToolApprovalRequestMsg_ReadTool_ShowsPath(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	m, _ := model.Update(ToolApprovalRequestMsg{
+		ModelName:  "m",
+		ToolName:   "read",
+		Input:      map[string]any{"path": "/tmp/file.txt"},
+		ResponseCh: ch,
+	})
+	if !strings.Contains(stripANSI(m.(Model).approvalDialog.View()), "/tmp/file.txt") {
+		t.Error("read tool approval preview should contain the file path")
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_WriteTool_ShowsPreview(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	m, _ := model.Update(ToolApprovalRequestMsg{
+		ModelName:  "m",
+		ToolName:   "write",
+		Input:      map[string]any{"path": "/tmp/out.txt", "content": "line1\nline2\nline3"},
+		ResponseCh: ch,
+	})
+	if !strings.Contains(stripANSI(m.(Model).approvalDialog.View()), "/tmp/out.txt") {
+		t.Error("write tool approval preview should contain the file path")
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_WriteTool_TruncatesLongContent(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	content := "l1\nl2\nl3\nl4\nl5\nl6\nl7"
+	m, _ := model.Update(ToolApprovalRequestMsg{
+		ModelName:  "m",
+		ToolName:   "write",
+		Input:      map[string]any{"path": "/tmp/out.txt", "content": content},
+		ResponseCh: ch,
+	})
+	if !strings.Contains(stripANSI(m.(Model).approvalDialog.View()), "...") {
+		t.Error("write tool approval with >5 lines should show truncation marker '...'")
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_GlobTool_ShowsPatternAndPath(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	m, _ := model.Update(ToolApprovalRequestMsg{
+		ModelName:  "m",
+		ToolName:   "glob",
+		Input:      map[string]any{"pattern": "**/*.go", "path": "/src"},
+		ResponseCh: ch,
+	})
+	view := stripANSI(m.(Model).approvalDialog.View())
+	if !strings.Contains(view, "**/*.go") || !strings.Contains(view, "/src") {
+		t.Errorf("glob approval preview should contain pattern and path: %q", view)
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_GlobTool_DefaultsPathToDot(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	m, _ := model.Update(ToolApprovalRequestMsg{
+		ModelName:  "m",
+		ToolName:   "glob",
+		Input:      map[string]any{"pattern": "*.go"},
+		ResponseCh: ch,
+	})
+	view := stripANSI(m.(Model).approvalDialog.View())
+	if !strings.Contains(view, " in .") {
+		t.Errorf("glob approval preview with no path should default to '.': %q", view)
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_GrepTool_ShowsPatternAndPath(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	m, _ := model.Update(ToolApprovalRequestMsg{
+		ModelName:  "m",
+		ToolName:   "grep",
+		Input:      map[string]any{"pattern": "func main", "path": "/src"},
+		ResponseCh: ch,
+	})
+	view := stripANSI(m.(Model).approvalDialog.View())
+	if !strings.Contains(view, "func main") || !strings.Contains(view, "/src") {
+		t.Errorf("grep approval preview should contain pattern and path: %q", view)
+	}
+}
+
+func TestUpdate_ToolApprovalRequestMsg_GrepTool_DefaultsPathToDot(t *testing.T) {
+	model := NewModel(nil)
+	ch := make(chan bool, 1)
+	m, _ := model.Update(ToolApprovalRequestMsg{
+		ModelName:  "m",
+		ToolName:   "grep",
+		Input:      map[string]any{"pattern": "TODO"},
+		ResponseCh: ch,
+	})
+	view := stripANSI(m.(Model).approvalDialog.View())
+	if !strings.Contains(view, " in .") {
+		t.Errorf("grep approval preview with no path should default to '.': %q", view)
+	}
+}
+
+// --- ToolApprovalRequestMsg: ape mode with approvalCh ---
+
+func TestUpdate_ToolApprovalRequestMsg_ApeMode_WithApprovalCh_ReturnsWaitCmd(t *testing.T) {
+	model := NewModel(nil)
+	model.apeMode = true
+	approvalCh := make(chan ToolApprovalRequestMsg, 1)
+	model.approvalCh = approvalCh
+	ch := make(chan bool, 1)
+	_, cmd := model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
+	if cmd == nil {
+		t.Error("ape mode with approvalCh set should return a wait cmd")
+	}
+}

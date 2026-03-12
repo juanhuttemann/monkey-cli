@@ -196,6 +196,95 @@ func TestRunUpdate_AlreadyLatest(t *testing.T) {
 	}
 }
 
+func TestRunUpdate_FetchError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	_, err := runUpdate(server.URL, "")
+	if err == nil {
+		t.Fatal("runUpdate should return error when fetchLatestVersion fails")
+	}
+}
+
+func TestDownloadAndInstall_NotGzip(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("not a gzip archive"))
+	}))
+	defer server.Close()
+
+	err := downloadAndInstall(server.URL, filepath.Join(t.TempDir(), "monkey"))
+	if err == nil {
+		t.Fatal("downloadAndInstall should return error for non-gzip response")
+	}
+}
+
+func TestDownloadAndInstall_BinaryNotFoundInArchive(t *testing.T) {
+	// Archive contains "other" but not "monkey"
+	archiveBytes := makeTarGz(t, "other-binary", "content")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(archiveBytes)
+	}))
+	defer server.Close()
+
+	err := downloadAndInstall(server.URL, filepath.Join(t.TempDir(), "monkey"))
+	if err == nil {
+		t.Fatal("downloadAndInstall should return error when binary not in archive")
+	}
+	if !strings.Contains(err.Error(), AppName) {
+		t.Errorf("error should mention binary name, got: %v", err)
+	}
+}
+
+func TestRunUpdate_DownloadError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "download") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"tag_name": "v99.99.99"})
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	destPath := filepath.Join(dir, "monkey")
+
+	_, err := runUpdate(server.URL, destPath)
+	if err == nil {
+		t.Fatal("runUpdate should return error when download fails")
+	}
+}
+
+func TestDownloadAndInstall_NetworkError(t *testing.T) {
+	// Use a server that is already closed to simulate network error.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := server.URL
+	server.Close()
+
+	err := downloadAndInstall(url, filepath.Join(t.TempDir(), "monkey"))
+	if err == nil {
+		t.Fatal("downloadAndInstall should return error on network failure")
+	}
+}
+
+func TestParseVersion_EmptyString(t *testing.T) {
+	v := parseVersion("")
+	if v != [3]int{0, 0, 0} {
+		t.Errorf("parseVersion('') = %v, want [0,0,0]", v)
+	}
+}
+
+func TestParseVersion_SingleComponent(t *testing.T) {
+	v := parseVersion("5")
+	if v[0] != 5 {
+		t.Errorf("parseVersion('5')[0] = %d, want 5", v[0])
+	}
+}
+
 func TestRunUpdate_NewVersionAvailable(t *testing.T) {
 	binaryContent := "new-monkey-binary"
 	archiveBytes := makeTarGz(t, "monkey", binaryContent)

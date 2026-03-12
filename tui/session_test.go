@@ -113,9 +113,89 @@ func TestRestoreSession_NilIsNoop(t *testing.T) {
 	}
 }
 
+func TestLoadSession_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.json")
+	if err := os.WriteFile(path, []byte(`{not valid json`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadSession(path)
+	if err == nil {
+		t.Fatal("LoadSession with invalid JSON should return error")
+	}
+}
+
+func TestLoadSession_ReadError(t *testing.T) {
+	// Create a directory at the session path — os.ReadFile on a dir returns an
+	// error that is NOT os.IsNotExist, exercising the non-nil, non-NotExist branch.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session_dir")
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadSession(path)
+	if err == nil {
+		t.Fatal("LoadSession on a directory should return error")
+	}
+}
+
+func TestSaveSession_WriteError(t *testing.T) {
+	// Make the target path a directory so os.WriteFile fails.
+	dir := t.TempDir()
+	target := filepath.Join(dir, "session.json")
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	err := SaveSession(target, "model", nil, nil)
+	if err == nil {
+		t.Fatal("SaveSession should return error when write fails")
+	}
+}
+
+func TestSaveSession_MkdirAllError(t *testing.T) {
+	dir := t.TempDir()
+	// Create a regular file where SaveSession would try to create a directory.
+	parentPath := filepath.Join(dir, "notadir")
+	if err := os.WriteFile(parentPath, []byte("file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Session path is inside "notadir" (which is a file, not a dir).
+	path := filepath.Join(parentPath, "session.json")
+
+	err := SaveSession(path, "model", nil, nil)
+	if err == nil {
+		t.Fatal("SaveSession should return error when MkdirAll fails")
+	}
+}
+
+func TestSessionPath_XDGConfigHome(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
+	p := SessionPath()
+	if !strings.Contains(p, "/custom/config") {
+		t.Errorf("SessionPath() = %q, want path under XDG_CONFIG_HOME", p)
+	}
+}
+
 func TestGetAPIMessages_InitiallyEmpty(t *testing.T) {
 	m := NewModel(nil)
 	if len(m.GetAPIMessages()) != 0 {
 		t.Errorf("GetAPIMessages() on new model = %d, want 0", len(m.GetAPIMessages()))
+	}
+}
+
+func TestRestoreSession_WithModel_SetsClientModel(t *testing.T) {
+	client := newTestClientWithModel("claude-sonnet")
+	m := NewModel(client)
+	sess := &SessionData{
+		Model:       "claude-opus",
+		APIMessages: []api.Message{{Role: "user", Content: "hi"}},
+		Messages:    []Message{{Role: "user", Content: "hi", Timestamp: time.Now()}},
+	}
+	m.RestoreSession(sess)
+	if client.GetModel() != "claude-opus" {
+		t.Errorf("RestoreSession should set client model to %q, got %q", "claude-opus", client.GetModel())
 	}
 }

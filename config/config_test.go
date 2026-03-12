@@ -407,3 +407,39 @@ func TestLoadSystemPromptFile_EmptyFile_ReturnsEmpty(t *testing.T) {
 		t.Errorf("LoadSystemPromptFile() = %q, want empty string for empty file", got)
 	}
 }
+
+func TestConfig_Validate_NoAPIKey(t *testing.T) {
+	cfg := Config{BaseURL: "https://api.anthropic.com", OpusModel: "claude-opus"}
+	if err := cfg.Validate(); err == nil {
+		t.Error("Validate() = nil, want error when APIKey is empty")
+	}
+}
+
+func TestConfig_Validate_NoBaseURL(t *testing.T) {
+	cfg := Config{APIKey: "sk-ant-test", OpusModel: "claude-opus"}
+	if err := cfg.Validate(); err == nil {
+		t.Error("Validate() = nil, want error when BaseURL is empty")
+	}
+}
+
+func TestLoad_MaxTokensInvalidString(t *testing.T) {
+	t.Setenv(EnvAPIKey, "sk-ant-test")
+	t.Setenv(EnvMaxTokens, "not-a-number")
+
+	loader := NewEnvLoader()
+	_, err := loader.Load()
+	if err == nil {
+		t.Fatal("Load() should return error for invalid ANTHROPIC_MAX_TOKENS")
+	}
+}
+
+func TestLoad_MaxTokensNegative(t *testing.T) {
+	t.Setenv(EnvAPIKey, "sk-ant-test")
+	t.Setenv(EnvMaxTokens, "-1")
+
+	loader := NewEnvLoader()
+	_, err := loader.Load()
+	if err == nil {
+		t.Fatal("Load() should return error for negative ANTHROPIC_MAX_TOKENS")
+	}
+}

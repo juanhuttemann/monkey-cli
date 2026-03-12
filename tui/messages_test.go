@@ -62,12 +62,3 @@ func TestMsg_PromptErrorMsg(t *testing.T) {
 		t.Errorf("PromptErrorMsg.Err.Error() = %q, should contain %q", msg.Err.Error(), "API error")
 	}
 }
-
-// testError is a simple error type for testing
-type testError struct {
-	msg string
-}
-
-func (e *testError) Error() string {
-	return e.msg
-}

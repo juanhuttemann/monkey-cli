@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -352,5 +353,71 @@ func TestSendMessageWithTools_NoToolUse_ReturnsMessages(t *testing.T) {
 	}
 	if msgs[1].Role != "assistant" || msgs[1].Content != "simple answer" {
 		t.Errorf("msgs[1] = {%q, %v}, want {assistant, simple answer}", msgs[1].Role, msgs[1].Content)
+	}
+}
+
+func TestExtractText_NoTextBlocks(t *testing.T) {
+	// A response with only tool_use blocks has no text → extractText must return error.
+	resp := apiResponse{
+		Content: []ContentBlock{
+			{Type: "tool_use", ID: "toolu_1", Name: "bash"},
+		},
+	}
+	_, err := extractText(resp)
+	if err == nil {
+		t.Fatal("extractText() should return error when there are no text blocks")
+	}
+}
+
+func TestExtractText_MultipleTextBlocks(t *testing.T) {
+	resp := apiResponse{
+		Content: []ContentBlock{
+			{Type: "text", Text: "part one"},
+			{Type: "text", Text: "part two"},
+		},
+	}
+	text, err := extractText(resp)
+	if err != nil {
+		t.Fatalf("extractText() returned error: %v", err)
+	}
+	if !strings.Contains(text, "part one") || !strings.Contains(text, "part two") {
+		t.Errorf("extractText() = %q, want both parts", text)
+	}
+}
+
+func TestRunToolCalls_ExecutorErrorWithEmptyOutput(t *testing.T) {
+	// When the executor returns an error with empty output, runToolCalls should
+	// use the error message as the tool result content.
+	ctx := context.Background()
+	msgs := []Message{{Role: "user", Content: "run cmd"}}
+	toolUse := ContentBlock{Type: "tool_use", ID: "toolu_1", Name: "bash", Input: map[string]any{"command": "fail"}}
+
+	errExec := &mockExecutor{result: "", err: errors.New("permission denied")}
+	result := runToolCalls(ctx, msgs, []ContentBlock{toolUse}, []ContentBlock{toolUse}, errExec, nil)
+
+	// Last message is user with tool_result
+	last := result[len(result)-1]
+	if last.Role != "user" {
+		t.Fatalf("last message role = %q, want user", last.Role)
+	}
+	blocks, ok := last.Content.([]ContentBlock)
+	if !ok {
+		t.Fatalf("last.Content is %T, want []ContentBlock", last.Content)
+	}
+	if len(blocks) == 0 {
+		t.Fatal("expected tool_result blocks, got none")
+	}
+	if !strings.Contains(blocks[0].Content, "permission denied") {
+		t.Errorf("tool_result content = %q, want to contain error message", blocks[0].Content)
+	}
+}
+
+func TestIsRetryableError_NonStatusNonURLError(t *testing.T) {
+	// A plain fmt.Errorf is not a StatusError, not a url.Error, not a context error.
+	// isRetryableError should return false.
+	ctx := context.Background()
+	err := errors.New("some plain error")
+	if isRetryableError(ctx, err) {
+		t.Error("isRetryableError should return false for a plain error")
 	}
 }

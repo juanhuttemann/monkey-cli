@@ -36,6 +36,13 @@ func containsSubstring(s, substr string) bool {
 	return strings.Contains(stripANSI(s), substr)
 }
 
+// testError is a minimal error implementation used across test files.
+type testError struct {
+	msg string
+}
+
+func (e *testError) Error() string { return e.msg }
+
 // fixture reads a file from testdata/, falling back to ../testdata/ for shared fixtures.
 func fixture(t *testing.T, name string) []byte {
 	t.Helper()

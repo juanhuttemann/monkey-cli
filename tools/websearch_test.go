@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/html"
 )
 
 // makeDDGPage generates a mock DDG HTML page with n search results.
@@ -347,5 +349,53 @@ func TestDecodeDDGHref_NoRutParam(t *testing.T) {
 	got := decodeDDGHref(href)
 	if got != "https://bar.com/" {
 		t.Errorf("decodeDDGHref() = %q, want %q", got, "https://bar.com/")
+	}
+}
+
+func TestNodeAttr_Found(t *testing.T) {
+	n := &html.Node{
+		Attr: []html.Attribute{
+			{Key: "href", Val: "https://example.com"},
+			{Key: "class", Val: "result__a"},
+		},
+	}
+	got := nodeAttr(n, "href")
+	if got != "https://example.com" {
+		t.Errorf("nodeAttr() = %q, want %q", got, "https://example.com")
+	}
+}
+
+func TestNodeAttr_NotFound(t *testing.T) {
+	n := &html.Node{
+		Attr: []html.Attribute{{Key: "class", Val: "foo"}},
+	}
+	got := nodeAttr(n, "href")
+	if got != "" {
+		t.Errorf("nodeAttr() = %q, want empty", got)
+	}
+}
+
+func TestTruncateAtWord_ShortString(t *testing.T) {
+	got := truncateAtWord("hello world", 100)
+	if got != "hello world" {
+		t.Errorf("truncateAtWord short = %q, want %q", got, "hello world")
+	}
+}
+
+func TestTruncateAtWord_TruncatesAtSpace(t *testing.T) {
+	got := truncateAtWord("hello world foo bar", 12)
+	if !strings.HasSuffix(got, "…") {
+		t.Errorf("truncateAtWord should end with ellipsis, got %q", got)
+	}
+	if strings.Contains(got, "foo") {
+		t.Errorf("truncateAtWord should not include 'foo', got %q", got)
+	}
+}
+
+func TestTruncateAtWord_NoSpaceBeforeLimit(t *testing.T) {
+	// No space in first 5 bytes, so cut at max exactly
+	got := truncateAtWord("abcdefghij", 5)
+	if !strings.HasSuffix(got, "…") {
+		t.Errorf("truncateAtWord with no space should end with ellipsis, got %q", got)
 	}
 }
