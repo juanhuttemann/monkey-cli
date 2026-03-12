@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juanhuttemann/monkey-cli/config"
 )
@@ -442,6 +444,43 @@ func TestBuildClientOpts_LoadsSystemPrompt(t *testing.T) {
 	}
 	if len(opts) == 0 {
 		t.Error("buildClientOpts should return non-empty options")
+	}
+}
+
+func TestBuildDynamicContext_ContainsDate(t *testing.T) {
+	now := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+	got := buildDynamicContext(now, t.TempDir())
+	want := "Today's date: 2025-06-15"
+	if !strings.Contains(got, want) {
+		t.Errorf("buildDynamicContext() = %q, want it to contain %q", got, want)
+	}
+}
+
+func TestBuildDynamicContext_ContainsCwd(t *testing.T) {
+	dir := t.TempDir()
+	got := buildDynamicContext(time.Now(), dir)
+	if !strings.Contains(got, dir) {
+		t.Errorf("buildDynamicContext() = %q, want it to contain cwd %q", got, dir)
+	}
+}
+
+func TestBuildDynamicContext_NoGitBranch_WhenNotARepo(t *testing.T) {
+	dir := t.TempDir()
+	got := buildDynamicContext(time.Now(), dir)
+	if strings.Contains(got, "Git branch:") {
+		t.Errorf("buildDynamicContext() = %q, should not contain git branch outside a repo", got)
+	}
+}
+
+func TestBuildDynamicContext_IncludesGitBranch_WhenInRepo(t *testing.T) {
+	dir := t.TempDir()
+	// Initialize a git repo with a known branch name.
+	if err := exec.Command("git", "-C", dir, "init", "-b", "test-branch").Run(); err != nil {
+		t.Skip("git not available:", err)
+	}
+	got := buildDynamicContext(time.Now(), dir)
+	if !strings.Contains(got, "Git branch: test-branch") {
+		t.Errorf("buildDynamicContext() = %q, want it to contain \"Git branch: test-branch\"", got)
 	}
 }
 

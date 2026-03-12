@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -13,6 +14,26 @@ import (
 	"github.com/juanhuttemann/monkey-cli/config"
 	"github.com/juanhuttemann/monkey-cli/tui"
 )
+
+// gitBranch returns the current git branch in dir, or empty string if not a git repo.
+func gitBranch(dir string) string {
+	out, err := exec.Command("git", "-C", dir, "symbolic-ref", "--short", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// buildDynamicContext returns a string with dynamic runtime context (date, cwd, git branch).
+func buildDynamicContext(now time.Time, cwd string) string {
+	var sb strings.Builder
+	sb.WriteString("Today's date: " + now.Format("2006-01-02") + "\n")
+	sb.WriteString("Working directory: " + cwd + "\n")
+	if branch := gitBranch(cwd); branch != "" {
+		sb.WriteString("Git branch: " + branch + "\n")
+	}
+	return sb.String()
+}
 
 // systemPromptCandidates returns the paths to check for the system prompt, in priority order.
 // Local MONKEY.md takes precedence over the global ~/.config/monkey/MONKEY.md.
@@ -69,9 +90,14 @@ func buildClientOpts(cfg config.Config) ([]api.ClientOption, error) {
 			}
 		}
 	}
+	cwd, _ := os.Getwd()
+	prefix := buildDynamicContext(time.Now(), cwd)
 	if systemPrompt != "" {
-		opts = append(opts, api.WithSystemPrompt(systemPrompt))
+		systemPrompt = prefix + systemPrompt
+	} else {
+		systemPrompt = prefix
 	}
+	opts = append(opts, api.WithSystemPrompt(systemPrompt))
 	return opts, nil
 }
 

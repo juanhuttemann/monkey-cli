@@ -187,9 +187,9 @@ func TestColorizeArt_EmptyString(t *testing.T) {
 	}
 }
 
-func TestRenderIntroBlock_UsesPrimaryDividerColor(t *testing.T) {
+func TestRenderIntroBlock_DividerPresent(t *testing.T) {
 	rendered := RenderIntroBlock(80, "Monkey", "", "ascii art")
-	if !strings.Contains(rendered, "70;25;20") {
-		t.Errorf("RenderIntroBlock divider should use ColorPrimary (%s → 70;25;20), got ANSI: %q", ColorPrimary, rendered)
+	if !strings.Contains(stripANSI(rendered), "│") {
+		t.Error("RenderIntroBlock should include a divider │ between the two panels")
 	}
 }

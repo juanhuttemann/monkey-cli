@@ -6,10 +6,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// colorizeArt applies lipgloss foreground colors to the three Unicode block
+// colorizeArt applies lipgloss foreground colors to the Unicode block
 // shading characters used in the monkey pixel art:
 //
-//	█  →  ColorMonkeyDark  (outline)
+//	█▄▀  →  ColorMonkeyDark  (outline)
+//	▓  →  ColorMonkeyMid   (body)
 //	▒  →  ColorMonkeyMid   (body)
 //	░  →  ColorMonkeyLight (face / underbelly)
 //
@@ -18,14 +19,13 @@ func colorizeArt(s string) string {
 	dark := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyDark))
 	mid := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyMid))
 	light := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMonkeyLight))
-
 	var sb strings.Builder
 	sb.Grow(len(s) * 2) // rough over-alloc for ANSI sequences
 	for _, r := range s {
 		switch r {
-		case '█':
+		case '█', '▄', '▀':
 			sb.WriteString(dark.Render(string(r)))
-		case '▒':
+		case '▓', '▒':
 			sb.WriteString(mid.Render(string(r)))
 		case '░':
 			sb.WriteString(light.Render(string(r)))
@@ -36,23 +36,18 @@ func colorizeArt(s string) string {
 	return sb.String()
 }
 
-// RenderIntroBlock renders a two-panel block split 3/5 left (ASCII art) and
-// 2/5 right (title + version at top, "Type ? for help" centered below).
+// RenderIntroBlock renders a two-panel block: left panel sized to fit the ASCII
+// art, right panel taking the remaining space (title + version + help text).
 func RenderIntroBlock(width int, title, version, content string) string {
-	bdr := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 	verFg := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGrayMid))
 
-	// Split inner area: 3/5 left, 1 divider, 2/5 right.
 	innerW := width - 2 // space between the two outer │ borders
-	leftW := innerW * 3 / 5
-	rightW := innerW - leftW - 1 // -1 for the divider │
 
 	// Colorize the pixel-art block characters before layout so that
 	// lipgloss.Width() (ANSI-aware) still measures correctly during centering.
 	content = colorizeArt(content)
 
-	// Center the art block as a unit within the left panel.
-	// Find the widest art line, compute a uniform left offset, then render.
+	// Size the left panel to fit the art exactly (padding: 3 left, 1 right).
 	artLines := strings.Split(strings.TrimRight(content, "\n"), "\n")
 	maxArtW := 0
 	for _, l := range artLines {
@@ -60,45 +55,31 @@ func RenderIntroBlock(width int, title, version, content string) string {
 			maxArtW = w
 		}
 	}
-	contentW := leftW - 2 // inner content area (Width() is outer, Padding uses 1 each side)
-	leftOff := max(0, (contentW-maxArtW)/2)
-	pad := strings.Repeat(" ", leftOff)
-	var centeredArt strings.Builder
-	for i, l := range artLines {
-		if i > 0 {
-			centeredArt.WriteByte('\n')
-		}
-		centeredArt.WriteString(pad + l)
-	}
+	leftW := maxArtW + 6 // 3 left padding + 3 right padding
+	rightW := innerW - leftW - 1 // -1 for the divider │
+
 	leftLines := strings.Split(strings.TrimRight(
-		lipgloss.NewStyle().Width(leftW).Padding(0, 1).Render(centeredArt.String()),
+		lipgloss.NewStyle().Width(leftW).Padding(0, 3, 0, 3).Render(strings.TrimRight(content, "\n")),
 		"\n",
 	), "\n")
 	nLines := len(leftLines)
 
-	// Build right lines: title+version at top, "Type ? for help" centered in remaining rows.
+	// Build right lines: title+version at top, "Type ? for help" below.
 	emptyRight := strings.Repeat(" ", rightW)
 
-	// Row 0: title (and version) centered in the right panel.
-	titleText := title
-	titleVisW := lipgloss.Width(title)
-	if version != "" {
-		titleVisW += 1 + lipgloss.Width(version)
-	}
-	titleLPad := max(0, (rightW-titleVisW)/2)
-	titleRPad := max(0, rightW-titleVisW-titleLPad)
-	titleLine := strings.Repeat(" ", titleLPad) +
-		lipgloss.NewStyle().Bold(true).Render(titleText)
+	const rightPad = "   " // 3-space left padding for right panel content
+
+	titleLine := rightPad + lipgloss.NewStyle().Bold(true).Render(title)
 	if version != "" {
 		titleLine += " " + verFg.Render(version)
 	}
-	titleLine += strings.Repeat(" ", titleRPad)
+	titleVisW := lipgloss.Width(titleLine)
+	titleLine += strings.Repeat(" ", max(0, rightW-titleVisW))
 
 	helpLine := lipgloss.NewStyle().
 		Width(rightW).
-		Align(lipgloss.Center).
 		Foreground(lipgloss.Color(ColorGrayDark)).
-		Render("Type ? for help")
+		Render(rightPad + "Type ? for help")
 	rightLines := make([]string, nLines)
 	titleRow := min(1, nLines-1) // 1 row top padding; clamp for very short content
 	rightLines[titleRow] = titleLine
@@ -124,7 +105,7 @@ func RenderIntroBlock(width int, title, version, content string) string {
 			sb.WriteByte('\n')
 		}
 		sb.WriteString(ll)
-		sb.WriteString(bdr.Render("│"))
+		sb.WriteString("│")
 		sb.WriteString(rightLines[i])
 	}
 
