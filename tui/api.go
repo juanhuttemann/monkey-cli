@@ -15,6 +15,34 @@ import (
 // errToolDeclined is returned by ApprovingExecutor when the user declines a tool call.
 var errToolDeclined = errors.New("tool call declined by user")
 
+// friendlyError returns a short, human-readable error string.
+// For *api.StatusError it uses FriendlyMessage(); other errors use err.Error().
+func friendlyError(err error) string {
+	var se *api.StatusError
+	if errors.As(err, &se) {
+		return se.FriendlyMessage()
+	}
+	return err.Error()
+}
+
+// retryReasonFor returns a short human-readable reason string for a retry error.
+func retryReasonFor(err error) string {
+	if err == nil {
+		return "network error"
+	}
+	var se *api.StatusError
+	if errors.As(err, &se) {
+		if se.StatusCode == 429 {
+			return "rate limit"
+		}
+		return "server error"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	return "network error"
+}
+
 // ApprovingExecutor wraps a ToolExecutor and requests user approval before each tool call.
 // It sends a ToolApprovalRequestMsg on approvalCh and blocks until the TUI responds.
 type ApprovingExecutor struct {

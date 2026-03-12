@@ -203,7 +203,7 @@ func (c *Client) doStreamRequest(ctx context.Context, reqBody apiRequest, onToke
 			if fn, ok := ctx.Value(retryNotifierKey{}).(func(int, error)); ok {
 				fn(attempt, lastErr)
 			}
-			delay := c.retryDelay * time.Duration(1<<(attempt-1))
+			delay := computeRetryDelay(c.retryDelay, attempt, lastErr)
 			if delay > 0 {
 				select {
 				case <-ctx.Done():
@@ -227,9 +227,10 @@ func (c *Client) doStreamRequest(ctx context.Context, reqBody apiRequest, onToke
 		}
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
+			retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
 			_ = resp.Body.Close()
 			cancel()
-			lastErr = &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
+			lastErr = &StatusError{StatusCode: resp.StatusCode, Body: string(body), RetryAfter: retryAfter}
 			if !isRetryableError(ctx, lastErr) {
 				break
 			}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -36,12 +37,47 @@ func applyPerAttemptTimeout(ctx context.Context) (context.Context, context.Cance
 	return ctx, func() {}
 }
 
+// parseRetryAfter parses the value of a Retry-After HTTP header.
+// It first tries to parse it as an integer number of seconds, then as an HTTP
+// date (e.g. "Wed, 21 Oct 2015 07:28:00 GMT"). Returns 0 for empty or invalid
+// values, and 0 if an HTTP date is in the past.
+func parseRetryAfter(header string) time.Duration {
+	if header == "" {
+		return 0
+	}
+	// Try integer seconds first.
+	if secs, err := strconv.Atoi(header); err == nil {
+		return time.Duration(secs) * time.Second
+	}
+	// Try HTTP date format.
+	if t, err := http.ParseTime(header); err == nil {
+		d := time.Until(t)
+		if d < 0 {
+			return 0
+		}
+		return d
+	}
+	return 0
+}
+
+// computeRetryDelay returns the delay to wait before attempt number attempt (1-based).
+// It computes base * 2^(attempt-1) as the exponential backoff, but uses
+// lastErr's RetryAfter field instead when that is larger.
+func computeRetryDelay(base time.Duration, attempt int, lastErr error) time.Duration {
+	delay := base * time.Duration(1<<uint(attempt-1))
+	var statusErr *StatusError
+	if errors.As(lastErr, &statusErr) && statusErr.RetryAfter > delay {
+		delay = statusErr.RetryAfter
+	}
+	return delay
+}
+
 // isRetryableError reports whether err warrants a retry attempt.
-// ctx should be the parent (non-per-attempt) context; if it is cancelled the
-// function returns false regardless of the error.
+// ctx should be the parent (non-per-attempt) context; if it is done (cancelled
+// or deadline exceeded) the function returns false regardless of the error.
 func isRetryableError(ctx context.Context, err error) bool {
-	// Explicit user cancellation — do not retry.
-	if errors.Is(ctx.Err(), context.Canceled) {
+	// Parent context is done — do not retry.
+	if ctx.Err() != nil {
 		return false
 	}
 	var statusErr *StatusError

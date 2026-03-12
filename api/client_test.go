@@ -628,3 +628,35 @@ func TestSendMessageWithHistory_WithContext(t *testing.T) {
 		t.Fatal("SendMessageWithHistory() should return error when context is cancelled")
 	}
 }
+
+func TestStatusError_FriendlyMessage_WithStructuredBody(t *testing.T) {
+	body := `{"type":"error","error":{"type":"rate_limit_error","message":"This request would exceed your rate limit."}}`
+	e := &StatusError{StatusCode: 429, Body: body}
+	got := e.FriendlyMessage()
+	if !strings.Contains(got, "429") {
+		t.Errorf("FriendlyMessage() = %q, want status code 429", got)
+	}
+	if !strings.Contains(got, "This request would exceed your rate limit.") {
+		t.Errorf("FriendlyMessage() = %q, want API message text", got)
+	}
+	// Should NOT contain the raw JSON
+	if strings.Contains(got, `{"type"`) {
+		t.Errorf("FriendlyMessage() = %q, should not contain raw JSON", got)
+	}
+}
+
+func TestStatusError_FriendlyMessage_WithUnstructuredBody(t *testing.T) {
+	e := &StatusError{StatusCode: 500, Body: "internal server error"}
+	got := e.FriendlyMessage()
+	if !strings.Contains(got, "500") {
+		t.Errorf("FriendlyMessage() = %q, want status code 500", got)
+	}
+}
+
+func TestStatusError_FriendlyMessage_WithEmptyBody(t *testing.T) {
+	e := &StatusError{StatusCode: 401, Body: ""}
+	got := e.FriendlyMessage()
+	if !strings.Contains(got, "401") {
+		t.Errorf("FriendlyMessage() = %q, want status code 401", got)
+	}
+}

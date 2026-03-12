@@ -339,6 +339,146 @@ func TestWithRetryNotifier_InjectsIntoContext(t *testing.T) {
 	}
 }
 
+func TestParseRetryAfter_Seconds(t *testing.T) {
+	got := parseRetryAfter("30")
+	if got != 30*time.Second {
+		t.Errorf("parseRetryAfter(\"30\") = %v, want 30s", got)
+	}
+}
+
+func TestParseRetryAfter_HTTPDate(t *testing.T) {
+	// Use an HTTP date 60 seconds in the future
+	future := time.Now().Add(60 * time.Second).UTC()
+	header := future.Format(http.TimeFormat)
+	got := parseRetryAfter(header)
+	if got <= 0 {
+		t.Errorf("parseRetryAfter(future HTTP date) = %v, want positive duration", got)
+	}
+	// Should be roughly 60 seconds (allow some tolerance)
+	if got > 65*time.Second || got < 55*time.Second {
+		t.Errorf("parseRetryAfter(future HTTP date) = %v, want ~60s", got)
+	}
+}
+
+func TestParseRetryAfter_Empty(t *testing.T) {
+	got := parseRetryAfter("")
+	if got != 0 {
+		t.Errorf("parseRetryAfter(\"\") = %v, want 0", got)
+	}
+}
+
+func TestParseRetryAfter_InvalidString(t *testing.T) {
+	got := parseRetryAfter("bogus")
+	if got != 0 {
+		t.Errorf("parseRetryAfter(\"bogus\") = %v, want 0", got)
+	}
+}
+
+func TestComputeRetryDelay_ExponentialBackoff(t *testing.T) {
+	base := 100 * time.Millisecond
+	if got := computeRetryDelay(base, 1, nil); got != base {
+		t.Errorf("computeRetryDelay(base, 1, nil) = %v, want %v", got, base)
+	}
+	if got := computeRetryDelay(base, 2, nil); got != 2*base {
+		t.Errorf("computeRetryDelay(base, 2, nil) = %v, want %v", got, 2*base)
+	}
+}
+
+func TestComputeRetryDelay_RespectsRetryAfterWhenLarger(t *testing.T) {
+	base := 100 * time.Millisecond
+	// RetryAfter = 5s >> base * 2^0 = 100ms
+	err := &StatusError{StatusCode: 429, RetryAfter: 5 * time.Second}
+	got := computeRetryDelay(base, 1, err)
+	if got != 5*time.Second {
+		t.Errorf("computeRetryDelay with large RetryAfter = %v, want 5s", got)
+	}
+}
+
+func TestIsRetryableError_ParentDeadlineExpired_NotRetryable(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-1*time.Second))
+	defer cancel()
+	// Even though DeadlineExceeded looks like a per-attempt timeout, an expired
+	// parent deadline must not trigger a retry.
+	if got := isRetryableError(ctx, context.DeadlineExceeded); got {
+		t.Error("isRetryableError with expired parent deadline = true, want false")
+	}
+}
+
+func TestSendMessage_ParentDeadlineExpired_NoRetry(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		time.Sleep(50 * time.Millisecond) // outlast the parent deadline
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture(t, "response_ok.json"))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	client := NewClient(server.URL, "key", WithMaxRetries(3), WithRetryDelay(0))
+	_, err := client.SendMessage(ctx, "test")
+	if err == nil {
+		t.Fatal("expected error when parent deadline expires")
+	}
+	// Should not retry after the parent context deadline has expired.
+	if got := calls.Load(); got > 1 {
+		t.Errorf("expected 1 request (no retry after parent deadline), got %d", got)
+	}
+}
+
+func TestComputeRetryDelay_IgnoresRetryAfterWhenSmaller(t *testing.T) {
+	base := 10 * time.Second
+	// base * 2^1 = 20s > RetryAfter = 1s
+	err := &StatusError{StatusCode: 429, RetryAfter: 1 * time.Second}
+	got := computeRetryDelay(base, 2, err)
+	if got != 20*time.Second {
+		t.Errorf("computeRetryDelay with small RetryAfter = %v, want 20s", got)
+	}
+}
+
+func TestSendMessage_429WithRetryAfterHeader_SetsRetryAfterOnStatusError(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		if n == 1 {
+			w.Header().Set("Retry-After", "5")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write(fixture(t, "error_rate_limited.json"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture(t, "response_ok.json"))
+	}))
+	defer server.Close()
+
+	var capturedErr error
+	ctx := WithRetryNotifier(context.Background(), func(attempt int, err error) {
+		capturedErr = err
+	})
+
+	client := NewClient(server.URL, "key", WithMaxRetries(2), WithRetryDelay(0))
+	_, err := client.SendMessage(ctx, "test")
+	if err != nil {
+		t.Fatalf("expected success after retry, got: %v", err)
+	}
+
+	if capturedErr == nil {
+		t.Fatal("expected retry notifier to be called with the 429 error")
+	}
+	var statusErr *StatusError
+	if !errors.As(capturedErr, &statusErr) {
+		t.Fatalf("expected *StatusError, got %T", capturedErr)
+	}
+	if statusErr.StatusCode != 429 {
+		t.Errorf("StatusCode = %d, want 429", statusErr.StatusCode)
+	}
+	if statusErr.RetryAfter != 5*time.Second {
+		t.Errorf("RetryAfter = %v, want 5s", statusErr.RetryAfter)
+	}
+}
+
 func TestSendMessage_RetriesAfterTimeoutThenConnectionReset(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

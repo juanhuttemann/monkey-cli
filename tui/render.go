@@ -142,7 +142,11 @@ func (m Model) inputWithCursor() string {
 }
 
 // formatRetryLabel formats the retry attempt indicator shown in the status line.
-func formatRetryLabel(attempt int) string {
+// When reason is non-empty, the format is "retrying: <reason> (<attempt>)".
+func formatRetryLabel(attempt int, reason string) string {
+	if reason != "" {
+		return fmt.Sprintf("retrying: %s (%d)", reason, attempt)
+	}
 	return fmt.Sprintf("retrying (%d)", attempt)
 }
 

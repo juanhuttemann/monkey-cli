@@ -41,6 +41,7 @@ type Model struct {
 	cancelFn       context.CancelFunc
 	wasCancelled   bool
 	retryAttempt   int
+	retryReason    string
 	width          int
 	height         int
 	scrollToBottom bool
@@ -215,6 +216,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.timerActive = false
 		m.wasCancelled = false
 		m.retryAttempt = 0
+		m.retryReason = ""
 		m.streamBuf = m.streamBuf[:0]
 		m.renderedPriorValid = false
 		if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
@@ -244,14 +246,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 
 	case PromptErrorMsg:
+		wasStreaming := m.streaming
 		m.streaming = false
 		m.tokenCh = nil
-		m.messages = append(m.messages, Message{Role: "error", Content: msg.Err.Error(), Timestamp: time.Now()})
+		// If we were streaming, remove any partial assistant message before appending the error.
+		if wasStreaming {
+			if n := len(m.messages); n > 0 && m.messages[n-1].Role == "assistant" {
+				m.messages = m.messages[:n-1]
+			}
+			m.streamBuf = m.streamBuf[:0]
+			m.renderedPriorValid = false
+		}
+		errContent := friendlyError(msg.Err)
+		m.messages = append(m.messages, Message{Role: "error", Content: errContent, Timestamp: time.Now()})
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
 		m.timerActive = false
 		m.wasCancelled = false
 		m.retryAttempt = 0
+		m.retryReason = ""
 		if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -276,11 +289,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.timerActive = false
 			m.wasCancelled = true
 			m.retryAttempt = 0
+			m.retryReason = ""
 			m.syncViewportHeight()
 		}
 
 	case RetryingMsg:
 		m.retryAttempt = msg.Attempt
+		m.retryReason = retryReasonFor(msg.Err)
 		if m.retryCh != nil {
 			cmds = append(cmds, waitForRetry(m.retryCh))
 		}
@@ -397,7 +412,7 @@ func (m Model) View() string {
 			line += " " + TimerStyle().Render(elapsed.String())
 		}
 		if m.retryAttempt > 0 {
-			line += " " + TimerStyle().Render(formatRetryLabel(m.retryAttempt))
+			line += " " + TimerStyle().Render(formatRetryLabel(m.retryAttempt, m.retryReason))
 		}
 		view.WriteString(line)
 		view.WriteString("\n")

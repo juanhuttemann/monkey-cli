@@ -24,10 +24,25 @@ const (
 type StatusError struct {
 	StatusCode int
 	Body       string
+	RetryAfter time.Duration // parsed from Retry-After header; 0 if not present
 }
 
 func (e *StatusError) Error() string {
 	return fmt.Sprintf("API returned status %d: %s", e.StatusCode, e.Body)
+}
+
+// FriendlyMessage returns a short, human-readable error message by parsing
+// the structured JSON body. Falls back to a generic status-code message.
+func (e *StatusError) FriendlyMessage() string {
+	var parsed struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(e.Body), &parsed) == nil && parsed.Error.Message != "" {
+		return fmt.Sprintf("API error (%d): %s", e.StatusCode, parsed.Error.Message)
+	}
+	return fmt.Sprintf("API error (%d)", e.StatusCode)
 }
 
 // Client handles communication with the LLM API
@@ -156,7 +171,11 @@ func (c *Client) doSingleAttempt(ctx context.Context, jsonBody []byte) (apiRespo
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return apiResponse{}, &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
+		return apiResponse{}, &StatusError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+			RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After")),
+		}
 	}
 
 	var apiResp apiResponse
@@ -196,7 +215,7 @@ func (c *Client) doRequest(ctx context.Context, reqBody apiRequest) (apiResponse
 			if fn, ok := ctx.Value(retryNotifierKey{}).(func(int, error)); ok {
 				fn(attempt, lastErr)
 			}
-			delay := c.retryDelay * time.Duration(1<<(attempt-1))
+			delay := computeRetryDelay(c.retryDelay, attempt, lastErr)
 			if delay > 0 {
 				select {
 				case <-ctx.Done():

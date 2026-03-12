@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -223,6 +224,30 @@ func TestUpdate_PromptErrorMsg_SetsLoadingFalse(t *testing.T) {
 	m := updatedModel.(Model)
 	if m.IsLoading() {
 		t.Error("IsLoading() = true after receiving error, want false")
+	}
+}
+
+func TestUpdate_PromptErrorMsg_StatusError_ShowsFriendlyMessage(t *testing.T) {
+	model := NewModel(nil)
+	body := `{"type":"error","error":{"type":"rate_limit_error","message":"Rate limit exceeded, try again later."}}`
+	statusErr := &api.StatusError{StatusCode: 429, Body: body}
+	updatedModel, _ := model.Update(PromptErrorMsg{Err: statusErr})
+
+	m := updatedModel.(Model)
+	var errContent string
+	for _, msg := range m.GetHistory() {
+		if msg.Role == "error" {
+			errContent = msg.Content
+		}
+	}
+	if strings.Contains(errContent, `{"type"`) {
+		t.Errorf("error message contains raw JSON: %q", errContent)
+	}
+	if !strings.Contains(errContent, "Rate limit exceeded, try again later.") {
+		t.Errorf("error message %q should contain the human-readable API message", errContent)
+	}
+	if !strings.Contains(errContent, "429") {
+		t.Errorf("error message %q should contain the status code", errContent)
 	}
 }
 
@@ -763,5 +788,73 @@ func TestUpdate_RetryingMsg_WithRetryCh_ReturnsWaitCmd(t *testing.T) {
 	_, cmd := model.Update(RetryingMsg{Attempt: 1})
 	if cmd == nil {
 		t.Error("RetryingMsg with retryCh set should return a wait cmd")
+	}
+}
+
+func TestUpdate_PromptErrorMsg_CleansUpPartialStreamingMessage(t *testing.T) {
+	model := NewModel(nil)
+	model.streaming = true
+	// Manually add a partial assistant message (as if streaming had begun)
+	model.messages = append(model.messages, Message{Role: "assistant", Content: "partial..."})
+
+	testErr := &testError{msg: "network error"}
+	m, _ := model.Update(PromptErrorMsg{Err: testErr})
+	updated := m.(Model)
+
+	history := updated.GetHistory()
+	// The partial assistant message should be gone
+	for _, msg := range history {
+		if msg.Role == "assistant" {
+			t.Errorf("partial assistant message should have been removed, found: %+v", msg)
+		}
+	}
+	// There should be an error message
+	var foundError bool
+	for _, msg := range history {
+		if msg.Role == "error" {
+			foundError = true
+		}
+	}
+	if !foundError {
+		t.Error("expected an error message in history after PromptErrorMsg with streaming=true")
+	}
+}
+
+func TestUpdate_RetryingMsg_ShowsReasonForRateLimit(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+
+	m, _ := model.Update(RetryingMsg{Attempt: 1, Err: &api.StatusError{StatusCode: 429}})
+	updated := m.(Model)
+
+	view := updated.View()
+	if !containsSubstring(view, "rate limit") {
+		t.Errorf("View() should contain 'rate limit' for 429 error, got:\n%s", stripANSI(view))
+	}
+}
+
+func TestUpdate_RetryingMsg_ShowsReasonForServerError(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+
+	m, _ := model.Update(RetryingMsg{Attempt: 1, Err: &api.StatusError{StatusCode: 500}})
+	updated := m.(Model)
+
+	view := updated.View()
+	if !containsSubstring(view, "server error") {
+		t.Errorf("View() should contain 'server error' for 500 error, got:\n%s", stripANSI(view))
+	}
+}
+
+func TestUpdate_RetryingMsg_ShowsReasonForTimeout(t *testing.T) {
+	model := NewModel(nil)
+	model.SetLoading(true)
+
+	m, _ := model.Update(RetryingMsg{Attempt: 1, Err: context.DeadlineExceeded})
+	updated := m.(Model)
+
+	view := updated.View()
+	if !containsSubstring(view, "timeout") {
+		t.Errorf("View() should contain 'timeout' for DeadlineExceeded error, got:\n%s", stripANSI(view))
 	}
 }
