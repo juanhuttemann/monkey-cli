@@ -83,6 +83,14 @@ go build -o monkey .
 
 > Requires Go 1.25 or later.
 
+## Updating
+
+```bash
+monkey update
+```
+
+Checks GitHub for the latest release and replaces the current binary in-place if a newer version is available.
+
 ## Setup
 
 The only required variable is your API key:
