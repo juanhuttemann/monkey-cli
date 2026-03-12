@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-12
+### Improved
+- Redesign intro panel layout and monkey pixel art
+- Split tui/model.go into focused packages (blocks, keys, render, toolcall)
+- Extract inline JSON to shared fixture files
+
 ## [0.4.0] - 2026-03-11
 ### Added
 - Thread context through tool executors and fix cancelled-prompt history
@@ -44,5 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GoReleaser for cross-platform builds
 - Code coverage reporting with Codecov
 
-[Unreleased]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/juanhuttemann/monkey-cli/compare/v0.3.1...v0.4.0
