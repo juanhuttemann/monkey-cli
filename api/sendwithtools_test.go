@@ -27,6 +27,16 @@ func fixture(t *testing.T, name string) []byte {
 	return nil
 }
 
+// apiRequest mirrors the Anthropic API request shape for inspecting what the SDK sends.
+type apiRequest struct {
+	Model     string    `json:"model"`
+	MaxTokens int       `json:"max_tokens"`
+	System    string    `json:"system,omitempty"`
+	Messages  []Message `json:"messages"`
+	Tools     []Tool    `json:"tools,omitempty"`
+	Stream    bool      `json:"stream,omitempty"`
+}
+
 // stubBashTool returns a minimal Tool for use in SendMessageWithTools tests.
 func stubBashTool() Tool {
 	return Tool{
@@ -62,10 +72,16 @@ func textResponse(text string) string {
 	return `{"content":[{"type":"text","text":` + string(b) + `}],"stop_reason":"end_turn"}`
 }
 
+// writeJSON sets Content-Type: application/json and writes data as the response body.
+func writeJSON(w http.ResponseWriter, data []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
 func TestSendMessageWithTools_NoToolUse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(textResponse("plain answer")))
+		writeJSON(w, []byte(textResponse("plain answer")))
 	}))
 	defer server.Close()
 
@@ -88,11 +104,10 @@ func TestSendMessageWithTools_SingleToolCall(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := requestCount.Add(1)
-		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			_, _ = w.Write([]byte(toolUseResponse("toolu_1", "bash", map[string]any{"command": "echo hi"})))
+			writeJSON(w, []byte(toolUseResponse("toolu_1", "bash", map[string]any{"command": "echo hi"})))
 		} else {
-			_, _ = w.Write([]byte(textResponse("done")))
+			writeJSON(w, []byte(textResponse("done")))
 		}
 	}))
 	defer server.Close()
@@ -122,8 +137,7 @@ func TestSendMessageWithTools_SendsToolsInFirstRequest(t *testing.T) {
 		if firstBody == nil {
 			firstBody = body
 		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(textResponse("ok")))
+		writeJSON(w, []byte(textResponse("ok")))
 	}))
 	defer server.Close()
 
@@ -157,11 +171,10 @@ func TestSendMessageWithTools_SendsToolResultInSecondRequest(t *testing.T) {
 		if n == 2 {
 			secondBody = body
 		}
-		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			_, _ = w.Write([]byte(toolUseResponse("toolu_42", "bash", map[string]any{"command": "pwd"})))
+			writeJSON(w, []byte(toolUseResponse("toolu_42", "bash", map[string]any{"command": "pwd"})))
 		} else {
-			_, _ = w.Write([]byte(textResponse("ok")))
+			writeJSON(w, []byte(textResponse("ok")))
 		}
 	}))
 	defer server.Close()
@@ -208,11 +221,10 @@ func TestSendMessageWithTools_AssistantToolUseAddedToHistory(t *testing.T) {
 		if n == 2 {
 			secondBody = body
 		}
-		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			_, _ = w.Write([]byte(toolUseResponse("toolu_7", "bash", map[string]any{"command": "ls"})))
+			writeJSON(w, []byte(toolUseResponse("toolu_7", "bash", map[string]any{"command": "ls"})))
 		} else {
-			_, _ = w.Write([]byte(textResponse("ok")))
+			writeJSON(w, []byte(textResponse("ok")))
 		}
 	}))
 	defer server.Close()
@@ -256,11 +268,10 @@ func TestSendMessageWithTools_AccumulatesUsage(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := requestCount.Add(1)
-		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			_, _ = w.Write(fixture(t, "tool_use_date_with_usage.json"))
+			writeJSON(w, fixture(t, "tool_use_date_with_usage.json"))
 		} else {
-			_, _ = w.Write(fixture(t, "response_done_with_usage.json"))
+			writeJSON(w, fixture(t, "response_done_with_usage.json"))
 		}
 	}))
 	defer server.Close()
@@ -287,11 +298,10 @@ func TestSendMessageWithTools_ReturnsAccumulatedMessages(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := requestCount.Add(1)
-		w.WriteHeader(http.StatusOK)
 		if n == 1 {
-			_, _ = w.Write([]byte(toolUseResponse("toolu_99", "bash", map[string]any{"command": "date"})))
+			writeJSON(w, []byte(toolUseResponse("toolu_99", "bash", map[string]any{"command": "date"})))
 		} else {
-			_, _ = w.Write([]byte(textResponse("today")))
+			writeJSON(w, []byte(textResponse("today")))
 		}
 	}))
 	defer server.Close()
@@ -330,8 +340,7 @@ func TestSendMessageWithTools_ReturnsAccumulatedMessages(t *testing.T) {
 
 func TestSendMessageWithTools_NoToolUse_ReturnsMessages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(textResponse("simple answer")))
+		writeJSON(w, []byte(textResponse("simple answer")))
 	}))
 	defer server.Close()
 
@@ -409,15 +418,5 @@ func TestRunToolCalls_ExecutorErrorWithEmptyOutput(t *testing.T) {
 	}
 	if !strings.Contains(blocks[0].Content, "permission denied") {
 		t.Errorf("tool_result content = %q, want to contain error message", blocks[0].Content)
-	}
-}
-
-func TestIsRetryableError_NonStatusNonURLError(t *testing.T) {
-	// A plain fmt.Errorf is not a StatusError, not a url.Error, not a context error.
-	// isRetryableError should return false.
-	ctx := context.Background()
-	err := errors.New("some plain error")
-	if isRetryableError(ctx, err) {
-		t.Error("isRetryableError should return false for a plain error")
 	}
 }

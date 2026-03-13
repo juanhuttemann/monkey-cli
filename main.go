@@ -60,7 +60,6 @@ func buildClientOpts(cfg config.Config) ([]api.ClientOption, error) {
 	opts := []api.ClientOption{
 		api.WithModel(cfg.DefaultModel()),
 		api.WithMaxRetries(3),
-		api.WithRetryDelay(time.Second),
 	}
 	if cfg.MaxTokens > 0 {
 		opts = append(opts, api.WithMaxTokens(cfg.MaxTokens))

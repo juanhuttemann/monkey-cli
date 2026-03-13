@@ -60,12 +60,18 @@ func TestSendPrompt_SendsCorrectPrompt(t *testing.T) {
 		t.Fatalf("sendPrompt() returned error: %v", err)
 	}
 
-	// Verify the prompt was sent correctly
+	// Verify the prompt was sent correctly.
+	// The SDK sends content as an array of typed content blocks.
 	messages := requestBody["messages"].([]interface{})
 	msg := messages[0].(map[string]interface{})
-	content := msg["content"].(string)
-	if content != "custom test prompt" {
-		t.Errorf("Request content = %q, want %q", content, "custom test prompt")
+	contentArr, _ := msg["content"].([]interface{})
+	if len(contentArr) == 0 {
+		t.Fatal("expected non-empty content array in request")
+	}
+	textBlock, _ := contentArr[0].(map[string]interface{})
+	text, _ := textBlock["text"].(string)
+	if text != "custom test prompt" {
+		t.Errorf("Request content = %q, want %q", text, "custom test prompt")
 	}
 }
 
@@ -179,7 +185,7 @@ func TestSendPrompt_InvalidJSON(t *testing.T) {
 	}
 
 	errMsg := err.Error()
-	if !strings.Contains(errMsg, "parse") && !strings.Contains(errMsg, "unmarshal") {
+	if !strings.Contains(errMsg, "pars") && !strings.Contains(errMsg, "unmarshal") && !strings.Contains(errMsg, "invalid") {
 		t.Errorf("error should indicate parse/unmarshal failure, got: %v", err)
 	}
 }

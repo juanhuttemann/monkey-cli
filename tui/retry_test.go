@@ -48,12 +48,13 @@ func TestSendPromptCmdWithTimeout_SendsRetryNotifications(t *testing.T) {
 			_, _ = w.Write(fixture(t, "error_rate_limited.json"))
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))
 	defer server.Close()
 
-	client := api.NewClient(server.URL, "key", api.WithModel("m"), api.WithMaxRetries(2), api.WithRetryDelay(0))
+	client := api.NewClient(server.URL, "key", api.WithModel("m"), api.WithMaxRetries(2))
 	messages := []api.Message{}
 
 	retryCh := make(chan RetryingMsg, 10)
@@ -85,6 +86,7 @@ func TestSendPromptCmdWithTimeout_SendsRetryNotifications(t *testing.T) {
 
 func TestSendPromptCmdWithTimeout_ClosesRetryCh_OnSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(fixture(t, "response_ok.json"))
 	}))

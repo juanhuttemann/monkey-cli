@@ -58,7 +58,7 @@ func RenderIntroBlock(width int, title, version, content string) string {
 			maxArtW = w
 		}
 	}
-	leftW := maxArtW + 6 // 3 left padding + 3 right padding
+	leftW := maxArtW + 6         // 3 left padding + 3 right padding
 	rightW := innerW - leftW - 1 // -1 for the divider │
 
 	leftLines := strings.Split(strings.TrimRight(

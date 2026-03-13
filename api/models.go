@@ -3,16 +3,6 @@ package api
 
 import "context"
 
-// apiRequest represents the request body sent to the LLM API
-type apiRequest struct {
-	Model     string    `json:"model"`
-	MaxTokens int       `json:"max_tokens"`
-	System    string    `json:"system,omitempty"`
-	Messages  []Message `json:"messages"`
-	Tools     []Tool    `json:"tools,omitempty"`
-	Stream    bool      `json:"stream,omitempty"`
-}
-
 // Message represents a single message in the conversation.
 // Content may be a plain string or a []ContentBlock (for tool_use/tool_result).
 type Message struct {
