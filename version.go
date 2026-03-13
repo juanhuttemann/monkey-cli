@@ -9,7 +9,7 @@ const AppName = "monkey"
 const AppTitle = "monkey CLI"
 
 // Version is the application version.
-const Version = "0.4.2"
+const Version = "0.5.0"
 
 //go:embed intro.txt
 var introArt string

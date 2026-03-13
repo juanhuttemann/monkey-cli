@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-13
+### Added
+- Add Retry-After support and friendly error messages
+
+### Improved
+- Migrate api package to official Anthropic Go SDK
+
 ## [0.4.2] - 2026-03-12
 ### Improved
 - Update monkey art colors and refresh demo recording
@@ -54,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GoReleaser for cross-platform builds
 - Code coverage reporting with Codecov
 
-[Unreleased]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/juanhuttemann/monkey-cli/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/juanhuttemann/monkey-cli/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/juanhuttemann/monkey-cli/compare/v0.3.1...v0.4.0
