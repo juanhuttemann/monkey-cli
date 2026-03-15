@@ -177,6 +177,22 @@ When Monkey needs to take action, it calls one of these built-in tools. Each cal
 go test ./...
 ```
 
+## Development
+
+The dev tag unlocks `/mockup` — a self-contained scenario player that exercises the full TUI without touching the API or consuming tokens:
+
+```bash
+ANTHROPIC_API_KEY=DUMMY go run -tags dev .
+```
+
+Type `/mockup` inside the TUI. All scenarios play automatically in sequence: streaming text, every tool type, approvals, denials, errors, and retries.
+
+To render all scenarios programmatically and inspect `View()` output:
+
+```bash
+go test -tags dev ./tui/
+```
+
 ## Contributing
 
 Contributions are welcome! Open an issue first to discuss what you'd like to change. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

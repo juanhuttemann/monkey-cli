@@ -1,0 +1,118 @@
+[
+  {
+    "name": "simple text",
+    "steps": [
+      {"type": "stream", "text": "Hello! This is **dev mockup mode** — no real API calls are made. Each `/mockup` cycles through scenarios covering streaming, all tool types, approvals, denials, errors, and retries."}
+    ]
+  },
+  {
+    "name": "bash tool",
+    "steps": [
+      {"type": "stream", "text": "Let me list the directory contents."},
+      {"type": "tool", "name": "bash", "input": {"command": "ls -la"}, "output": "total 64\ndrwxr-xr-x  9 user group  288 Mar 14 10:00 .\ndrwxr-xr-x 42 user group 1344 Mar 14 09:00 ..\n-rw-r--r--  1 user group 1024 Mar 14 10:00 main.go\n-rw-r--r--  1 user group  512 Mar 14 09:30 go.mod\n-rw-r--r--  1 user group  256 Mar 14 09:30 go.sum"},
+      {"type": "stream", "text": "The directory contains main.go and go module files."}
+    ]
+  },
+  {
+    "name": "read tool",
+    "steps": [
+      {"type": "stream", "text": "Reading main.go for you."},
+      {"type": "tool", "name": "read", "input": {"file_path": "main.go"}, "output": "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n\tfmt.Println(\"Hello, monkey!\")\n\tos.Exit(0)\n}"},
+      {"type": "stream", "text": "The file contains the main entry point."}
+    ]
+  },
+  {
+    "name": "write tool",
+    "steps": [
+      {"type": "stream", "text": "Writing a temporary file."},
+      {"type": "tool", "name": "write", "input": {"file_path": "/tmp/monkey-dev.txt", "content": "Hello from monkey dev mode!\n"}, "output": "File written successfully."},
+      {"type": "stream", "text": "Created /tmp/monkey-dev.txt."}
+    ]
+  },
+  {
+    "name": "edit tool",
+    "steps": [
+      {"type": "stream", "text": "Patching a string in README.md."},
+      {"type": "tool", "name": "edit", "input": {"file_path": "README.md", "old_string": "# monkey", "new_string": "# monkey-cli"}, "output": "Edit applied successfully."},
+      {"type": "stream", "text": "README.md updated: `# monkey` → `# monkey-cli`."}
+    ]
+  },
+  {
+    "name": "glob tool",
+    "steps": [
+      {"type": "stream", "text": "Finding all Go source files."},
+      {"type": "tool", "name": "glob", "input": {"pattern": "**/*.go"}, "output": "api/client.go\napi/models.go\napi/tools.go\ntui/model.go\ntui/keys.go\ntools/bash.go\nmain.go"},
+      {"type": "stream", "text": "Found 7 Go source files across the project."}
+    ]
+  },
+  {
+    "name": "grep tool",
+    "steps": [
+      {"type": "stream", "text": "Searching for the NewModel definition."},
+      {"type": "tool", "name": "grep", "input": {"pattern": "func NewModel", "path": "."}, "output": "tui/model.go:96:func NewModel(client api.Client) Model {"},
+      {"type": "stream", "text": "Found `NewModel` in tui/model.go at line 96."}
+    ]
+  },
+  {
+    "name": "web_search tool",
+    "steps": [
+      {"type": "stream", "text": "Searching the web for TUI frameworks."},
+      {"type": "tool", "name": "web_search", "input": {"query": "bubbletea TUI framework Go"}, "output": "1. Bubble Tea – A TUI framework (github.com/charmbracelet/bubbletea)\n2. Lip Gloss – Style definitions (github.com/charmbracelet/lipgloss)\n3. Bubbles – TUI components (github.com/charmbracelet/bubbles)"},
+      {"type": "stream", "text": "The top result is the official Bubble Tea repository."}
+    ]
+  },
+  {
+    "name": "web_fetch tool",
+    "steps": [
+      {"type": "stream", "text": "Fetching a documentation page."},
+      {"type": "tool", "name": "web_fetch", "input": {"url": "https://pkg.go.dev/github.com/charmbracelet/bubbletea"}, "output": "# Bubble Tea\n\nA powerful little TUI framework based on The Elm Architecture.\n\n## Install\n\n```\ngo get github.com/charmbracelet/bubbletea\n```"},
+      {"type": "stream", "text": "Retrieved the Bubble Tea package documentation."}
+    ]
+  },
+  {
+    "name": "denial demo",
+    "steps": [
+      {"type": "stream", "text": "I need to run a dangerous command. Please **deny** it to see the denial flow."},
+      {"type": "tool", "name": "bash", "input": {"command": "rm -rf /"}, "output": "would have deleted everything!"},
+      {"type": "stream", "text": "Command completed (try denying it next time!)."}
+    ]
+  },
+  {
+    "name": "rate limit error",
+    "steps": [
+      {"type": "stream", "text": "Simulating a 429 rate limit response..."},
+      {"type": "error", "status": 429, "message": "Rate limit exceeded. Please slow down your requests."}
+    ]
+  },
+  {
+    "name": "server error",
+    "steps": [
+      {"type": "stream", "text": "Simulating a 500 server error response..."},
+      {"type": "error", "status": 500, "message": "Internal server error. Please try again later."}
+    ]
+  },
+  {
+    "name": "network error",
+    "steps": [
+      {"type": "stream", "text": "Simulating a network connection failure..."},
+      {"type": "error", "status": 0, "message": "dial tcp api.anthropic.com:443: connection refused"}
+    ]
+  },
+  {
+    "name": "retry then success",
+    "steps": [
+      {"type": "stream", "text": "Simulating a rate-limit retry (watch the spinner)..."},
+      {"type": "retry", "attempt": 1, "status": 429},
+      {"type": "stream", "text": "Request succeeded after the retry!"}
+    ]
+  },
+  {
+    "name": "multi-tool",
+    "steps": [
+      {"type": "stream", "text": "I'll glob for files then grep inside them — two tool calls in one turn."},
+      {"type": "tool", "name": "glob", "input": {"pattern": "tui/*.go"}, "output": "tui/model.go\ntui/keys.go\ntui/api.go\ntui/render.go"},
+      {"type": "tool", "name": "grep", "input": {"pattern": "func.*Model", "path": "tui/"}, "output": "tui/model.go:96:func NewModel(client api.Client) Model {\ntui/render.go:12:func (m Model) renderMessages() string {"},
+      {"type": "stream", "text": "Found 4 TUI source files; 2 functions match `func.*Model`."}
+    ]
+  }
+]

@@ -305,7 +305,7 @@ func (m Model) execSlashCommand(cmd string, cleanup bool) (Model, tea.Cmd, bool)
 	case "/compact":
 		teaCmd = m.startCompact()
 	default:
-		return m, nil, false
+		return m.handleDevSlashCommand(cmd, cleanup)
 	}
 	m.input.SetValue("")
 	if cleanup {

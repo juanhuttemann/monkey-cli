@@ -9,7 +9,7 @@ type helpItem struct {
 
 var helpItems = []helpItem{
 	{Trigger: "?", Desc: "show this help"},
-	{Trigger: "/", Desc: "slash commands  /exit  /clear  /model  /ape  /copy  /compact"},
+	{Trigger: "/", Desc: ""}, // filled at render time from slashCommands
 	{Trigger: "@", Desc: "mention files"},
 }
 
@@ -41,8 +41,21 @@ func (hp HelpPanel) View() string {
 	if !hp.active {
 		return ""
 	}
+	// Build the slash-commands summary from the live slashCommands list so
+	// it stays in sync with any commands registered after package init.
+	items := make([]helpItem, len(helpItems))
+	copy(items, helpItems)
+	for i := range items {
+		if items[i].Trigger == "/" {
+			names := make([]string, len(slashCommands))
+			for j, sc := range slashCommands {
+				names[j] = "/" + sc.Name
+			}
+			items[i].Desc = "slash commands  " + strings.Join(names, "  ")
+		}
+	}
 	var sb strings.Builder
-	for i, item := range helpItems {
+	for i, item := range items {
 		line := item.Trigger + "  " + item.Desc
 		if i < len(helpItems)-1 {
 			sb.WriteString(line + "\n")
