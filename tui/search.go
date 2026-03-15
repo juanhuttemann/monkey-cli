@@ -7,10 +7,11 @@ import (
 // SearchBar provides incremental search over conversation messages.
 // Ctrl+F activates it; Ctrl+N / Ctrl+P cycle matches; Esc dismisses.
 type SearchBar struct {
-	active  bool
-	query   string
-	matches []int // message indices that match the current query
-	cursor  int   // position within matches
+	active   bool
+	query    string
+	matches  []int        // message indices that match the current query (ordered)
+	matchSet map[int]bool // set view of matches for O(1) IsMatch lookups
+	cursor   int          // position within matches
 }
 
 // NewSearchBar returns an inactive SearchBar.
@@ -24,6 +25,7 @@ func (s *SearchBar) Deactivate() {
 	s.active = false
 	s.query = ""
 	s.matches = nil
+	s.matchSet = nil
 	s.cursor = 0
 }
 
@@ -38,14 +40,17 @@ func (s SearchBar) Query() string { return s.query }
 func (s *SearchBar) SetQuery(q string, messages []Message) {
 	s.query = q
 	s.matches = nil
+	s.matchSet = nil
 	s.cursor = 0
 	if q == "" {
 		return
 	}
 	lower := strings.ToLower(q)
+	s.matchSet = make(map[int]bool)
 	for i, msg := range messages {
 		if strings.Contains(strings.ToLower(msg.Content), lower) {
 			s.matches = append(s.matches, i)
+			s.matchSet[i] = true
 		}
 	}
 }
@@ -64,12 +69,7 @@ func (s SearchBar) CurrentMatchIndex() int {
 
 // IsMatch reports whether message index i is one of the current matches.
 func (s SearchBar) IsMatch(i int) bool {
-	for _, m := range s.matches {
-		if m == i {
-			return true
-		}
-	}
-	return false
+	return s.matchSet[i]
 }
 
 // NextMatch advances the cursor to the next match, wrapping around.

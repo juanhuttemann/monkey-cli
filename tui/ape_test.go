@@ -122,7 +122,7 @@ func TestView_ApeModeIndicator_DoesNotOverflowTerminalHeight(t *testing.T) {
 func TestView_ApeModeIndicator_ShowsEnabledWhenActive(t *testing.T) {
 	model := NewModel(nil)
 	model.SetDimensions(80, 24)
-	model.apeMode = true
+	model.autoApprove = true
 
 	view := stripANSI(model.View())
 
@@ -134,7 +134,7 @@ func TestView_ApeModeIndicator_ShowsEnabledWhenActive(t *testing.T) {
 func TestView_ApeModeIndicator_EnabledUsesYellowColor(t *testing.T) {
 	model := NewModel(nil)
 	model.SetDimensions(80, 24)
-	model.apeMode = true
+	model.autoApprove = true
 
 	view := model.View() // raw with ANSI
 
@@ -148,7 +148,7 @@ func TestView_ApeModeIndicator_EnabledUsesYellowColor(t *testing.T) {
 
 func TestUpdate_ToolApprovalRequestMsg_ApeModeOn_AutoApproves(t *testing.T) {
 	model := NewModel(nil)
-	model.apeMode = true
+	model.autoApprove = true
 	ch := make(chan bool, 1)
 	msg := ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch}
 
@@ -166,7 +166,7 @@ func TestUpdate_ToolApprovalRequestMsg_ApeModeOn_AutoApproves(t *testing.T) {
 
 func TestUpdate_ToolApprovalRequestMsg_ApeModeOn_DoesNotActivateDialog(t *testing.T) {
 	model := NewModel(nil)
-	model.apeMode = true
+	model.autoApprove = true
 	ch := make(chan bool, 1)
 	msg := ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch}
 
@@ -180,7 +180,7 @@ func TestUpdate_ToolApprovalRequestMsg_ApeModeOn_DoesNotActivateDialog(t *testin
 
 func TestUpdate_ToolApprovalRequestMsg_ApeModeOff_ShowsDialog(t *testing.T) {
 	model := NewModel(nil)
-	model.apeMode = false
+	model.autoApprove = false
 	ch := make(chan bool, 1)
 	msg := ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch}
 

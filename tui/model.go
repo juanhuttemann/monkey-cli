@@ -8,13 +8,26 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/timer"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/juanhuttemann/monkey-cli/api"
 )
 
 // toolCollapseLines is the line count above which tool output is auto-collapsed.
 const toolCollapseLines = 20
+
+// reservedBaseRows is the number of terminal rows always occupied below the viewport
+// (separator + input box + trailing newline + ape-mode line). See syncViewportHeight.
+const reservedBaseRows = 9
+
+// compactUserSeed and compactAssistantAck are the synthetic API messages injected after
+// /compact to satisfy the Anthropic API's requirement that conversations alternate
+// user/assistant turns. The summary becomes the "user" context message; the ack
+// acts as a placeholder assistant turn so the next real user message is valid.
+// Neither is ever shown in the UI — they exist only to keep the API history well-formed.
+const (
+	compactUserPrefix   = "Conversation context (summarized):\n"
+	compactAssistantAck = "Understood. I have the conversation context."
+)
 
 // State represents the current UI state
 type State int
@@ -30,7 +43,7 @@ type Model struct {
 	apiMessages    []api.Message // full API-layer history (includes tool_use/tool_result)
 	totalUsage     api.Usage     // cumulative token counts for the session
 	input          textarea.Model
-	viewport       viewport.Model
+	viewportHeight int
 	state          State
 	spinner        spinner.Model
 	timer          timer.Model
@@ -59,7 +72,7 @@ type Model struct {
 	helpPanel      HelpPanel
 	approvalDialog ToolApprovalDialog
 	models         []string
-	apeMode        bool
+	autoApprove    bool
 	pendingPrompt  string // the expanded prompt of the in-flight request; preserved into apiMessages on cancel
 	promptHistory  History
 	searchBar      SearchBar
@@ -75,8 +88,8 @@ type Model struct {
 	renderedPriorValid bool
 }
 
-// IsApeMode reports whether tool approval is disabled.
-func (m Model) IsApeMode() bool { return m.apeMode }
+// IsApeMode reports whether ape mode (auto tool approval) is enabled.
+func (m Model) IsApeMode() bool { return m.autoApprove }
 
 // NewModel creates a new TUI model with initialized components
 func NewModel(client *api.Client) Model {
@@ -86,8 +99,6 @@ func NewModel(client *api.Client) Model {
 	ta.SetHeight(3)
 	ta.Focus()
 
-	vp := viewport.New(80, 20)
-
 	sp := spinner.New()
 	sp.Spinner = spinner.Monkey
 	t := timer.NewWithInterval(24*time.Hour, time.Second)
@@ -96,7 +107,6 @@ func NewModel(client *api.Client) Model {
 		client:         client,
 		messages:       []Message{},
 		input:          ta,
-		viewport:       vp,
 		spinner:        sp,
 		timer:          t,
 		state:          StateReady,
@@ -141,24 +151,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.modelPicker.SetWidth(msg.Width)
 		m.helpPanel.SetWidth(msg.Width)
 		m.approvalDialog.SetWidth(msg.Width)
-		m.viewport.Width = msg.Width
 		m.syncViewportHeight()
 		m.renderedPriorValid = false // width changed; prior-render cache is stale
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
 
 	case tea.MouseMsg:
 		if msg.Button == tea.MouseButtonWheelUp {
 			m.scrollToBottom = false
 		}
-		var vpCmd tea.Cmd
-		m.viewport, vpCmd = m.viewport.Update(msg)
-		cmds = append(cmds, vpCmd)
 
 	case PartialResponseMsg:
 		if m.streaming {
 			n := len(m.messages)
-			if n > 0 && m.messages[n-1].Role == "assistant" {
+			if n > 0 && m.messages[n-1].Role == roleAssistant {
 				// Append to buf (O(1) amortised) instead of O(n) string concat.
 				m.streamBuf = append(m.streamBuf, msg.Token...)
 				m.messages[n-1].Content = string(m.streamBuf)
@@ -168,7 +172,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// every subsequent token.
 				m.streamBuf = m.streamBuf[:0]
 				m.streamBuf = append(m.streamBuf, msg.Token...)
-				m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Token, Timestamp: time.Now()})
+				m.messages = append(m.messages, Message{Role: roleAssistant, Content: msg.Token, Timestamp: time.Now()})
 				n = len(m.messages)
 				sw := m.messageStyleWidth()
 				var prior strings.Builder
@@ -179,16 +183,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.renderedPriorValid = true
 			}
 			m.scrollToBottom = true
-			// Re-render only the last (in-flight) message; prior messages are cached.
-			// Fall back to full render when search is active (match markers may change).
-			if m.renderedPriorValid && !m.searchBar.IsActive() {
-				sw := m.messageStyleWidth()
-				n = len(m.messages)
-				m.viewport.SetContent(m.renderedPrior + m.renderMessageEntry(sw, n-1))
-			} else {
-				m.viewport.SetContent(m.renderMessages())
-			}
-			m.viewport.GotoBottom()
 		}
 		if m.tokenCh != nil {
 			cmds = append(cmds, waitForToken(m.tokenCh))
@@ -204,10 +198,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Replace last assistant message with complete response (handles any race with PartialResponseMsg),
 		// or append if streaming didn't produce one yet.
 		n := len(m.messages)
-		if n > 0 && m.messages[n-1].Role == "assistant" {
+		if n > 0 && m.messages[n-1].Role == roleAssistant {
 			m.messages[n-1].Content = msg.Response
 		} else {
-			m.messages = append(m.messages, Message{Role: "assistant", Content: msg.Response, Timestamp: time.Now()})
+			m.messages = append(m.messages, Message{Role: roleAssistant, Content: msg.Response, Timestamp: time.Now()})
 		}
 		m.apiMessages = msg.APIMessages
 		m.totalUsage = m.totalUsage.Add(msg.Usage)
@@ -224,17 +218,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.scrollToBottom = true
 		m.syncViewportHeight()
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
 
 	case CompactResponseMsg:
 		// Replace entire message history with a single summary context message.
-		m.messages = []Message{{Role: "system", Content: msg.Summary, Timestamp: time.Now()}}
+		m.messages = []Message{{Role: roleSystem, Content: msg.Summary, Timestamp: time.Now()}}
 		m.printedCount = 0
 		// Seed apiMessages so the next turn has the summary as prior context.
 		m.apiMessages = []api.Message{
-			{Role: "user", Content: "Conversation context (summarized):\n" + msg.Summary},
-			{Role: "assistant", Content: "Understood. I have the conversation context."},
+			{Role: "user", Content: compactUserPrefix + msg.Summary},
+			{Role: "assistant", Content: compactAssistantAck},
 		}
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
@@ -242,8 +234,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.wasCancelled = false
 		m.scrollToBottom = true
 		m.syncViewportHeight()
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
 
 	case PromptErrorMsg:
 		wasStreaming := m.streaming
@@ -251,14 +241,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tokenCh = nil
 		// If we were streaming, remove any partial assistant message before appending the error.
 		if wasStreaming {
-			if n := len(m.messages); n > 0 && m.messages[n-1].Role == "assistant" {
+			if n := len(m.messages); n > 0 && m.messages[n-1].Role == roleAssistant {
 				m.messages = m.messages[:n-1]
 			}
 			m.streamBuf = m.streamBuf[:0]
 			m.renderedPriorValid = false
 		}
 		errContent := friendlyError(msg.Err)
-		m.messages = append(m.messages, Message{Role: "error", Content: errContent, Timestamp: time.Now()})
+		m.messages = append(m.messages, Message{Role: roleError, Content: errContent, Timestamp: time.Now()})
 		m.state = StateReady
 		m.lastElapsed = time.Since(m.startTime)
 		m.timerActive = false
@@ -270,8 +260,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.scrollToBottom = true
 		m.syncViewportHeight()
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
 
 	case PromptCancelledMsg:
 		m.streaming = false
@@ -307,7 +295,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if content := formatToolCall(msg.ToolCall); content != "" {
 			collapsed := strings.Count(content, "\n") >= toolCollapseLines
 			m.messages = append(m.messages, Message{
-				Role:      "tool",
+				Role:      roleTool,
 				Content:   content,
 				ToolName:  msg.ToolCall.Name,
 				Timestamp: time.Now(),
@@ -318,8 +306,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 		m.scrollToBottom = true
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
 		if m.toolCallCh != nil {
 			cmds = append(cmds, waitForToolCall(m.toolCallCh))
 		}
@@ -330,7 +316,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ToolApprovalRequestMsg:
 		// Ape mode may have been enabled after this request started (during streaming).
 		// Auto-approve without showing the dialog.
-		if m.apeMode {
+		if m.autoApprove {
 			msg.ResponseCh <- true
 			if m.approvalCh != nil {
 				cmds = append(cmds, waitForApproval(m.approvalCh))
@@ -510,7 +496,7 @@ func (m Model) GetDimensions() (int, int) {
 //
 // = 9 rows.  Each optional element adds its own row count on top.
 func (m *Model) syncViewportHeight() {
-	reserved := 9
+	reserved := reservedBaseRows
 
 	// Status line: spinner, "What should monkey do?", or "took N s"
 	if m.state == StateLoading || m.wasCancelled || m.lastElapsed > 0 {
@@ -537,7 +523,7 @@ func (m *Model) syncViewportHeight() {
 	if h < 1 {
 		h = 1
 	}
-	m.viewport.Height = h
+	m.viewportHeight = h
 }
 
 // SetDimensions sets the viewport and textarea dimensions (pointer receiver to mutate in place)
@@ -550,12 +536,11 @@ func (m *Model) SetDimensions(width, height int) {
 	m.modelPicker.SetWidth(width)
 	m.helpPanel.SetWidth(width)
 	m.approvalDialog.SetWidth(width)
-	m.viewport.Width = width
 	m.syncViewportHeight()
 }
 
-// GetViewportHeight returns the current viewport height (for testing).
-func (m Model) GetViewportHeight() int { return m.viewport.Height }
+// GetViewportHeight returns the available message-area height (for testing).
+func (m Model) GetViewportHeight() int { return m.viewportHeight }
 
 // CanSubmit returns true when input is non-empty (trimmed) and not loading
 func (m Model) CanSubmit() bool {
@@ -603,10 +588,8 @@ func (m *Model) applyModelSelection(model string) {
 	}
 	m.modelPicker.Deactivate()
 	m.input.SetValue("")
-	m.messages = append(m.messages, Message{Role: "system", Content: "model: " + model, Timestamp: time.Now()})
+	m.messages = append(m.messages, Message{Role: roleSystem, Content: "model: " + model, Timestamp: time.Now()})
 	m.scrollToBottom = true
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
 }
 
 // AddMessage appends a message to the conversation history (pointer receiver to mutate in place)
@@ -636,7 +619,7 @@ func (m *Model) startCompact() tea.Cmd {
 // lastAssistantContent returns the content of the most recent assistant message, or "".
 func (m Model) lastAssistantContent() string {
 	for i := len(m.messages) - 1; i >= 0; i-- {
-		if m.messages[i].Role == "assistant" {
+		if m.messages[i].Role == roleAssistant {
 			return m.messages[i].Content
 		}
 	}

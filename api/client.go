@@ -143,6 +143,8 @@ func retryNotifierMiddleware(fn func(int, error)) option.RequestOption {
 	var count atomic.Int32
 	var lastStatus atomic.Int32
 	return option.WithMiddleware(func(req *http.Request, next option.MiddlewareNext) (*http.Response, error) {
+		// n is the total invocation count (1 = first attempt, 2 = first retry, …).
+		// We skip n==1 (no retry yet) and pass n-1 as the 1-based retry number.
 		n := int(count.Add(1))
 		if n > 1 {
 			code := int(lastStatus.Load())

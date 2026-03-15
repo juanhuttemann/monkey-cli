@@ -22,10 +22,15 @@ func friendlyError(err error) string {
 	if errors.As(err, &se) {
 		return se.FriendlyMessage()
 	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "request timed out"
+	}
 	return err.Error()
 }
 
 // retryReasonFor returns a short human-readable reason string for a retry error.
+// err is nil when the previous attempt never received an HTTP response (e.g. connection
+// refused, EOF before headers) — retryNotifierMiddleware passes nil in that case.
 func retryReasonFor(err error) string {
 	if err == nil {
 		return "network error"
@@ -80,56 +85,59 @@ func (a ApprovingExecutor) ExecuteTool(ctx context.Context, name string, input m
 // APITimeout is the default timeout for API requests
 const APITimeout = 60 * time.Second
 
+// SendPromptOpts holds the optional channel arguments for SendPromptCmdWithTimeout.
+type SendPromptOpts struct {
+	ToolCallCh chan<- ToolCallMsg
+	ApprovalCh chan<- ToolApprovalRequestMsg
+	TokenCh    chan<- PartialResponseMsg
+	RetryCh    chan<- RetryingMsg
+}
+
 // SendPromptCmd creates a tea.Cmd that sends the conversation history plus
 // the new prompt to the API using the default timeout.
 // apiMessages is the full API-layer history (including tool_use/tool_result from prior turns).
 // The returned CancelFunc can be called to cancel the in-flight request.
 func SendPromptCmd(client *api.Client, apiMessages []api.Message, prompt string) (tea.Cmd, context.CancelFunc) {
-	return SendPromptCmdWithTimeout(client, apiMessages, prompt, APITimeout, nil, nil, nil)
+	return SendPromptCmdWithTimeout(client, apiMessages, prompt, APITimeout, SendPromptOpts{})
 }
 
 // SendPromptCmdWithTimeout creates a tea.Cmd that sends the prompt with a per-attempt timeout.
 // apiMessages is the full API-layer history (including tool_use/tool_result from prior turns).
 // The returned CancelFunc can be called to cancel the in-flight request.
-// toolCallCh, if non-nil, receives a ToolCallMsg for each tool call as it completes and is closed when done.
-// approvalCh, if non-nil, enables the approval harness: each tool call sends a ToolApprovalRequestMsg
+// opts.ToolCallCh, if non-nil, receives a ToolCallMsg for each tool call as it completes and is closed when done.
+// opts.ApprovalCh, if non-nil, enables the approval harness: each tool call sends a ToolApprovalRequestMsg
 // and blocks until the TUI responds. When nil, tools execute without approval.
-// tokenCh, if non-nil, uses the streaming SSE API and receives a PartialResponseMsg for each text token.
-// An optional retryCh receives a RetryingMsg before each retry attempt and is closed when done.
-func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, prompt string, timeout time.Duration, toolCallCh chan<- ToolCallMsg, approvalCh chan<- ToolApprovalRequestMsg, tokenCh chan<- PartialResponseMsg, retryChs ...chan<- RetryingMsg) (tea.Cmd, context.CancelFunc) {
+// opts.TokenCh, if non-nil, uses the streaming SSE API and receives a PartialResponseMsg for each text token.
+// opts.RetryCh, if non-nil, receives a RetryingMsg before each retry attempt and is closed when done.
+func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, prompt string, timeout time.Duration, opts SendPromptOpts) (tea.Cmd, context.CancelFunc) {
 	// Use a cancel-only parent so that each retry gets a fresh per-attempt timeout
 	// rather than sharing an already-expired deadline.
 	parentCtx, parentCancel := context.WithCancel(context.Background())
 	ctx := api.WithPerAttemptTimeout(parentCtx, timeout)
 
-	var retryCh chan<- RetryingMsg
-	if len(retryChs) > 0 {
-		retryCh = retryChs[0]
-	}
-
 	cmd := func() tea.Msg {
 		defer parentCancel()
-		if retryCh != nil {
-			defer close(retryCh)
+		if opts.RetryCh != nil {
+			defer close(opts.RetryCh)
 		}
-		if toolCallCh != nil {
-			defer close(toolCallCh)
+		if opts.ToolCallCh != nil {
+			defer close(opts.ToolCallCh)
 		}
-		if approvalCh != nil {
-			defer close(approvalCh)
+		if opts.ApprovalCh != nil {
+			defer close(opts.ApprovalCh)
 		}
-		if tokenCh != nil {
-			defer close(tokenCh)
+		if opts.TokenCh != nil {
+			defer close(opts.TokenCh)
 		}
 
 		// Build full message list: accumulated API history + new user prompt.
 		// apiMessages already contains all prior tool_use/tool_result context.
 		msgs := append(append([]api.Message(nil), apiMessages...), api.Message{Role: "user", Content: prompt})
 
-		if retryCh != nil {
+		if opts.RetryCh != nil {
 			ctx = api.WithRetryNotifier(ctx, func(attempt int, err error) {
 				select {
-				case retryCh <- RetryingMsg{Attempt: attempt, Err: err}:
+				case opts.RetryCh <- RetryingMsg{Attempt: attempt, Err: err}:
 				default:
 				}
 			})
@@ -148,19 +156,19 @@ func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, pro
 
 		toolList := []api.Tool{tools.BashTool(), tools.ReadTool(), tools.WriteTool(), tools.EditTool(), tools.GlobTool(), tools.GrepTool(), tools.WebSearchTool(), tools.WebFetchTool()}
 
-		// Use ApprovingExecutor when approvalCh is set, otherwise run tools directly.
+		// Use ApprovingExecutor when ApprovalCh is set, otherwise run tools directly.
 		var executor api.ToolExecutor = multi
-		if approvalCh != nil {
+		if opts.ApprovalCh != nil {
 			modelName := ""
 			if client != nil {
 				modelName = client.GetModel()
 			}
-			executor = ApprovingExecutor{inner: multi, modelName: modelName, approvalCh: approvalCh}
+			executor = ApprovingExecutor{inner: multi, modelName: modelName, approvalCh: opts.ApprovalCh}
 		}
 
 		onCall := func(tc api.ToolCallResult) {
-			if toolCallCh != nil && tc.Err != errToolDeclined {
-				toolCallCh <- ToolCallMsg{ToolCall: tc}
+			if opts.ToolCallCh != nil && tc.Err != errToolDeclined {
+				opts.ToolCallCh <- ToolCallMsg{ToolCall: tc}
 			}
 		}
 
@@ -171,11 +179,11 @@ func SendPromptCmdWithTimeout(client *api.Client, apiMessages []api.Message, pro
 			err         error
 		)
 
-		if tokenCh != nil {
+		if opts.TokenCh != nil {
 			// Streaming path: deliver text tokens incrementally.
 			onToken := func(tok string) {
 				select {
-				case tokenCh <- PartialResponseMsg{Token: tok}:
+				case opts.TokenCh <- PartialResponseMsg{Token: tok}:
 				case <-parentCtx.Done():
 				}
 			}

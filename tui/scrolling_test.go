@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -26,65 +25,6 @@ func TestScrolling_ViewportOffsetAtBottomAfterNewMessage(t *testing.T) {
 	// All messages (15 user + 1 assistant) should be committed to scrollback.
 	if m.printedCount != 16 {
 		t.Errorf("After PromptResponseMsg, printedCount = %d, want 16", m.printedCount)
-	}
-}
-
-// TestScrolling_MouseWheelUp_DecreasesYOffset verifies that mouse scroll up
-// actually changes the viewport offset (requires content set in the model).
-func TestScrolling_MouseWheelUp_DecreasesYOffset(t *testing.T) {
-	model := NewModel(nil)
-	model.SetDimensions(80, 10)
-
-	for i := 0; i < 15; i++ {
-		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
-	}
-
-	response := PromptResponseMsg{Response: "assistant reply"}
-	updated, _ := model.Update(response)
-	m := updated.(Model)
-
-	if m.viewport.YOffset == 0 {
-		t.Skip("Viewport not scrollable - content may not exceed viewport height")
-	}
-
-	initialOffset := m.viewport.YOffset
-	mouseUp := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
-	updated2, _ := m.Update(mouseUp)
-	m2 := updated2.(Model)
-
-	if m2.viewport.YOffset >= initialOffset {
-		t.Errorf("After mouse wheel up, YOffset = %d, want < %d", m2.viewport.YOffset, initialOffset)
-	}
-}
-
-// TestScrolling_ScrolledUp_ViewShowsScrolledContent verifies that after scrolling
-// to the top, View() renders earlier messages, not always the bottom.
-func TestScrolling_ScrolledUp_ViewShowsScrolledContent(t *testing.T) {
-	model := NewModel(nil)
-	model.SetDimensions(80, 15)
-
-	for i := 0; i < 15; i++ {
-		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
-	}
-
-	response := PromptResponseMsg{Response: "assistant reply"}
-	updated, _ := model.Update(response)
-	m := updated.(Model)
-
-	if m.viewport.YOffset == 0 {
-		t.Skip("Content fits in viewport - scrolling not needed")
-	}
-
-	// Scroll all the way to the top
-	mouseUp := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
-	for i := 0; i < 200; i++ {
-		updated2, _ := m.Update(mouseUp)
-		m = updated2.(Model)
-	}
-
-	topView := m.View()
-	if !strings.Contains(topView, "user message number 0") {
-		t.Error("After scrolling to top, first message should be visible in View()")
 	}
 }
 
@@ -126,70 +66,6 @@ func TestScrolling_PageUp_SetsScrollToBottomFalse(t *testing.T) {
 
 	if m2.scrollToBottom {
 		t.Error("After PageUp, scrollToBottom should be false")
-	}
-}
-
-// TestScrolling_PageUp_DecreasesYOffset verifies that PageUp actually scrolls
-// the viewport upward when content exceeds the viewport height.
-func TestScrolling_PageUp_DecreasesYOffset(t *testing.T) {
-	model := NewModel(nil)
-	model.SetDimensions(80, 10)
-
-	for i := 0; i < 15; i++ {
-		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
-	}
-
-	response := PromptResponseMsg{Response: "assistant reply"}
-	updated, _ := model.Update(response)
-	m := updated.(Model)
-
-	if m.viewport.YOffset == 0 {
-		t.Skip("Viewport not scrollable - content may not exceed viewport height")
-	}
-
-	initialOffset := m.viewport.YOffset
-	pgUp := tea.KeyMsg{Type: tea.KeyPgUp}
-	updated2, _ := m.Update(pgUp)
-	m2 := updated2.(Model)
-
-	if m2.viewport.YOffset >= initialOffset {
-		t.Errorf("After PageUp, YOffset = %d, want < %d", m2.viewport.YOffset, initialOffset)
-	}
-}
-
-// TestScrolling_PageDown_IncreasesYOffset verifies that PageDown scrolls down
-// from a position that is not already at the bottom.
-func TestScrolling_PageDown_IncreasesYOffset(t *testing.T) {
-	model := NewModel(nil)
-	model.SetDimensions(80, 10)
-
-	for i := 0; i < 15; i++ {
-		model.AddMessage("user", fmt.Sprintf("user message number %d", i))
-	}
-
-	response := PromptResponseMsg{Response: "assistant reply"}
-	updated, _ := model.Update(response)
-	m := updated.(Model)
-
-	if m.viewport.YOffset == 0 {
-		t.Skip("Viewport not scrollable - cannot test PageDown from top")
-	}
-
-	// Scroll to top first via PageUp
-	pgUp := tea.KeyMsg{Type: tea.KeyPgUp}
-	for i := 0; i < 20; i++ {
-		upd, _ := m.Update(pgUp)
-		m = upd.(Model)
-	}
-	topOffset := m.viewport.YOffset
-
-	// Now PageDown should increase offset
-	pgDown := tea.KeyMsg{Type: tea.KeyPgDown}
-	updated2, _ := m.Update(pgDown)
-	m2 := updated2.(Model)
-
-	if m2.viewport.YOffset <= topOffset {
-		t.Errorf("After PageDown from top, YOffset = %d, want > %d", m2.viewport.YOffset, topOffset)
 	}
 }
 

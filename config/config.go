@@ -164,17 +164,3 @@ func LoadSystemPromptFile(path string) (string, error) {
 	}
 	return string(data), nil
 }
-
-// Validate checks that all required fields are set
-func (c Config) Validate() error {
-	if c.APIKey == "" {
-		return fmt.Errorf("APIKey is required")
-	}
-	if c.BaseURL == "" {
-		return fmt.Errorf("BaseURL is required")
-	}
-	if c.DefaultModel() == "" {
-		return fmt.Errorf("at least one model must be set")
-	}
-	return nil
-}

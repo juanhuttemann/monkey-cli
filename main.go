@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -100,35 +101,37 @@ func buildClientOpts(cfg config.Config) ([]api.ClientOption, error) {
 	return opts, nil
 }
 
-// sendPrompt calls the LLM API with the user-provided prompt and returns the response
-func sendPrompt(prompt string) (string, error) {
-	// Load configuration
+const cliTimeout = 60 * time.Second
+
+// buildClient loads config and constructs an API client.
+// It returns both so callers that need cfg (e.g. available models) can use it directly.
+func buildClient() (*api.Client, config.Config, error) {
 	loader := config.NewEnvLoader()
 	cfg, err := loader.Load()
 	if err != nil {
-		return "", err
+		return nil, config.Config{}, err
 	}
-
-	// Create API client
 	opts, err := buildClientOpts(cfg)
 	if err != nil {
-		return "", err
+		return nil, config.Config{}, err
 	}
-	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
-
-	// Send message and get response
-	return client.SendMessage(context.Background(), prompt)
+	return api.NewClient(cfg.BaseURL, cfg.APIKey, opts...), cfg, nil
 }
 
-// runPrompt sends the prompt to the LLM API and returns the response
-// On error, it prints to stderr and exits with code 1
-func runPrompt(prompt string) string {
-	response, err := sendPrompt(prompt)
+// sendPromptWithContext calls the LLM API with the given context and prompt.
+func sendPromptWithContext(ctx context.Context, prompt string) (string, error) {
+	client, _, err := buildClient()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
+		return "", err
 	}
-	return response
+	return client.SendMessage(ctx, prompt)
+}
+
+// sendPrompt calls the LLM API with a 60-second timeout.
+func sendPrompt(prompt string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cliTimeout)
+	defer cancel()
+	return sendPromptWithContext(ctx, prompt)
 }
 
 // printVersion prints the application name and version to stdout.
@@ -152,19 +155,11 @@ func shouldLaunchTUI(prompt string) bool {
 // launchTUI starts the interactive TUI.
 // If continueSession is true, the last saved session is restored.
 func launchTUI(continueSession bool) {
-	loader := config.NewEnvLoader()
-	cfg, err := loader.Load()
+	client, cfg, err := buildClient()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-
-	opts, err := buildClientOpts(cfg)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-	client := api.NewClient(cfg.BaseURL, cfg.APIKey, opts...)
 	model := tui.NewModel(client)
 	model.SetModels(cfg.AvailableModels())
 	model.SetIntro(introContent())
@@ -193,18 +188,33 @@ func launchTUI(continueSession bool) {
 		if client != nil {
 			modelName = client.GetModel()
 		}
-		_ = tui.SaveSession(tui.SessionPath(), modelName, m.GetAPIMessages(), m.GetHistory())
+		saveSessionWithWarning(os.Stderr, tui.SessionPath(), modelName, m.GetAPIMessages(), m.GetHistory())
+	}
+}
+
+// saveSessionWithWarning saves the session to path and writes a warning to w
+// if the save fails. Errors are non-fatal: the user can still use the app,
+// but --continue won't have a session to restore next time.
+func saveSessionWithWarning(w io.Writer, path, modelName string, apiMsgs []api.Message, msgs []tui.Message) {
+	if err := tui.SaveSession(path, modelName, apiMsgs, msgs); err != nil {
+		fmt.Fprintf(w, "warning: session not saved: %v\n", err)
 	}
 }
 
 // run is the core application logic, separated for testability.
 // tuiRunner is called when no prompt is provided; in production this is launchTUI.
-func run(prompt string, tuiRunner func()) {
+// On success with a non-empty prompt, the response is written to w.
+func run(prompt string, tuiRunner func(), w io.Writer) error {
 	if shouldLaunchTUI(prompt) {
 		tuiRunner()
-		return
+		return nil
 	}
-	fmt.Println(runPrompt(prompt))
+	response, err := sendPrompt(prompt)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(w, response)
+	return nil
 }
 
 func main() {
@@ -244,5 +254,8 @@ func main() {
 		}
 	}
 
-	run(prompt, func() { launchTUI(*continueFlag) })
+	if err := run(prompt, func() { launchTUI(*continueFlag) }, os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 }

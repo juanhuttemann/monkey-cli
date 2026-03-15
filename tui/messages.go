@@ -7,6 +7,15 @@ import (
 	"github.com/juanhuttemann/monkey-cli/api"
 )
 
+// Message role constants. These are the only valid values for Message.Role.
+const (
+	roleUser      = "user"
+	roleAssistant = "assistant"
+	roleTool      = "tool"
+	roleSystem    = "system"
+	roleError     = "error"
+)
+
 // Message represents a single message in the conversation
 type Message struct {
 	Role      string

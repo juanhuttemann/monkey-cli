@@ -205,6 +205,58 @@ func TestStreaming_MultipleTokens_DoesNotPanic(t *testing.T) {
 	}
 }
 
+// TestRenderMessages_Streaming_UsesRenderedPriorCache verifies that renderMessages
+// uses the renderedPrior cache instead of re-rendering prior messages on every token.
+// This test fails if the fast path is absent (renderMessages ignores renderedPrior).
+func TestRenderMessages_Streaming_UsesRenderedPriorCache(t *testing.T) {
+	m := NewModel(nil)
+	m.SetDimensions(80, 40)
+	m.messages = []Message{
+		{Role: "user", Content: "prior question", Timestamp: time.Now()},
+		{Role: "assistant", Content: "partial answer", Timestamp: time.Now()},
+	}
+	m.printedCount = 0
+	m.streaming = true
+	// Install a recognisable sentinel in place of the real prior render.
+	m.renderedPrior = "CACHED_PRIOR_SENTINEL\n"
+	m.renderedPriorValid = true
+
+	rendered := stripANSI(m.renderMessages())
+
+	if !strings.Contains(rendered, "CACHED_PRIOR_SENTINEL") {
+		t.Error("renderMessages during streaming should use renderedPrior cache for prior messages")
+	}
+}
+
+// TestRenderMessages_Streaming_FastPathMatchesFullRender verifies that the
+// streaming fast path produces byte-identical output to the full render path.
+func TestRenderMessages_Streaming_FastPathMatchesFullRender(t *testing.T) {
+	m := NewModel(nil)
+	m.SetDimensions(80, 40)
+	m.messages = []Message{
+		{Role: "user", Content: "question", Timestamp: time.Now()},
+		{Role: "assistant", Content: "partial answer so far", Timestamp: time.Now()},
+	}
+	m.printedCount = 0
+	m.streaming = true
+
+	// Build the prior cache exactly as Update does on the first streaming token.
+	sw := m.messageStyleWidth()
+	m.renderedPrior = m.renderMessageEntry(sw, 0)
+	m.renderedPriorValid = true
+
+	fastOutput := m.renderMessages()
+
+	// Full path: invalidate cache so the loop runs for all messages.
+	m.renderedPriorValid = false
+	fullOutput := m.renderMessages()
+
+	if fastOutput != fullOutput {
+		t.Errorf("streaming fast path differs from full render\nfast:\n%s\nfull:\n%s",
+			stripANSI(fastOutput), stripANSI(fullOutput))
+	}
+}
+
 // BenchmarkStreaming_ManyTokensWithPriorMessages measures the cost of
 // processing N streaming tokens when prior messages exist in the viewport.
 func BenchmarkStreaming_ManyTokensWithPriorMessages(b *testing.B) {

@@ -833,7 +833,7 @@ func TestUpdate_Enter_CommandPicker_SlashApe_TogglesMode(t *testing.T) {
 	updatedModel, _ := model.Update(ctrlEnter)
 
 	m := updatedModel.(Model)
-	if !m.apeMode {
+	if !m.autoApprove {
 		t.Error("Enter on /ape in picker should toggle ape mode")
 	}
 }
@@ -896,7 +896,7 @@ func TestUpdate_CommandPicker_SlashApe_TogglesApeMode(t *testing.T) {
 	model.commandPicker.Activate()
 	model.commandPicker.SetQuery("ape")
 	m, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlM})
-	if !m.(Model).apeMode {
+	if !m.(Model).autoApprove {
 		t.Error("/ape from command picker should enable ape mode")
 	}
 }

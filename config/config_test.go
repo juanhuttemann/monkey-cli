@@ -330,20 +330,6 @@ func TestConfig_AvailableModels_Empty(t *testing.T) {
 	}
 }
 
-func TestConfig_Validate_Valid(t *testing.T) {
-	cfg := Config{APIKey: "key", BaseURL: "url", OpusModel: "model"}
-	if err := cfg.Validate(); err != nil {
-		t.Errorf("Validate() = %v, want nil", err)
-	}
-}
-
-func TestConfig_Validate_NoModel(t *testing.T) {
-	cfg := Config{APIKey: "key", BaseURL: "url"}
-	if err := cfg.Validate(); err == nil {
-		t.Error("Validate() = nil, want error when no model set")
-	}
-}
-
 func TestConfig_EmptyValues(t *testing.T) {
 	t.Setenv(EnvAPIKey, "")
 	t.Setenv(EnvBaseURL, "https://api.example.com")
@@ -405,20 +391,6 @@ func TestLoadSystemPromptFile_EmptyFile_ReturnsEmpty(t *testing.T) {
 	}
 	if got != "" {
 		t.Errorf("LoadSystemPromptFile() = %q, want empty string for empty file", got)
-	}
-}
-
-func TestConfig_Validate_NoAPIKey(t *testing.T) {
-	cfg := Config{BaseURL: "https://api.anthropic.com", OpusModel: "claude-opus"}
-	if err := cfg.Validate(); err == nil {
-		t.Error("Validate() = nil, want error when APIKey is empty")
-	}
-}
-
-func TestConfig_Validate_NoBaseURL(t *testing.T) {
-	cfg := Config{APIKey: "sk-ant-test", OpusModel: "claude-opus"}
-	if err := cfg.Validate(); err == nil {
-		t.Error("Validate() = nil, want error when BaseURL is empty")
 	}
 }
 

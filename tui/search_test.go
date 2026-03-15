@@ -247,10 +247,26 @@ func TestSearchBar_PrevMatch_NoMatches_DoesNothing(t *testing.T) {
 	}
 }
 
-func TestScrollToMatch_NoMatches_DoesNotPanic(t *testing.T) {
-	model := NewModel(nil)
-	model.SetDimensions(80, 24)
-	model.searchBar.Activate()
-	// No query → no matches → CurrentMatchIndex() == -1 → early return
-	model.scrollToMatch()
+// TestSearchBar_IsMatch_ManyMessages verifies that IsMatch correctly reports
+// membership for a large set of messages, ensuring the matchSet lookup is used
+// rather than a linear scan over matches.
+func TestSearchBar_IsMatch_ManyMessages(t *testing.T) {
+	const n = 1000
+	msgs := make([]Message, n)
+	for i := range msgs {
+		if i%2 == 0 {
+			msgs[i] = Message{Role: "user", Content: "needle"}
+		} else {
+			msgs[i] = Message{Role: "user", Content: "haystack"}
+		}
+	}
+	sb := NewSearchBar()
+	sb.SetQuery("needle", msgs)
+
+	for i := 0; i < n; i++ {
+		want := i%2 == 0
+		if got := sb.IsMatch(i); got != want {
+			t.Errorf("IsMatch(%d) = %v, want %v", i, got, want)
+		}
+	}
 }

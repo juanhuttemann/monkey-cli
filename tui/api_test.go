@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -150,7 +152,7 @@ func TestSendPromptCmd_TimeoutError(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
 	// Use a short timeout for testing
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 100*time.Millisecond, nil, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 100*time.Millisecond, SendPromptOpts{})
 	result := cmd()
 
 	errMsg, ok := result.(PromptErrorMsg)
@@ -176,7 +178,7 @@ func TestSendPromptCmdWithTimeout_RespectsTimeout(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
 	timeout := 100 * time.Millisecond
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", timeout, nil, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", timeout, SendPromptOpts{})
 	_ = cmd()
 
 	elapsed := time.Since(startTime)
@@ -225,7 +227,7 @@ func TestSendPromptCmdWithTimeout_StreamsToolCallsToChannel(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
 	toolCallCh := make(chan ToolCallMsg, 10)
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, toolCallCh, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, SendPromptOpts{ToolCallCh: toolCallCh})
 	result := cmd()
 
 	// Channel should have received the tool call
@@ -354,7 +356,7 @@ func TestSendPromptCmdWithTimeout_ReturnsCmd(t *testing.T) {
 
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 5*time.Second, nil, nil, nil)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test prompt", 5*time.Second, SendPromptOpts{})
 	if cmd == nil {
 		t.Fatal("SendPromptCmdWithTimeout() returned nil, want non-nil tea.Cmd")
 	}
@@ -379,7 +381,7 @@ func TestSendPromptCmdWithTimeout_StreamingPath_DeliversTokens(t *testing.T) {
 	client := api.NewClient(server.URL, "test-key", api.WithModel("test-model"))
 	tokenCh := make(chan PartialResponseMsg, 10)
 
-	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, nil, nil, tokenCh)
+	cmd, _ := SendPromptCmdWithTimeout(client, nil, "test", 5*time.Second, SendPromptOpts{TokenCh: tokenCh})
 
 	var tokens []string
 	done := make(chan struct{})
@@ -519,6 +521,41 @@ func TestWaitForApproval_ClosedChannel(t *testing.T) {
 
 	if _, ok := msg.(toolApprovalDoneMsg); !ok {
 		t.Fatalf("waitForApproval on closed ch = %T, want toolApprovalDoneMsg", msg)
+	}
+}
+
+func TestFriendlyError_DeadlineExceeded(t *testing.T) {
+	got := friendlyError(context.DeadlineExceeded)
+	if got != "request timed out" {
+		t.Errorf("friendlyError(context.DeadlineExceeded) = %q, want %q", got, "request timed out")
+	}
+}
+
+func TestFriendlyError_WrappedDeadlineExceeded(t *testing.T) {
+	wrapped := fmt.Errorf("outer: %w", context.DeadlineExceeded)
+	got := friendlyError(wrapped)
+	if got != "request timed out" {
+		t.Errorf("friendlyError(wrapped DeadlineExceeded) = %q, want %q", got, "request timed out")
+	}
+}
+
+func TestFriendlyError_StatusError(t *testing.T) {
+	se := &api.StatusError{StatusCode: 429}
+	got := friendlyError(se)
+	if got == "" {
+		t.Error("friendlyError(*api.StatusError) returned empty string")
+	}
+	// Should not return the raw err.Error() form
+	if got == se.Error() {
+		t.Errorf("friendlyError(*api.StatusError) = raw Error() %q, want FriendlyMessage()", got)
+	}
+}
+
+func TestFriendlyError_GenericError(t *testing.T) {
+	err := errors.New("some random error")
+	got := friendlyError(err)
+	if got != "some random error" {
+		t.Errorf("friendlyError(generic) = %q, want %q", got, "some random error")
 	}
 }
 

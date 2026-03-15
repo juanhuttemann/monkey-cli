@@ -161,10 +161,10 @@ func TestSyncViewportHeight_UsesPickerHeight(t *testing.T) {
 
 	// The picker height should equal lipgloss.Height(View()).
 	pickerH := lipgloss.Height(m.commandPicker.View())
-	// viewport = 40 - 9 - pickerH
-	wantVP := 40 - 9 - pickerH
+	// viewport = 40 - reservedBaseRows - pickerH
+	wantVP := 40 - reservedBaseRows - pickerH
 	if withPicker != wantVP {
-		t.Errorf("syncViewportHeight with command picker: got %d, want %d (40-9-%d)", withPicker, wantVP, pickerH)
+		t.Errorf("syncViewportHeight with command picker: got %d, want %d (40-%d-%d)", withPicker, wantVP, reservedBaseRows, pickerH)
 	}
 }
 

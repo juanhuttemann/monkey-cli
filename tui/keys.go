@@ -20,14 +20,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 	case tea.KeyPgUp:
 		m.scrollToBottom = false
-		var vpCmd tea.Cmd
-		m.viewport, vpCmd = m.viewport.Update(msg)
-		cmds = append(cmds, vpCmd)
-
-	case tea.KeyPgDown:
-		var vpCmd tea.Cmd
-		m.viewport, vpCmd = m.viewport.Update(msg)
-		cmds = append(cmds, vpCmd)
 
 	case tea.KeyUp:
 		if m.approvalDialog.IsActive() {
@@ -97,11 +89,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 				if selected == "/model" && len(m.models) > 0 {
 					// Transition directly to model picker.
 					m.input.SetValue("/model")
-					m.modelPicker.SetModels(m.models)
-					if m.client != nil {
-						m.modelPicker.SetCursor(m.client.GetModel())
-					}
-					m.modelPicker.Activate()
+					m.activateModelPicker()
 				} else {
 					m.input.SetValue(selected)
 				}
@@ -115,9 +103,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case tea.KeyCtrlT:
 		// ctrl+t expands the most recently collapsed tool message.
 		for i := len(m.messages) - 1; i >= 0; i-- {
-			if m.messages[i].Role == "tool" && m.messages[i].Collapsed {
+			if m.messages[i].Role == roleTool && m.messages[i].Collapsed {
 				m.messages[i].Collapsed = false
-				m.viewport.SetContent(m.renderMessages())
 				break
 			}
 		}
@@ -130,14 +117,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		} else {
 			m.searchBar.Activate()
 		}
-		m.viewport.SetContent(m.renderMessages())
 		return m, nil
 
 	case tea.KeyCtrlN:
 		// Ctrl+N advances to next search match.
 		if m.searchBar.IsActive() {
 			m.searchBar.NextMatch()
-			m.scrollToMatch()
 			return m, nil
 		}
 
@@ -145,7 +130,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Ctrl+P retreats to previous search match.
 		if m.searchBar.IsActive() {
 			m.searchBar.PrevMatch()
-			m.scrollToMatch()
 			return m, nil
 		}
 
@@ -171,7 +155,6 @@ func (m Model) handleEscCtrlC(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if msg.Type == tea.KeyEsc {
 		if m.searchBar.IsActive() {
 			m.searchBar.Deactivate()
-			m.viewport.SetContent(m.renderMessages())
 			return m, nil
 		}
 		if m.helpPanel.IsActive() {
@@ -284,10 +267,20 @@ func (m Model) handleEnter() (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// activateModelPicker loads available models into the picker and activates it.
+func (m *Model) activateModelPicker() {
+	m.modelPicker.SetModels(m.models)
+	if m.client != nil {
+		m.modelPicker.SetCursor(m.client.GetModel())
+	}
+	m.modelPicker.Activate()
+}
+
 // execSlashCommand executes a recognised slash command.
 // When cleanup is true (inline input), the command/file pickers are also dismissed.
 // Returns (model, cmd, true) when the caller should return immediately.
 func (m Model) execSlashCommand(cmd string, cleanup bool) (Model, tea.Cmd, bool) {
+	var teaCmd tea.Cmd
 	switch cmd {
 	case "/exit":
 		return m, tea.Sequence(tea.ClearScreen, tea.Quit), true
@@ -296,52 +289,29 @@ func (m Model) execSlashCommand(cmd string, cleanup bool) (Model, tea.Cmd, bool)
 		m.apiMessages = nil
 		m.totalUsage = api.Usage{}
 		m.printedCount = 0
-		m.input.SetValue("")
 		if cleanup {
-			m.commandPicker.Deactivate()
 			m.filePicker.Deactivate()
 		}
-		return m, nil, true
 	case "/model":
-		m.input.SetValue("")
-		if cleanup {
-			m.commandPicker.Deactivate()
-		}
-		m.modelPicker.SetModels(m.models)
-		if m.client != nil {
-			m.modelPicker.SetCursor(m.client.GetModel())
-		}
-		m.modelPicker.Activate()
-		return m, nil, true
+		m.activateModelPicker()
 	case "/ape":
-		m.apeMode = !m.apeMode
-		m.input.SetValue("")
-		if cleanup {
-			m.commandPicker.Deactivate()
-		}
-		return m, nil, true
+		m.autoApprove = !m.autoApprove
 	case "/copy":
 		if text := m.lastAssistantContent(); text != "" {
 			if err := clipboard.WriteAll(text); err != nil {
-				m.messages = append(m.messages, Message{Role: "error", Content: "clipboard: " + err.Error(), Timestamp: time.Now()})
+				m.messages = append(m.messages, Message{Role: roleError, Content: "clipboard: " + err.Error(), Timestamp: time.Now()})
 			}
 		}
-		m.input.SetValue("")
-		if cleanup {
-			m.commandPicker.Deactivate()
-		}
-		return m, nil, true
 	case "/compact":
-		m.input.SetValue("")
-		if cleanup {
-			m.commandPicker.Deactivate()
-		}
-		if teaCmd := m.startCompact(); teaCmd != nil {
-			return m, teaCmd, true
-		}
-		return m, nil, true
+		teaCmd = m.startCompact()
+	default:
+		return m, nil, false
 	}
-	return m, nil, false
+	m.input.SetValue("")
+	if cleanup {
+		m.commandPicker.Deactivate()
+	}
+	return m, teaCmd, true
 }
 
 // submitPrompt builds the submission command for the current input value.
@@ -350,7 +320,7 @@ func (m *Model) submitPrompt() tea.Cmd {
 	expandedInput := expandMentions(rawInput)
 	m.promptHistory.Add(rawInput)
 	// Show the original message in the UI (preserves @mentions).
-	m.messages = append(m.messages, Message{Role: "user", Content: rawInput, Timestamp: time.Now()})
+	m.messages = append(m.messages, Message{Role: roleUser, Content: rawInput, Timestamp: time.Now()})
 	m.pendingPrompt = expandedInput
 	var cmds []tea.Cmd
 	if cmd := m.commitUpTo(len(m.messages)); cmd != nil {
@@ -361,8 +331,6 @@ func (m *Model) submitPrompt() tea.Cmd {
 	m.state = StateLoading
 	m.scrollToBottom = true
 	m.syncViewportHeight()
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
 	// Start elapsed timer.
 	m.wasCancelled = false
 	m.timer = timer.NewWithInterval(24*time.Hour, time.Second)
@@ -373,14 +341,14 @@ func (m *Model) submitPrompt() tea.Cmd {
 	toolCallCh := make(chan ToolCallMsg, 10)
 	m.toolCallCh = toolCallCh
 	var approvalCh chan ToolApprovalRequestMsg
-	if !m.apeMode {
+	if !m.autoApprove {
 		approvalCh = make(chan ToolApprovalRequestMsg, 1)
 	}
 	m.approvalCh = approvalCh
 	tokenCh := make(chan PartialResponseMsg, 64)
 	m.tokenCh = tokenCh
 	m.streaming = true
-	cmd, cancel := SendPromptCmdWithTimeout(m.client, m.apiMessages, expandedInput, APITimeout, toolCallCh, approvalCh, tokenCh, retryCh)
+	cmd, cancel := SendPromptCmdWithTimeout(m.client, m.apiMessages, expandedInput, APITimeout, SendPromptOpts{ToolCallCh: toolCallCh, ApprovalCh: approvalCh, TokenCh: tokenCh, RetryCh: retryCh})
 	m.cancelFn = cancel
 	cmds = append(cmds, cmd, m.spinner.Tick, m.timer.Init(), waitForRetry(retryCh), waitForToolCall(toolCallCh), waitForToken(tokenCh))
 	if approvalCh != nil {
@@ -405,8 +373,6 @@ func (m Model) handleDefaultKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			default:
 				m.searchBar.SetQuery(m.searchBar.Query()+string(msg.Runes), m.messages)
 			}
-			m.viewport.SetContent(m.renderMessages())
-			m.scrollToMatch()
 			return m, nil
 		}
 	}
@@ -421,11 +387,7 @@ func (m Model) handleDefaultKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Exact "/model" typed → show model picker inline (like @file picker).
 			m.commandPicker.Deactivate()
 			m.filePicker.Deactivate()
-			m.modelPicker.SetModels(m.models)
-			if m.client != nil {
-				m.modelPicker.SetCursor(m.client.GetModel())
-			}
-			m.modelPicker.Activate()
+			m.activateModelPicker()
 		} else {
 			m.commandPicker.Activate()
 			m.commandPicker.SetQuery(cmdQuery)

@@ -38,6 +38,22 @@ func (m Model) renderMessageEntry(sw, i int) string {
 // renderMessages returns the styled content string for all messages.
 func (m Model) renderMessages() string {
 	sw := m.messageStyleWidth()
+
+	// Streaming fast path: prior messages were rendered once into renderedPrior on
+	// the first token; only re-render the last (in-flight) message each tick.
+	// Fall back to the full loop when search is active (every message needs a
+	// match prefix) or when the cache is stale (e.g. after a window resize).
+	if m.streaming && m.renderedPriorValid && !m.searchBar.IsActive() {
+		n := len(m.messages)
+		if n == 0 {
+			return m.renderedPrior
+		}
+		var sb strings.Builder
+		sb.WriteString(m.renderedPrior)
+		sb.WriteString(m.renderMessageEntry(sw, n-1))
+		return sb.String()
+	}
+
 	var sb strings.Builder
 	for i := m.printedCount; i < len(m.messages); i++ {
 		sb.WriteString(m.renderMessageEntry(sw, i))
@@ -67,9 +83,9 @@ func (m *Model) commitUpTo(n int) tea.Cmd {
 // renderSingleMessage returns the styled string for one message (without timestamp).
 func (m Model) renderSingleMessage(sw int, msg Message) string {
 	switch msg.Role {
-	case "user":
+	case roleUser:
 		return RenderUserBlock(sw, msg.Content)
-	case "assistant":
+	case roleAssistant:
 		md := strings.TrimRight(RenderMarkdown(msg.Content, sw-8), "\n")
 		modelName := ""
 		if m.client != nil {
@@ -79,14 +95,14 @@ func (m Model) renderSingleMessage(sw int, msg Message) string {
 			return RenderAssistantBlock(sw, modelName, md)
 		}
 		return AssistantMessageStyle(sw).Render(md)
-	case "tool":
+	case roleTool:
 		content := msg.Content
 		if msg.Collapsed {
 			lines := strings.Split(content, "\n")
 			content = fmt.Sprintf("%s\n[%d lines hidden — ctrl+t to expand]", lines[0], len(lines)-1)
 		}
 		return RenderToolBlock(sw, msg.ToolName, content)
-	case "system":
+	case roleSystem:
 		return SystemMessageStyle(sw).Render(msg.Content)
 	default:
 		return ErrorMessageStyle(sw).Render(msg.Content)
@@ -104,7 +120,7 @@ func (m Model) renderStatusBar() string {
 	modelSeg := StatusBarModelStyle().Render(model)
 
 	var apeSeg string
-	if m.apeMode {
+	if m.autoApprove {
 		apeSeg = ApeModeActiveStyle().Render("ape mode: on")
 	} else {
 		apeSeg = ApeModeInactiveStyle().Render("ape mode: off")
@@ -148,23 +164,4 @@ func formatRetryLabel(attempt int, reason string) string {
 		return fmt.Sprintf("retrying: %s (%d)", reason, attempt)
 	}
 	return fmt.Sprintf("retrying (%d)", attempt)
-}
-
-// scrollToMatch sets the viewport Y offset so the current search match is visible.
-// It estimates line positions by rendering each message in sequence.
-func (m *Model) scrollToMatch() {
-	idx := m.searchBar.CurrentMatchIndex()
-	if idx < 0 {
-		return
-	}
-	sw := m.messageStyleWidth()
-	line := 0
-	for i, msg := range m.messages {
-		if i == idx {
-			break
-		}
-		rendered := m.renderSingleMessage(sw, msg)
-		line += strings.Count(rendered, "\n") + 2 // +1 timestamp line, +1 gap
-	}
-	m.viewport.SetYOffset(line)
 }

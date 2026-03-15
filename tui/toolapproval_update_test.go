@@ -316,7 +316,7 @@ func TestUpdate_ToolApprovalDialog_Yes_WithApprovalCh_ReturnsWaitCmd(t *testing.
 
 func TestUpdate_ToolApprovalRequestMsg_ApeMode_AutoApproves(t *testing.T) {
 	model := NewModel(nil)
-	model.apeMode = true
+	model.autoApprove = true
 	ch := make(chan bool, 1)
 	_, _ = model.Update(ToolApprovalRequestMsg{ModelName: "m", ToolName: "bash", ResponseCh: ch})
 	select {
@@ -451,7 +451,7 @@ func TestUpdate_ToolApprovalRequestMsg_GrepTool_DefaultsPathToDot(t *testing.T) 
 
 func TestUpdate_ToolApprovalRequestMsg_ApeMode_WithApprovalCh_ReturnsWaitCmd(t *testing.T) {
 	model := NewModel(nil)
-	model.apeMode = true
+	model.autoApprove = true
 	approvalCh := make(chan ToolApprovalRequestMsg, 1)
 	model.approvalCh = approvalCh
 	ch := make(chan bool, 1)

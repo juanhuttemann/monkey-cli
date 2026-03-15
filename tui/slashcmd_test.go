@@ -111,6 +111,13 @@ func TestParseSlashCommand_Multiline_NotOk(t *testing.T) {
 	}
 }
 
+func TestParseSlashCommand_LoneSlash_IsNotOk(t *testing.T) {
+	_, ok := parseSlashCommand("/")
+	if ok {
+		t.Error("ok = true for bare '/', want false — a lone slash is not a slash command")
+	}
+}
+
 func TestParseSlashCommand_Unknown(t *testing.T) {
 	cmd, ok := parseSlashCommand("/unknown")
 	if !ok {

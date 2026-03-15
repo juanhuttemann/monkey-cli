@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -492,7 +493,7 @@ func TestBuildDynamicContext_IncludesGitBranch_WhenInRepo(t *testing.T) {
 
 func TestRun_EmptyPrompt_LaunchesTUI(t *testing.T) {
 	tuiLaunched := false
-	run("", func() { tuiLaunched = true })
+	_ = run("", func() { tuiLaunched = true }, io.Discard)
 
 	if !tuiLaunched {
 		t.Error("run('') should launch TUI when prompt is empty")
@@ -501,7 +502,7 @@ func TestRun_EmptyPrompt_LaunchesTUI(t *testing.T) {
 
 func TestRun_WhitespacePrompt_LaunchesTUI(t *testing.T) {
 	tuiLaunched := false
-	run("   \t\n  ", func() { tuiLaunched = true })
+	_ = run("   \t\n  ", func() { tuiLaunched = true }, io.Discard)
 
 	if !tuiLaunched {
 		t.Error("run('   ') should launch TUI when prompt is whitespace-only")
@@ -514,32 +515,83 @@ func TestRun_WithPrompt_DoesNotLaunchTUI(t *testing.T) {
 	defer setupTestEnv("test-key", server.URL, "test-model")()
 
 	tuiLaunched := false
-	run("ping", func() { tuiLaunched = true })
+	_ = run("ping", func() { tuiLaunched = true }, io.Discard)
 
 	if tuiLaunched {
 		t.Error("run('ping') should not launch TUI when prompt is provided")
 	}
 }
 
-func TestRun_WithPrompt_PrintsResponse(t *testing.T) {
+func TestRun_WithPrompt_WritesResponseToWriter(t *testing.T) {
 	server, cleanup := createMockServer(successResponse("hello back"), 200)
 	defer cleanup()
 	defer setupTestEnv("test-key", server.URL, "test-model")()
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	run("hello", func() {})
-
-	_ = w.Close()
-	os.Stdout = oldStdout
-
 	var buf strings.Builder
-	_, _ = io.Copy(&buf, r)
+	if err := run("hello", func() {}, &buf); err != nil {
+		t.Fatalf("run() returned error: %v", err)
+	}
 
 	if !strings.Contains(buf.String(), "hello back") {
 		t.Errorf("run() output = %q, want to contain %q", buf.String(), "hello back")
+	}
+}
+
+func TestRun_WithPrompt_ReturnsErrorWhenAPIFails(t *testing.T) {
+	server, cleanup := createMockServer(`{"type":"error","error":{"type":"api_error","message":"internal server error"}}`, 500)
+	defer cleanup()
+	defer setupTestEnv("test-key", server.URL, "test-model")()
+
+	err := run("hello", func() {}, io.Discard)
+	if err == nil {
+		t.Error("run() should return error when API call fails")
+	}
+}
+
+func TestSendPromptWithContext_CancelledContext_ReturnsError(t *testing.T) {
+	// Server that hangs until the request is cancelled.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	t.Setenv("ANTHROPIC_API_KEY", "test-api-key")
+	t.Setenv("ANTHROPIC_BASE_URL", server.URL)
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "test-model")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel
+
+	_, err := sendPromptWithContext(ctx, "hello")
+	if err == nil {
+		t.Fatal("sendPromptWithContext() should return error when context is cancelled")
+	}
+}
+
+func TestSaveSessionWithWarning_Success_NoOutput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.json")
+
+	var buf strings.Builder
+	saveSessionWithWarning(&buf, path, "test-model", nil, nil)
+
+	if buf.Len() != 0 {
+		t.Errorf("saveSessionWithWarning on success wrote to stderr: %q", buf.String())
+	}
+}
+
+func TestSaveSessionWithWarning_Failure_WritesWarning(t *testing.T) {
+	// Place a directory at the target path so WriteFile fails.
+	dir := t.TempDir()
+	target := filepath.Join(dir, "session.json")
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf strings.Builder
+	saveSessionWithWarning(&buf, target, "model", nil, nil)
+
+	if !strings.Contains(buf.String(), "warning") {
+		t.Errorf("saveSessionWithWarning on failure should write a warning, got: %q", buf.String())
 	}
 }
